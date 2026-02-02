@@ -1,0 +1,11 @@
+{
+  "length": 91,
+  "name": "error",
+  "severity": "ERROR",
+  "code": "42601",
+  "position": "374",
+  "file": "scan.l",
+  "line": "1244",
+  "routine": "scanner_yyerror"
+}
+error: syntax error at or near ";"
