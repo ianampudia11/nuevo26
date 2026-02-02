@@ -160,6 +160,22 @@ router.get('/', ensureAuthenticated, requirePermission(PERMISSIONS.MANAGE_TEMPLA
 
     const formattedTemplates = templates.map(({ template, connection }) => {
       const connectionData = connection?.connectionData as any;
+      
+
+      if (connectionData) {
+        logger.info('whatsapp-templates', 'Template connection data structure', {
+          templateId: template.id,
+          templateName: template.name,
+          connectionId: connection?.id,
+          connectionDataKeys: Object.keys(connectionData),
+          hasWabaId: !!(connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id),
+          hasAccessToken: !!(connectionData.accessToken || connectionData.access_token),
+          hasAppId: !!(connectionData.appId || connectionData.app_id),
+          partnerManaged: connectionData.partnerManaged === true,
+          phoneNumberId: connectionData.phoneNumberId || connectionData.phone_number_id
+        });
+      }
+      
       return {
         ...template,
         connection: connection ? {
@@ -303,10 +319,60 @@ router.post('/', ensureAuthenticated, requirePermission(PERMISSIONS.MANAGE_TEMPL
 
 
     const connectionData = whatsappChannel.connectionData as any;
-    const wabaId = connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id;
-    const accessToken = connectionData.accessToken || connectionData.access_token;
+    
+
+    logger.info('whatsapp-templates', 'Connection data structure for template creation', {
+      connectionId,
+      connectionDataKeys: Object.keys(connectionData || {}),
+      connectionData: {
+        wabaId: connectionData?.wabaId,
+        businessAccountId: connectionData?.businessAccountId,
+        waba_id: connectionData?.waba_id,
+        accessToken: connectionData?.accessToken ? '***REDACTED***' : undefined,
+        access_token: connectionData?.access_token ? '***REDACTED***' : undefined,
+        appId: connectionData?.appId,
+        app_id: connectionData?.app_id,
+        phoneNumberId: connectionData?.phoneNumberId,
+        phone_number_id: connectionData?.phone_number_id,
+        partnerManaged: connectionData?.partnerManaged
+      }
+    });
+    
+    let wabaId = connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id;
+    let accessToken = connectionData.accessToken || connectionData.access_token;
     const phoneNumberId = connectionData.phoneNumberId || connectionData.phone_number_id;
-    const appId = connectionData.appId || connectionData.app_id;
+    let appId = connectionData.appId || connectionData.app_id;
+    const partnerManaged = connectionData.partnerManaged === true;
+    
+
+    if (partnerManaged && (!appId || !accessToken)) {
+      try {
+        const partnerConfig = await storage.getPartnerConfiguration('meta');
+        if (partnerConfig) {
+          logger.info('whatsapp-templates', 'Using partner configuration for template creation', {
+            connectionId,
+            hadAppId: !!appId,
+            hadAccessToken: !!accessToken,
+            partnerConfigHasAppId: !!partnerConfig.partnerApiKey,
+            partnerConfigHasAccessToken: !!partnerConfig.accessToken
+          });
+          
+          if (!appId && partnerConfig.partnerApiKey) {
+            appId = partnerConfig.partnerApiKey;
+          }
+
+
+          if (!accessToken && partnerConfig.accessToken) {
+            accessToken = partnerConfig.accessToken;
+          }
+        }
+      } catch (partnerConfigError: any) {
+        logger.error('whatsapp-templates', 'Error fetching partner configuration', {
+          connectionId,
+          error: partnerConfigError.message
+        });
+      }
+    }
 
     logger.info('whatsapp-templates', 'Connection credentials', {
       hasWabaId: !!wabaId,
@@ -316,7 +382,11 @@ router.post('/', ensureAuthenticated, requirePermission(PERMISSIONS.MANAGE_TEMPL
       phoneNumberId: phoneNumberId,
       hasAppId: !!appId,
       appId: appId,
-      connectionDataKeys: Object.keys(connectionData || {})
+      partnerManaged,
+      connectionDataKeys: Object.keys(connectionData || {}),
+      tokenSource: partnerManaged && accessToken !== (connectionData.accessToken || connectionData.access_token) 
+        ? 'partner-config' 
+        : 'connection'
     });
 
     if (!wabaId || !accessToken) {
@@ -797,6 +867,9 @@ router.post('/:id/sync-status', ensureAuthenticated, async (req, res) => {
  * POST /api/whatsapp-templates/sync-from-meta
  */
 router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
+  let whatsappChannel: any[] | null = null;
+  let fetchMethod: 'business' | 'waba' | 'unknown' = 'unknown'; // Track which fetch method was used
+  
   try {
     const user = (req as any).user;
     const { connectionId } = req.body;
@@ -810,7 +883,7 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
     }
 
 
-    const whatsappChannel = await db
+    whatsappChannel = await db
       .select()
       .from(channelConnections)
       .where(
@@ -832,33 +905,448 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
     }
 
     const connectionData = whatsappChannel[0].connectionData as any;
-    const wabaId = connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id;
-    const accessToken = connectionData.accessToken || connectionData.access_token;
+    
 
-    if (!wabaId || !accessToken) {
-      return res.status(400).json({
-        error: 'WhatsApp Business Account ID or access token not found in connection'
+    logger.info('whatsapp-templates', 'Connection data structure for template sync', {
+      connectionId,
+      connectionDataKeys: Object.keys(connectionData || {}),
+      connectionData: {
+        wabaId: connectionData?.wabaId,
+        businessAccountId: connectionData?.businessAccountId,
+        waba_id: connectionData?.waba_id,
+        accessToken: connectionData?.accessToken ? '***REDACTED***' : undefined,
+        access_token: connectionData?.access_token ? '***REDACTED***' : undefined,
+        appId: connectionData?.appId,
+        app_id: connectionData?.app_id,
+        phoneNumberId: connectionData?.phoneNumberId,
+        phone_number_id: connectionData?.phone_number_id,
+        partnerManaged: connectionData?.partnerManaged
+      }
+    });
+    
+    let wabaId = connectionData.wabaId || connectionData.businessAccountId || connectionData.waba_id;
+    const originalAccessToken = connectionData.accessToken || connectionData.access_token;
+    let accessToken = originalAccessToken;
+    const appId = connectionData.appId || connectionData.app_id;
+    const partnerManaged = connectionData.partnerManaged === true;
+    const businessId = connectionData.businessId; // Extract business_id for business-level template fetching
+    let tokenSource: 'connection' | 'partner-config' = 'connection';
+    
+
+    
+
+    if (partnerManaged) {
+      logger.info('whatsapp-templates', 'Detected embedded signup (partner-managed) connection', {
+        connectionId,
+        hasConnectionToken: !!accessToken,
+        wabaId,
+        hasBusinessId: !!businessId
       });
     }
+    
 
+    if (partnerManaged || !accessToken) {
+      try {
+        const partnerConfig = await storage.getPartnerConfiguration('meta');
+        if (partnerConfig?.accessToken) {
+
+          if (accessToken !== partnerConfig.accessToken) {
+            tokenSource = 'partner-config';
+            logger.info('whatsapp-templates', 'Using partner configuration access token', {
+              connectionId,
+              partnerManaged,
+              hadConnectionToken: !!accessToken,
+              usingPartnerToken: true,
+              tokenSource: 'partner-config'
+            });
+            accessToken = partnerConfig.accessToken;
+          } else {
+            logger.info('whatsapp-templates', 'Partner config token matches connection token', {
+              connectionId,
+              partnerManaged,
+              tokenSource: 'connection'
+            });
+          }
+        } else if (!accessToken) {
+          logger.warn('whatsapp-templates', 'No access token found in connection or partner config', {
+            connectionId,
+            partnerManaged,
+            hasPartnerConfig: !!partnerConfig
+          });
+        }
+      } catch (partnerConfigError: any) {
+        logger.error('whatsapp-templates', 'Error fetching partner configuration', {
+          connectionId,
+          error: partnerConfigError.message
+        });
+      }
+    }
+
+    if (!wabaId || !accessToken) {
+      const errorMessage = partnerManaged 
+        ? 'WhatsApp Business Account ID or access token not found. Embedded signup connections may require system-level access token in partner configuration.'
+        : 'WhatsApp Business Account ID or access token not found in connection';
+      
+      logger.error('whatsapp-templates', 'Missing credentials for template sync', {
+        connectionId,
+        hasWabaId: !!wabaId,
+        hasAccessToken: !!accessToken,
+        partnerManaged
+      });
+      
+      return res.status(400).json({
+        error: errorMessage
+      });
+    }
+    
+
+    const safeTokenPrefix = (typeof accessToken === 'string' && accessToken.length > 0)
+      ? accessToken.slice(0, 10) + '...'
+      : 'UNKNOWN';
+    
     logger.info('whatsapp-templates', 'Fetching templates from Meta API', {
       wabaId,
-      connectionId
+      connectionId,
+      tokenSource,
+      tokenPrefix: safeTokenPrefix,
+      partnerManaged,
+      hasAppId: !!appId
     });
 
 
-    const templatesUrl = `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${wabaId}/message_templates?fields=id,name,status,category,language,components&limit=250`;
-    const response = await axios.get(templatesUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      timeout: 30000,
-    });
+    let metaTemplates: any[] = [];
+    fetchMethod = 'waba'; // Initialize to default, will be updated based on which method succeeds
 
-    const metaTemplates = response.data?.data || [];
+    if (partnerManaged && businessId) {
+      try {
+        logger.info('whatsapp-templates', 'Attempting business-level template fetch', {
+          businessId,
+          wabaId,
+          connectionId
+        });
 
-    logger.info('whatsapp-templates', 'Fetched templates from Meta', {
-      count: metaTemplates.length
+        const businessTemplatesUrl = `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${businessId}/message_templates?fields=id,name,status,category,language,components&limit=250`;
+        
+        const businessResponse = await axios.get(businessTemplatesUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          timeout: 30000,
+        });
+
+        if (businessResponse.data?.data && businessResponse.data.data.length > 0) {
+          metaTemplates = businessResponse.data.data;
+          fetchMethod = 'business';
+          logger.info('whatsapp-templates', 'Successfully fetched templates from business', {
+            count: metaTemplates.length,
+            businessId,
+            fetchUrl: businessTemplatesUrl.replace(accessToken, 'REDACTED'),
+            connectionType: 'embedded-signup',
+            firstTemplate: metaTemplates.length > 0 ? {
+              id: metaTemplates[0].id,
+              name: metaTemplates[0].name,
+              status: metaTemplates[0].status
+            } : null
+          });
+        } else {
+
+          throw new Error('Business endpoint returned no templates');
+        }
+      } catch (businessFetchError: any) {
+        logger.warn('whatsapp-templates', 'Business-level fetch failed, falling back to WABA', {
+          businessId,
+          wabaId,
+          error: businessFetchError.message,
+          statusCode: businessFetchError.response?.status,
+          errorDetails: businessFetchError.response?.data
+        });
+
+      }
+    }
+
+
+    if (metaTemplates.length === 0) {
+
+      const templatesUrl = `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${wabaId}/message_templates?fields=id,name,status,category,language,components&limit=250`;
+      logger.info('whatsapp-templates', 'Meta API request details (WABA-level)', {
+        url: templatesUrl.replace(accessToken, 'REDACTED'),
+        wabaId,
+        apiVersion: WHATSAPP_API_VERSION,
+        tokenSource,
+        partnerManaged,
+        wasBusinessFetchAttempted: partnerManaged && !!businessId,
+        reason: partnerManaged && !businessId 
+          ? 'No businessId in connectionData' 
+          : partnerManaged && businessId 
+            ? 'Business fetch failed or returned no templates' 
+            : 'Not a partner-managed connection',
+        businessIdAvailable: !!businessId
+      });
+
+      let response;
+      try {
+        response = await axios.get(templatesUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          timeout: 30000,
+        });
+
+        metaTemplates = response.data?.data || [];
+        fetchMethod = 'waba';
+
+
+        logger.info('whatsapp-templates', 'Fetched templates from Meta (WABA-level)', {
+          count: metaTemplates.length,
+          responseStatus: response.status,
+          hasData: !!response.data?.data,
+          firstTemplate: metaTemplates.length > 0 ? {
+            id: metaTemplates[0].id,
+            name: metaTemplates[0].name,
+            status: metaTemplates[0].status,
+            category: metaTemplates[0].category
+          } : null
+        });
+      } catch (apiError: any) {
+
+        const errorStatus = apiError.response?.status;
+        const errorData = apiError.response?.data;
+        const errorMessage = errorData?.error?.message || apiError.message;
+        const errorCode = errorData?.error?.code;
+        const errorType = errorData?.error?.type;
+        const errorSubcode = errorData?.error?.error_subcode;
+      
+
+
+        const isBusinessNodeError = errorCode === 100 && errorMessage && 
+            errorMessage.includes('message_templates') && 
+            (errorMessage.toLowerCase().includes('business') || 
+             errorMessage.toLowerCase().includes('node type'));
+        
+        if (isBusinessNodeError) {
+          logger.info('whatsapp-templates', 'Detected code 100 error - treating wabaId as Business Manager ID', {
+            connectionId,
+            currentWabaId: wabaId,
+            errorMessage,
+            errorCode
+          });
+
+          try {
+
+            const businessManagerId = wabaId;
+            let resolvedWabaId: string | null = null;
+
+
+            try {
+              const ownedWabaUrl = `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${businessManagerId}/owned_whatsapp_business_accounts?access_token=${accessToken}`;
+              logger.info('whatsapp-templates', 'Attempting to resolve WABA from owned accounts', {
+                businessManagerId,
+                url: ownedWabaUrl.replace(accessToken, 'REDACTED')
+              });
+
+              const ownedResponse = await axios.get(ownedWabaUrl, {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                },
+                timeout: 30000,
+              });
+
+              if (ownedResponse.data?.data && Array.isArray(ownedResponse.data.data) && ownedResponse.data.data.length > 0) {
+                resolvedWabaId = ownedResponse.data.data[0].id;
+                logger.info('whatsapp-templates', 'Resolved WABA ID from owned accounts', {
+                  businessManagerId,
+                  resolvedWabaId
+                });
+              }
+            } catch (ownedError: any) {
+              logger.warn('whatsapp-templates', 'Failed to fetch owned WABA accounts', {
+                businessManagerId,
+                error: ownedError.message,
+                statusCode: ownedError.response?.status
+              });
+            }
+
+
+            if (!resolvedWabaId) {
+              try {
+                const clientWabaUrl = `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${businessManagerId}/client_whatsapp_business_accounts?access_token=${accessToken}`;
+                logger.info('whatsapp-templates', 'Attempting to resolve WABA from client accounts', {
+                  businessManagerId,
+                  url: clientWabaUrl.replace(accessToken, 'REDACTED')
+                });
+
+                const clientResponse = await axios.get(clientWabaUrl, {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                  },
+                  timeout: 30000,
+                });
+
+                if (clientResponse.data?.data && Array.isArray(clientResponse.data.data) && clientResponse.data.data.length > 0) {
+                  resolvedWabaId = clientResponse.data.data[0].id;
+                  logger.info('whatsapp-templates', 'Resolved WABA ID from client accounts', {
+                    businessManagerId,
+                    resolvedWabaId
+                  });
+                }
+              } catch (clientError: any) {
+                logger.warn('whatsapp-templates', 'Failed to fetch client WABA accounts', {
+                  businessManagerId,
+                  error: clientError.message,
+                  statusCode: clientError.response?.status
+                });
+              }
+            }
+
+
+            if (resolvedWabaId) {
+              logger.info('whatsapp-templates', 'Updating connection data with resolved WABA ID', {
+                connectionId,
+                oldWabaId: wabaId,
+                newWabaId: resolvedWabaId,
+                businessManagerId
+              });
+
+
+              const updatedConnectionData = {
+                ...connectionData,
+                wabaId: resolvedWabaId,
+                businessAccountId: resolvedWabaId,
+                waba_id: resolvedWabaId,
+                businessId: businessManagerId // Also store the Business Manager ID for future reference
+              };
+
+              await storage.updateChannelConnection(connectionId, {
+                connectionData: updatedConnectionData
+              });
+
+
+              logger.info('whatsapp-templates', 'Retrying template fetch with resolved WABA ID', {
+                connectionId,
+                resolvedWabaId
+              });
+
+              const retryTemplatesUrl = `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${resolvedWabaId}/message_templates?fields=id,name,status,category,language,components&limit=250`;
+              const retryResponse = await axios.get(retryTemplatesUrl, {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                },
+                timeout: 30000,
+              });
+
+              metaTemplates = retryResponse.data?.data || [];
+              fetchMethod = 'waba';
+              
+
+              wabaId = resolvedWabaId;
+              
+              logger.info('whatsapp-templates', 'Successfully fetched templates after WABA ID resolution', {
+                count: metaTemplates.length,
+                originalBusinessManagerId: businessManagerId,
+                resolvedWabaId
+              });
+
+
+            } else {
+
+              logger.error('whatsapp-templates', 'Could not resolve WABA ID from Business Manager', {
+                connectionId,
+                businessManagerId: wabaId,
+                errorMessage
+              });
+
+              return res.status(400).json({
+                error: 'Unable to resolve WhatsApp Business Account ID. The provided ID appears to be a Business Manager ID. Please reconnect your WhatsApp account to ensure the correct WABA ID is stored.',
+                details: errorMessage,
+                errorCode,
+                errorType,
+                errorSubcode,
+                partnerManaged,
+                fetchMethod: 'waba',
+                suggestion: 'Please disconnect and reconnect your WhatsApp account to update the connection with the correct WABA ID.'
+              });
+            }
+          } catch (resolutionError: any) {
+            logger.error('whatsapp-templates', 'Error during WABA ID resolution fallback', {
+              connectionId,
+              businessManagerId: wabaId,
+              error: resolutionError.message,
+              stack: resolutionError.stack
+            });
+
+            return res.status(500).json({
+              error: 'Failed to resolve WhatsApp Business Account ID. Please reconnect your WhatsApp account.',
+              details: resolutionError.message,
+              errorCode,
+              errorType,
+              errorSubcode,
+              partnerManaged,
+              fetchMethod: 'waba'
+            });
+          }
+        } else {
+
+          logger.error('whatsapp-templates', 'Meta API error during template fetch (WABA-level)', {
+            connectionId,
+            wabaId,
+            statusCode: errorStatus,
+            errorMessage,
+            errorCode,
+            errorType,
+            errorSubcode,
+            fullErrorResponse: JSON.stringify(errorData, null, 2),
+            partnerManaged,
+            tokenSource,
+            wasBusinessFetchAttempted: partnerManaged && !!businessId,
+            suggestions: {
+              invalidToken: errorStatus === 401 ? 'Access token may be invalid or expired' : null,
+              insufficientPermissions: errorStatus === 403 ? 'Access token may lack whatsapp_business_management permission scope' : null,
+              wabaNotFound: errorStatus === 404 ? 'WABA ID may be incorrect or account not found' : null,
+              partnerManagedIssue: partnerManaged && (errorStatus === 401 || errorStatus === 403) 
+                ? 'Embedded signup connections may require system-level access token. Please verify partner configuration has valid token with template management permissions.'
+                : null
+            }
+          });
+        
+
+          let userFriendlyError = 'Failed to sync templates from Meta';
+          if (errorStatus === 401) {
+            userFriendlyError = partnerManaged
+              ? 'Authentication failed. Embedded signup connections may require system-level access token. Please verify partner configuration.'
+              : 'Authentication failed. Access token may be invalid or expired.';
+          } else if (errorStatus === 403) {
+            userFriendlyError = partnerManaged
+              ? 'Permission denied. Embedded signup connections may require system-level access token with whatsapp_business_management permission scope. Please verify partner configuration.'
+              : 'Permission denied. Access token may lack required permissions for template management.';
+          } else if (errorStatus === 404) {
+            userFriendlyError = 'WhatsApp Business Account not found. Please verify the connection configuration.';
+          } else if (errorMessage) {
+            userFriendlyError = `Failed to sync templates: ${errorMessage}`;
+          }
+          
+          return res.status(errorStatus || 500).json({
+            error: userFriendlyError,
+            details: errorMessage,
+            errorCode,
+            errorType,
+            errorSubcode,
+            partnerManaged,
+            fetchMethod: 'waba'
+          });
+        }
+      }
+    }
+
+
+    logger.info('whatsapp-templates', 'Template fetch completed', {
+      method: fetchMethod,
+      count: metaTemplates.length,
+      connectionId,
+      businessId: fetchMethod === 'business' ? businessId : undefined,
+      wabaId: fetchMethod === 'waba' ? wabaId : undefined,
+      recommendation: fetchMethod === 'waba' && partnerManaged && !businessId 
+        ? 'Connection missing businessId - may show incomplete templates. Reconnect to fix.' 
+        : null
     });
 
     let createdCount = 0;
@@ -1073,13 +1561,53 @@ router.post('/sync-from-meta', ensureAuthenticated, async (req, res) => {
         created: createdCount,
         updated: updatedCount,
         skipped: skippedCount
-      }
+      },
+      connectionType: {
+        partnerManaged: partnerManaged || false
+      },
+      fetchMethod: fetchMethod // Include fetch method for frontend display
     });
   } catch (error: any) {
-    logger.error('whatsapp-templates', 'Error syncing templates from Meta:', error);
-    res.status(500).json({
-      error: 'Failed to sync templates from Meta',
-      details: error.message
+
+
+    let connectionData: any = null;
+    let partnerManaged = false;
+    try {
+      if (whatsappChannel && whatsappChannel.length > 0) {
+        connectionData = whatsappChannel[0].connectionData as any;
+        partnerManaged = connectionData?.partnerManaged === true;
+      }
+    } catch {
+
+    }
+    
+    logger.error('whatsapp-templates', 'Error syncing templates from Meta', {
+      connectionId: req.body?.connectionId,
+      error: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status,
+      partnerManaged,
+      hasConnectionData: !!connectionData
+    });
+    
+
+    let errorMessage = 'Failed to sync templates from Meta';
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      errorMessage = partnerManaged
+        ? 'Authentication or permission error. Embedded signup connections may require system-level access token. Please verify partner configuration.'
+        : 'Authentication or permission error. Please verify the connection has valid credentials with template management permissions.';
+    } else if (error.message) {
+      errorMessage = `Failed to sync templates: ${error.message}`;
+    }
+    
+    res.status(error.response?.status || 500).json({
+      error: errorMessage,
+      details: error.message,
+      errorCode: error.response?.data?.error?.code,
+      errorType: error.response?.data?.error?.type,
+      partnerManaged,
+      fetchMethod // Include fetch method for frontend error handling
     });
   }
 });

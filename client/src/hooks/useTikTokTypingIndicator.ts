@@ -1,58 +1,69 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
 
-
-const useWebSocket = () => {
-  return {
-    socket: null,
-    subscribe: (_event: string, _callback: (data: any) => void) => {
-
-      return () => {};
-    }
-  };
-};
+const TYPING_ENDPOINT_BASE = '/api/tiktok/conversations';
+const MIN_RETRY_DELAY = 1000;
+const MAX_RETRY_DELAY = 30000;
+const BACKOFF_MULTIPLIER = 2;
 
 interface TypingIndicatorOptions {
   conversationId: number;
   enabled?: boolean;
   debounceMs?: number;
+  hasImChatScope?: boolean;
 }
 
 /**
- * Hook for managing TikTok typing indicators
- * Automatically sends typing status when user is typing
+ * Hook for managing TikTok typing indicators (Business Messaging API).
+ * Sends typing status via REST; capability check disables when connection lacks im.chat scope.
  */
 export function useTikTokTypingIndicator({
   conversationId,
   enabled = true,
-  debounceMs = 1000
+  debounceMs = 1000,
+  hasImChatScope = true
 }: TypingIndicatorOptions) {
-  const { socket: _socket } = useWebSocket();
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingRef = useRef(false);
+  const retryDelayRef = useRef(MIN_RETRY_DELAY);
 
-  /**
-   * Start typing indicator
-   */
-  const startTyping = useCallback(async () => {
-    if (!enabled || !conversationId) return;
-
+  const callTypingApi = useCallback(async (isTyping: boolean): Promise<boolean> => {
     try {
-
-      await fetch(`/api/tiktok/typing/${conversationId}`, {
+      const response = await fetch(`${TYPING_ENDPOINT_BASE}/${conversationId}/typing`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ isTyping: true })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isTyping })
       });
 
-      isTypingRef.current = true;
+      if (response.ok) {
+        retryDelayRef.current = MIN_RETRY_DELAY;
+        return true;
+      }
 
+      if (response.status === 403) {
+
+        return false;
+      }
+
+      throw new Error(`HTTP ${response.status}`);
+    } catch (_err) {
+      const nextDelay = Math.min(retryDelayRef.current * BACKOFF_MULTIPLIER, MAX_RETRY_DELAY);
+      retryDelayRef.current = nextDelay;
+      return false;
+    }
+  }, [conversationId]);
+
+  const startTyping = useCallback(async () => {
+    if (!enabled || !conversationId || !hasImChatScope) return;
+
+    try {
+      const ok = await callTypingApi(true);
+      if (!ok) return;
+
+      isTypingRef.current = true;
 
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-
 
       typingTimeoutRef.current = setTimeout(() => {
         stopTyping();
@@ -60,47 +71,29 @@ export function useTikTokTypingIndicator({
     } catch (error) {
       console.error('Error starting typing indicator:', error);
     }
-  }, [conversationId, enabled, debounceMs]);
+  }, [conversationId, enabled, debounceMs, hasImChatScope, callTypingApi]);
 
-  /**
-   * Stop typing indicator
-   */
   const stopTyping = useCallback(async () => {
     if (!enabled || !conversationId || !isTypingRef.current) return;
 
     try {
-
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
       }
 
-
-      await fetch(`/api/tiktok/typing/${conversationId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ isTyping: false })
-      });
-
+      await callTypingApi(false);
       isTypingRef.current = false;
     } catch (error) {
       console.error('Error stopping typing indicator:', error);
     }
-  }, [conversationId, enabled]);
+  }, [conversationId, enabled, callTypingApi]);
 
-  /**
-   * Handle input change - debounced typing indicator
-   */
   const handleInputChange = useCallback(() => {
     if (!enabled) return;
     startTyping();
   }, [enabled, startTyping]);
 
-  /**
-   * Cleanup on unmount
-   */
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) {
@@ -120,123 +113,43 @@ export function useTikTokTypingIndicator({
 }
 
 /**
- * Hook for listening to typing indicators from other users
+ * Hook for listening to typing indicators from other users.
+ * TikTok Business Messaging API does not provide real-time typing events; returns empty state.
  */
-export function useTikTokTypingListener(conversationId: number) {
-  const { socket, subscribe } = useWebSocket();
-  const [typingUsers, setTypingUsers] = useState<number[]>([]);
-
-  useEffect(() => {
-    if (!socket || !conversationId) return;
-
-
-    const unsubscribe = subscribe('userTyping', (data: any) => {
-      if (data.conversationId !== conversationId) return;
-
-      setTypingUsers(prev => {
-        if (data.isTyping) {
-
-          if (!prev.includes(data.userId)) {
-            return [...prev, data.userId];
-          }
-          return prev;
-        } else {
-
-          return prev.filter(id => id !== data.userId);
-        }
-      });
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [socket, conversationId, subscribe]);
-
+export function useTikTokTypingListener(_conversationId: number) {
+  const [typingUsers] = useState<number[]>([]);
   return {
     typingUsers,
-    isAnyoneTyping: typingUsers.length > 0
+    isAnyoneTyping: false
   };
 }
 
 /**
- * Hook for managing user presence status
+ * Hook for managing user presence status.
+ * TikTok Business Messaging API does not expose presence; no-op implementation.
  */
 export function useTikTokPresence(conversationId: number) {
-  const { socket, subscribe } = useWebSocket();
-  const [presenceMap, setPresenceMap] = useState<Map<number, {
-    status: 'online' | 'offline' | 'away';
-    lastSeen: Date;
-  }>>(new Map());
+  const [presenceMap] = useState<Map<number, { status: 'online' | 'offline' | 'away'; lastSeen: Date }>>(new Map());
 
-  /**
-   * Update own presence status
-   */
-  const updatePresence = useCallback(async (status: 'online' | 'offline' | 'away') => {
+  const updatePresence = useCallback(async (_status: 'online' | 'offline' | 'away') => {
     if (!conversationId) return;
 
-    try {
-      await fetch(`/api/tiktok/presence/${conversationId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status })
-      });
-    } catch (error) {
-      console.error('Error updating presence:', error);
-    }
   }, [conversationId]);
 
-  /**
-   * Set online when component mounts
-   */
   useEffect(() => {
     updatePresence('online');
-
-
     return () => {
       updatePresence('offline');
     };
   }, [updatePresence]);
 
-  /**
-   * Listen to presence updates from other users
-   */
-  useEffect(() => {
-    if (!socket || !conversationId) return;
-
-    const unsubscribe = subscribe('userPresence', (data: any) => {
-      if (data.conversationId !== conversationId) return;
-
-      setPresenceMap(prev => {
-        const newMap = new Map(prev);
-        newMap.set(data.userId, {
-          status: data.status,
-          lastSeen: new Date(data.lastSeen)
-        });
-        return newMap;
-      });
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [socket, conversationId, subscribe]);
-
-  /**
-   * Get presence for a specific user
-   */
   const getUserPresence = useCallback((userId: number) => {
     return presenceMap.get(userId) || null;
   }, [presenceMap]);
 
-  /**
-   * Check if user is online
-   */
-  const isUserOnline = useCallback((userId: number) => {
-    const presence = presenceMap.get(userId);
-    return presence?.status === 'online';
-  }, [presenceMap]);
+  const isUserOnline = useCallback((_userId: number) => {
+    return false;
+  }, []);
 
   return {
     presenceMap,
@@ -245,4 +158,3 @@ export function useTikTokPresence(conversationId: number) {
     updatePresence
   };
 }
-

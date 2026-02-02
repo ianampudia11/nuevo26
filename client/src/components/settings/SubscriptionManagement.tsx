@@ -194,15 +194,15 @@ export function SubscriptionManagement() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>;
+        return <Badge className="bg-primary/10 text-primary border border-primary/20"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>;
       case 'paused':
-        return <Badge className="bg-blue-100 text-blue-800"><Pause className="w-3 h-3 mr-1" />Paused</Badge>;
+        return <Badge className="bg-secondary/10 text-secondary border border-secondary/20"><Pause className="w-3 h-3 mr-1" />Paused</Badge>;
       case 'grace_period':
-        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" />Grace Period</Badge>;
+        return <Badge className="bg-secondary/10 text-secondary border border-secondary/20"><Clock className="w-3 h-3 mr-1" />Grace Period</Badge>;
       case 'past_due':
-        return <Badge className="bg-red-100 text-red-800"><AlertTriangle className="w-3 h-3 mr-1" />Past Due</Badge>;
+        return <Badge className="bg-destructive/10 text-destructive border border-destructive/20"><AlertTriangle className="w-3 h-3 mr-1" />Past Due</Badge>;
       case 'trial':
-        return <Badge className="bg-purple-100 text-purple-800"><Zap className="w-3 h-3 mr-1" />Trial</Badge>;
+        return <Badge className="bg-accent/10 text-accent border border-accent/20"><Zap className="w-3 h-3 mr-1" />Trial</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -224,15 +224,15 @@ export function SubscriptionManagement() {
   };
 
   const getUsageColor = (percentage: number) => {
-    if (percentage >= 95) return 'text-red-600';
-    if (percentage >= 80) return 'text-yellow-600';
-    return 'text-green-600';
+    if (percentage >= 95) return 'text-destructive';
+    if (percentage >= 80) return 'text-secondary';
+    return 'text-primary';
   };
 
   const getProgressColor = (percentage: number) => {
-    if (percentage >= 95) return 'bg-red-500';
-    if (percentage >= 80) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (percentage >= 95) return 'bg-destructive';
+    if (percentage >= 80) return 'bg-secondary';
+    return 'bg-primary';
   };
 
   if (isLoadingPlanInfo || isLoadingStatus || isLoadingUsage || isLoadingPause || isLoadingDunning) {
@@ -249,7 +249,7 @@ export function SubscriptionManagement() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
+            <Shield className="w-5 h-5 text-foreground" />
             Current Subscription
           </CardTitle>
           <CardDescription>
@@ -261,12 +261,12 @@ export function SubscriptionManagement() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold">{planInfo.plan.name}</h3>
-                  <p className="text-sm text-gray-600">{planInfo.plan.description}</p>
+                  <h3 className="text-lg font-semibold text-foreground">{planInfo.plan.name}</h3>
+                  <p className="text-sm text-muted-foreground">{planInfo.plan.description}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold">{formatCurrency(planInfo.plan.price)}</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(planInfo.plan.price)}</p>
+                  <p className="text-sm text-muted-foreground">
                     {formatPlanDurationForDisplay(planInfo.plan)}
                   </p>
                 </div>
@@ -275,10 +275,10 @@ export function SubscriptionManagement() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <AlertTriangle className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-                <h3 className="text-lg font-medium text-yellow-800 mb-1">No Active Subscription</h3>
-                <p className="text-sm text-yellow-700">Select a plan below to subscribe</p>
+              <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-4">
+                <AlertTriangle className="h-8 w-8 text-secondary mx-auto mb-2" />
+                <h3 className="text-lg font-medium text-secondary mb-1">No Active Subscription</h3>
+                <p className="text-sm text-secondary">Select a plan below to subscribe</p>
               </div>
             </div>
           )}
@@ -289,7 +289,7 @@ export function SubscriptionManagement() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
+            <Shield className="w-5 h-5 text-foreground" />
             Subscription Status
           </CardTitle>
           <CardDescription>
@@ -300,17 +300,17 @@ export function SubscriptionManagement() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Current Status</p>
+                <p className="text-sm text-muted-foreground">Current Status</p>
                 <div className="mt-1">
                   {subscriptionStatus && getStatusBadge(subscriptionStatus.status)}
                 </div>
               </div>
               {subscriptionStatus?.endDate && (
                 <div className="text-right">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {subscriptionStatus.status === 'active' ? 'Renews on' : 'Expires on'}
                   </p>
-                  <p className="font-medium">
+                  <p className="font-medium text-foreground">
                     {new Date(subscriptionStatus.endDate).toLocaleDateString()}
                   </p>
                 </div>
@@ -319,8 +319,8 @@ export function SubscriptionManagement() {
 
             {/* Grace Period Warning */}
             {subscriptionStatus?.isInGracePeriod && (
-              <Alert className="border-yellow-200 bg-yellow-50">
-                <AlertTriangle className="h-4 w-4" />
+              <Alert className="border-secondary/20 bg-secondary/10">
+                <AlertTriangle className="h-4 w-4 text-secondary" />
                 <AlertTitle>Grace Period Active</AlertTitle>
                 <AlertDescription>
                   Your subscription is in a grace period until{' '}
@@ -333,8 +333,8 @@ export function SubscriptionManagement() {
 
             {/* Dunning Status */}
             {dunningStatus?.status === 'active' && (
-              <Alert className="border-red-200 bg-red-50">
-                <XCircle className="h-4 w-4" />
+              <Alert className="border-destructive/20 bg-destructive/10">
+                <XCircle className="h-4 w-4 text-destructive" />
                 <AlertTitle>Payment Retry in Progress</AlertTitle>
                 <AlertDescription>
                   We're attempting to process your payment. Attempt {dunningStatus.totalAttempts} of {dunningStatus.totalAttempts + dunningStatus.remainingAttempts}.
@@ -347,8 +347,8 @@ export function SubscriptionManagement() {
 
             {/* Pause Status */}
             {pauseStatus?.isPaused && (
-              <Alert className="border-blue-200 bg-blue-50">
-                <Pause className="h-4 w-4" />
+              <Alert className="border-primary/20 bg-primary/10">
+                <Pause className="h-4 w-4 text-primary" />
                 <AlertTitle>Subscription Paused</AlertTitle>
                 <AlertDescription>
                   Your subscription is paused until{' '}

@@ -98,10 +98,31 @@ export default function UsersPage() {
 
       const data = await res.json();
 
-      toast({
-        title: "Password Reset",
-        description: `Temporary password: ${data.temporaryPassword}`,
-      });
+
+      try {
+        await navigator.clipboard.writeText(data.temporaryPassword);
+        toast({
+          title: "Password Reset",
+          description: `Temporary password: ${data.temporaryPassword}`,
+        });
+        toast({
+          title: "Copied to Clipboard",
+          description: "The temporary password has been copied to your clipboard.",
+        });
+      } catch (clipboardError) {
+
+        toast({
+          title: "Password Reset",
+          description: `Temporary password: ${data.temporaryPassword}`,
+          duration: 10000, // Keep visible for 10 seconds so admin can copy manually
+        });
+        toast({
+          title: "Clipboard Copy Failed",
+          description: "Could not copy password to clipboard. Please copy it manually from the password toast above.",
+          variant: "destructive",
+          duration: 10000,
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -209,7 +230,7 @@ export default function UsersPage() {
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
                           {user.isSuperAdmin ? (
-                            <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                            <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 dark:bg-purple-900 dark:text-purple-300 dark:hover:bg-purple-900">
                               Super Admin
                             </Badge>
                           ) : (

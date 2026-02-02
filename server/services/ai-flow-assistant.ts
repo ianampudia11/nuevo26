@@ -971,7 +971,7 @@ Remember: You're helping users build powerful automation flows. Focus on practic
   }
 
   /**
-   * Configure Trigger Node
+   * Configure Message Trigger
    */
   private configureTriggerNode(baseConfig: any, userDescription: string, _nodeLabel: string): any {
     const config = { ...baseConfig };
@@ -2107,9 +2107,9 @@ class FlowGenerationEngine {
       {
         id: 'trigger-welcome',
         type: 'trigger',
-        label: 'Message Received',
+        label: 'Message Trigger',
         data: {
-          label: 'Message Received',
+          label: 'Message Trigger',
           channelTypes: scenario.channels || ['whatsapp_unofficial'],
           conditionType: 'any',
           conditionValue: '',
@@ -2840,7 +2840,7 @@ Would you like me to sign you up for our free resources?`
   }
 
   /**
-   * Configure Trigger Node
+   * Configure Message Trigger
    */
   private configureTriggerNode(baseConfig: any, userDescription: string, nodeLabel: string): any {
     const config = { ...baseConfig };

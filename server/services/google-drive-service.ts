@@ -117,7 +117,7 @@ export class GoogleDriveService {
 
         const credentials = this.oauth2Client.credentials;
 
-
+        
 
 
         const config = await storage.getAppSetting('backup_config');
@@ -131,7 +131,7 @@ export class GoogleDriveService {
         };
         await storage.saveAppSetting('backup_config', updatedConfig);
 
-
+        
         return; // Success, exit retry loop
 
       } catch (error) {
@@ -159,7 +159,7 @@ export class GoogleDriveService {
               }
             };
             await storage.saveAppSetting('backup_config', updatedConfig);
-
+            
           } catch (clearError) {
             console.error('[GoogleDrive] Failed to clear credentials:', clearError);
           }
@@ -170,7 +170,7 @@ export class GoogleDriveService {
 
         if (attempt < maxRetries - 1) {
           const delay = retryDelays[attempt];
-
+          
           await new Promise(resolve => setTimeout(resolve, delay));
         } else {
 
@@ -307,7 +307,7 @@ export class GoogleDriveService {
           }
         });
 
-
+        
 
         return {
           fileId: response.data.id || '',
@@ -327,7 +327,7 @@ export class GoogleDriveService {
         if (attempt < maxRetries && isRetryable) {
 
           const delay = baseDelay * Math.pow(2, attempt - 1);
-
+          
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }

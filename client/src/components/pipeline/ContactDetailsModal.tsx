@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/hooks/use-translation';
 import { 
   User, 
   Phone, 
@@ -24,6 +25,7 @@ interface ContactDetailsModalProps {
 }
 
 export default function ContactDetailsModal({ contactId, isOpen, onClose }: ContactDetailsModalProps) {
+  const { t } = useTranslation();
   const { data: contact, isLoading } = useQuery({
     queryKey: ['/api/contacts', contactId],
     queryFn: () => apiRequest('GET', `/api/contacts/${contactId}`)
@@ -65,7 +67,7 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
       case 'facebook':
         return 'ri-facebook-line text-blue-600';
       default:
-        return 'ri-message-line text-gray-600';
+        return 'ri-message-line text-muted-foreground';
     }
   };
 
@@ -90,7 +92,7 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-3">
             <User className="h-5 w-5" />
-            Contact Details
+            {t('pipeline.contact_details', 'Contact Details')}
           </DialogTitle>
         </DialogHeader>
         
@@ -107,9 +109,9 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold">{contact.name}</h2>
                     <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${contact.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <div className={`h-2 w-2 rounded-full ${contact.isActive ? 'bg-green-500' : 'bg-muted-foreground'}`} />
                       <span className="text-sm text-muted-foreground">
-                        {contact.isActive ? 'Active' : 'Inactive'}
+                        {contact.isActive ? t('common.active', 'Active') : t('common.inactive', 'Inactive')}
                       </span>
                     </div>
                   </div>
@@ -144,41 +146,41 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline" onClick={handleViewAllDeals}>
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      View Deals
+                      {t('pipeline.view_deals', 'View Deals')}
                     </Button>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Contact Information</h3>
+                <h3 className="text-lg font-semibold">{t('pipeline.contact_information', 'Contact Information')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Identifier</p>
-                      <p className="text-sm">{contact.identifier || 'Not provided'}</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('pipeline.identifier', 'Identifier')}</p>
+                      <p className="text-sm">{contact.identifier || t('pipeline.not_provided', 'Not provided')}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Identifier Type</p>
-                      <p className="text-sm capitalize">{contact.identifierType || 'Not specified'}</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('pipeline.identifier_type', 'Identifier Type')}</p>
+                      <p className="text-sm capitalize">{contact.identifierType || t('pipeline.not_specified', 'Not specified')}</p>
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">First Contacted</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('pipeline.first_contacted', 'First Contacted')}</p>
                       <p className="text-sm">
                         {contact.createdAt 
                           ? format(new Date(contact.createdAt), 'PPP')
-                          : 'Unknown'
+                          : t('pipeline.unknown', 'Unknown')
                         }
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Last Activity</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('pipeline.last_activity_contact', 'Last Activity')}</p>
                       <p className="text-sm">
                         {contact.lastContactedAt 
                           ? formatDistanceToNow(new Date(contact.lastContactedAt), { addSuffix: true })
-                          : 'No recent activity'
+                          : t('pipeline.no_recent_activity', 'No recent activity')
                         }
                       </p>
                     </div>
@@ -190,7 +192,7 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h3 className="text-lg font-semibold">Notes</h3>
+                    <h3 className="text-lg font-semibold">{t('pipeline.notes', 'Notes')}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{contact.notes}</p>
                   </div>
                 </>
@@ -200,10 +202,10 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h3 className="text-lg font-semibold">Tags</h3>
+                    <h3 className="text-lg font-semibold">{t('pipeline.tags', 'Tags')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {contact.tags.map((tag: string, index: number) => (
-                        <Badge key={index} variant="secondary">
+                        <Badge key={index} variant="secondary" className="!bg-muted !text-muted-foreground">
                           {tag}
                         </Badge>
                       ))}
@@ -218,7 +220,7 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                       <MessageCircle className="h-5 w-5" />
-                      Recent Conversations ({conversations.length})
+                      {t('pipeline.recent_conversations', 'Recent Conversations ({{count}})', { count: conversations.length })}
                     </h3>
                     <div className="space-y-2">
                       {conversations.slice(0, 3).map((conversation: any) => (
@@ -227,7 +229,7 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
                           <div className="flex-1">
                             <p className="text-sm font-medium">{getChannelName(conversation.channelType)}</p>
                             <p className="text-xs text-muted-foreground">
-                              Last message: {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
+                              {t('pipeline.last_message', 'Last message: {{time}}', { time: formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true }) })}
                             </p>
                           </div>
                           <Badge variant={conversation.status === 'active' ? 'default' : 'secondary'}>
@@ -246,7 +248,7 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                       <Activity className="h-5 w-5" />
-                      Associated Deals ({deals.length})
+                      {t('pipeline.associated_deals', 'Associated Deals ({{count}})', { count: deals.length })}
                     </h3>
                     <div className="space-y-2">
                       {deals.slice(0, 3).map((deal: any) => (
@@ -271,11 +273,11 @@ export default function ContactDetailsModal({ contactId, isOpen, onClose }: Cont
               <Separator />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
                 <div>
-                  <p className="font-medium">Created</p>
+                  <p className="font-medium">{t('pipeline.created', 'Created')}</p>
                   <p>{format(new Date(contact.createdAt), 'PPP p')}</p>
                 </div>
                 <div>
-                  <p className="font-medium">Last Updated</p>
+                  <p className="font-medium">{t('pipeline.last_updated', 'Last Updated')}</p>
                   <p>{format(new Date(contact.updatedAt), 'PPP p')}</p>
                 </div>
               </div>

@@ -79,10 +79,10 @@ export let db = drizzle(poolInstance, { schema });
  * Used during maintenance operations like database restore
  */
 export async function drainPool(): Promise<void> {
-
+  
   isPoolDrained = true;
   await poolInstance.end();
-
+  
 }
 
 /**
@@ -90,7 +90,7 @@ export async function drainPool(): Promise<void> {
  * Used after maintenance operations like database restore
  */
 export function reinitializePool(): void {
-
+  
 
   poolInstance = new Pool({
     connectionString: secureEnv.getDatabaseUrl(),
@@ -110,5 +110,5 @@ export function reinitializePool(): void {
 
   isPoolDrained = false;
 
-
+  
 }

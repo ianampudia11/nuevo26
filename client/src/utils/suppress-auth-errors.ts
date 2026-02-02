@@ -31,8 +31,24 @@ export function suppressAuthErrors() {
   
 
   console.warn = (...args: any[]) => {
-    const message = args.join(' ');
-    if (message.includes('401') || message.includes('Unauthorized')) {
+    const message = args.map(arg => {
+      if (typeof arg === 'string') return arg;
+      if (typeof arg === 'object' && arg !== null) {
+        try {
+          return JSON.stringify(arg);
+        } catch (e) {
+          return String(arg);
+        }
+      }
+      return String(arg);
+    }).join(' ');
+    
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('401') || 
+        lowerMessage.includes('unauthorized') || 
+        lowerMessage.includes('blocked conversation update') || 
+        lowerMessage.includes('insufficient permissions') ||
+        message.includes('[Security] Blocked conversation update')) {
       return;
     }
     originalWarn.apply(console, args);

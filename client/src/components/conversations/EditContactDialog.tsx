@@ -439,7 +439,7 @@ export default function EditContactDialog({
                     <button
                       type="button"
                       onClick={handleRemoveProfilePicture}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90"
                     >
                       <X className="w-3 h-3" />
                     </button>

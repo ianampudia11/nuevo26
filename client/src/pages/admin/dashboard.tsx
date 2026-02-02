@@ -101,7 +101,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
-                <Building className="h-5 w-5 text-green-500 mr-2" />
+                <Building className="h-5 w-5 text-green-500 dark:text-green-400 mr-2" />
                 <div className="text-2xl">
                   {isLoadingCompanies ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -121,7 +121,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
-                <Building className="h-5 w-5 text-gray-400 mr-2" />
+                <Building className="h-5 w-5 text-muted-foreground mr-2" />
                 <div className="text-2xl">
                   {isLoadingCompanies ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -169,11 +169,11 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         {company.active ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
                             {t('common.active', 'Active')}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                             {t('common.inactive', 'Inactive')}
                           </span>
                         )}

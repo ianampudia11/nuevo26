@@ -1,4 +1,7 @@
 import { Badge } from '@/components/ui/badge';
+import { SegmentCard } from '@/components/segments/SegmentCard';
+import { SkeletonLoader } from '@/components/segments/SkeletonLoader';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -6,6 +9,7 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -72,6 +76,8 @@ import {
   WhatsAppContactSegment,
   WhatsAppContentValidation
 } from '@/types/whatsapp-campaign';
+import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
+import { getBrowserTimezone } from '@/utils/timezones';
 
 
 type ContactSegment = WhatsAppContactSegment;
@@ -80,7 +86,9 @@ import {
   WHATSAPP_CHANNEL_TYPES,
   WHATSAPP_MESSAGE_TYPES,
   WHATSAPP_LIMITS,
-  getRateLimits
+  getRateLimits,
+  DAYS_OF_WEEK,
+  RECURRING_DAILY_LIMITS
 } from '@/lib/whatsapp-constants';
 
 
@@ -280,14 +288,23 @@ export function CampaignBuilder() {
       useTypingIndicators: true,
       randomizeMessageTiming: true,
       respectRecipientTimezone: false
+    },
+    recurringDailySettings: {
+      enabled: false,
+      sendTimes: ['10:00'],
+      offDays: [],
+      timezone: 'UTC'
     }
   });
 
   const [templates, setTemplates] = useState<WhatsAppCampaignTemplate[]>([]);
   const [segments, setSegments] = useState<WhatsAppContactSegment[]>([]);
+  const [pipelineStages, setPipelineStages] = useState<Array<{ id: number; name: string; color: string }>>([]);
+  const [selectedPipelineStageId, setSelectedPipelineStageId] = useState<number | undefined>(undefined);
   const [contentValidation, setContentValidation] = useState<WhatsAppContentValidation | null>(null);
   const [rateLimitCalculation, setRateLimitCalculation] = useState<RateLimitCalculation | null>(null);
   const [loading, setLoading] = useState(false);
+  const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [isSegmentModalOpen, setIsSegmentModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [editSegmentId, setEditSegmentId] = useState<number | null>(null);
@@ -295,6 +312,8 @@ export function CampaignBuilder() {
   const [showLaunchConfirmation, setShowLaunchConfirmation] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [editingSendTimeIndex, setEditingSendTimeIndex] = useState<number | null>(null);
+  const [segmentSearchQuery, setSegmentSearchQuery] = useState('');
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -336,9 +355,45 @@ export function CampaignBuilder() {
     return selectedTemplate?.whatsappChannelType === 'official';
   };
 
+
+  useKeyboardShortcuts([
+    {
+      key: 'n',
+      ctrl: true,
+      callback: () => {
+        if (currentStep === 1) { // Audience step
+          setIsSegmentModalOpen(true);
+        }
+      },
+      description: 'Create new segment'
+    },
+    {
+      key: 'k',
+      ctrl: true,
+      callback: () => {
+        if (currentStep === 1) { // Audience step
+          const searchInput = document.querySelector('input[placeholder*="Search segments"]') as HTMLInputElement;
+          searchInput?.focus();
+        }
+      },
+      description: 'Focus segment search'
+    },
+    {
+      key: 'Escape',
+      callback: () => {
+        if (isSegmentModalOpen) setIsSegmentModalOpen(false);
+        if (isTemplateModalOpen) setIsTemplateModalOpen(false);
+        if (editSegmentId) setEditSegmentId(null);
+        if (editTemplateId) setEditTemplateId(null);
+      },
+      description: 'Close modals'
+    }
+  ], true);
+
   useEffect(() => {
     fetchTemplates();
     fetchSegments();
+    fetchPipelineStages();
 
     if (isEditMode && campaignId) {
       fetchCampaignData(campaignId);
@@ -398,6 +453,7 @@ export function CampaignBuilder() {
   };
 
   const fetchSegments = async () => {
+    setSegmentsLoading(true);
     try {
       const response = await fetch('/api/campaigns/segments');
       const data = await response.json();
@@ -406,6 +462,20 @@ export function CampaignBuilder() {
       }
     } catch (error) {
       console.error('Failed to fetch segments:', error);
+    } finally {
+      setSegmentsLoading(false);
+    }
+  };
+
+  const fetchPipelineStages = async () => {
+    try {
+      const response = await fetch('/api/pipeline/stages');
+      if (response.ok) {
+        const stages = await response.json();
+        setPipelineStages(stages || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pipeline stages:', error);
     }
   };
 
@@ -415,6 +485,11 @@ export function CampaignBuilder() {
       const data = await response.json();
       if (data.success) {
         const campaign = data.data;
+        const pipelineStageIds = campaign.pipelineStageIds || [];
+
+        if (pipelineStageIds.length > 0) {
+          setSelectedPipelineStageId(pipelineStageIds[0]);
+        }
         setCampaignData({
           name: campaign.name || '',
           description: campaign.description || '',
@@ -426,6 +501,7 @@ export function CampaignBuilder() {
           whatsappAccountIds: campaign.whatsappAccountIds || campaign.channelIds || [],
           templateId: campaign.templateId,
           segmentId: campaign.segmentId,
+          pipelineStageIds: pipelineStageIds.length > 0 ? pipelineStageIds : undefined,
           campaignType: campaign.campaignType || 'immediate',
           messageType: campaign.messageType || WHATSAPP_MESSAGE_TYPES.TEXT,
           scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : '',
@@ -447,7 +523,15 @@ export function CampaignBuilder() {
             accountRotation: true,
             cooldownPeriod: 30,
             messageVariation: false
-          }
+          },
+          recurringDailySettings: campaign.recurringDailySettings || (campaign.campaignType === 'recurring_daily' && campaign.dripSettings ? {
+            enabled: true,
+            sendTimes: campaign.dripSettings.sendTimes || ['10:00'],
+            offDays: campaign.dripSettings.offDays || [],
+            timezone: campaign.timezone || campaign.dripSettings.timezone || 'UTC',
+            startDate: campaign.dripSettings.startDate,
+            endDate: campaign.dripSettings.endDate
+          } : undefined)
         });
       }
     } catch (error) {
@@ -663,6 +747,231 @@ export function CampaignBuilder() {
     setEditSegmentId(null);
   };
 
+
+
+  const formatTimeTo12Hour = (time24: string): string => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+
+  const formatTimeTo24Hour = (time12: string): string => {
+    const match = time12.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return time12; // Return as-is if format doesn't match
+    
+    let hours = parseInt(match[1]);
+    const minutes = parseInt(match[2]);
+    const period = match[3].toUpperCase();
+    
+    if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  const handleUpdateSendTime = (index: number, newTime: string) => {
+
+    const time24 = newTime;
+    
+    if (!time24 || !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time24)) {
+      toast({
+        title: t('campaigns.builder.basic.invalid_time', 'Invalid Time'),
+        description: t('campaigns.builder.basic.invalid_time_format', 'Please enter a valid time in HH:mm format'),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const currentTimes = campaignData.recurringDailySettings?.sendTimes || [];
+    
+
+    if (currentTimes[index] === time24) {
+      setEditingSendTimeIndex(null);
+      return;
+    }
+
+
+    const otherTimes = currentTimes.filter((_, i) => i !== index);
+    if (otherTimes.includes(time24)) {
+      toast({
+        title: t('campaigns.builder.basic.duplicate_time', 'Duplicate Time'),
+        description: t('campaigns.builder.basic.time_already_added', 'This time has already been added'),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+
+    const [newHour, newMinute] = time24.split(':').map(Number);
+    const newTimeMinutes = newHour * 60 + newMinute;
+    
+    for (let i = 0; i < otherTimes.length; i++) {
+      const [existingHour, existingMinute] = otherTimes[i].split(':').map(Number);
+      const existingTimeMinutes = existingHour * 60 + existingMinute;
+      const timeDifference = Math.abs(newTimeMinutes - existingTimeMinutes);
+      
+      if (timeDifference < RECURRING_DAILY_LIMITS.MIN_TIME_INTERVAL_MINUTES && timeDifference > 0) {
+        toast({
+          title: t('campaigns.builder.basic.min_time_interval', 'Time Interval Too Short'),
+          description: t('campaigns.builder.basic.min_time_interval_message', 'Send times must be at least {minutes} minutes apart', { minutes: RECURRING_DAILY_LIMITS.MIN_TIME_INTERVAL_MINUTES }),
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
+
+    const updatedTimes = [...currentTimes];
+    updatedTimes[index] = time24;
+
+
+    const sortedTimes = updatedTimes.sort((a, b) => {
+      const [aHours, aMinutes] = a.split(':').map(Number);
+      const [bHours, bMinutes] = b.split(':').map(Number);
+      return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+    });
+
+    setCampaignData(prev => ({
+      ...prev,
+      recurringDailySettings: {
+        ...prev.recurringDailySettings!,
+        sendTimes: sortedTimes
+      }
+    }));
+
+    setEditingSendTimeIndex(null);
+  };
+
+  const handleAddSendTime = (time: string) => {
+    if (!time || !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+      toast({
+        title: t('campaigns.builder.basic.invalid_time', 'Invalid Time'),
+        description: t('campaigns.builder.basic.invalid_time_format', 'Please enter a valid time in HH:mm format'),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const currentTimes = campaignData.recurringDailySettings?.sendTimes || [];
+    
+
+    if (currentTimes.length >= RECURRING_DAILY_LIMITS.MAX_SEND_TIMES) {
+      toast({
+        title: t('campaigns.builder.basic.max_send_times_reached', 'Maximum Send Times Reached'),
+        description: t('campaigns.builder.basic.max_send_times_message', 'You can only add up to {max} send times', { max: RECURRING_DAILY_LIMITS.MAX_SEND_TIMES }),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (currentTimes.includes(time)) {
+      toast({
+        title: t('campaigns.builder.basic.duplicate_time', 'Duplicate Time'),
+        description: t('campaigns.builder.basic.time_already_added', 'This time has already been added'),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+
+    const [newHour, newMinute] = time.split(':').map(Number);
+    const newTimeMinutes = newHour * 60 + newMinute;
+    
+    for (const existingTime of currentTimes) {
+      const [existingHour, existingMinute] = existingTime.split(':').map(Number);
+      const existingTimeMinutes = existingHour * 60 + existingMinute;
+      const timeDifference = Math.abs(newTimeMinutes - existingTimeMinutes);
+      
+      if (timeDifference < RECURRING_DAILY_LIMITS.MIN_TIME_INTERVAL_MINUTES && timeDifference > 0) {
+        toast({
+          title: t('campaigns.builder.basic.min_time_interval', 'Time Interval Too Short'),
+          description: t('campaigns.builder.basic.min_time_interval_message', 'Send times must be at least {minutes} minutes apart', { minutes: RECURRING_DAILY_LIMITS.MIN_TIME_INTERVAL_MINUTES }),
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
+    const sortedTimes = [...currentTimes, time].sort((a, b) => {
+      const [aHours, aMinutes] = a.split(':').map(Number);
+      const [bHours, bMinutes] = b.split(':').map(Number);
+      return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+    });
+
+    setCampaignData(prev => ({
+      ...prev,
+      recurringDailySettings: {
+        ...prev.recurringDailySettings!,
+        sendTimes: sortedTimes
+      }
+    }));
+  };
+
+  const handleRemoveSendTime = (index: number) => {
+    const currentTimes = campaignData.recurringDailySettings?.sendTimes || [];
+    if (currentTimes.length <= 1) {
+      toast({
+        title: t('campaigns.builder.basic.min_send_times', 'Minimum Send Times'),
+        description: t('campaigns.builder.basic.at_least_one_time', 'At least one send time is required'),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setCampaignData(prev => ({
+      ...prev,
+      recurringDailySettings: {
+        ...prev.recurringDailySettings!,
+        sendTimes: currentTimes.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  const handleToggleOffDay = (dayNumber: number) => {
+    const currentOffDays = campaignData.recurringDailySettings?.offDays || [];
+    const newOffDays = currentOffDays.includes(dayNumber)
+      ? currentOffDays.filter(d => d !== dayNumber)
+      : [...currentOffDays, dayNumber];
+
+
+    if (newOffDays.length === 7) {
+      toast({
+        title: t('campaigns.builder.basic.invalid_off_days', 'Invalid Configuration'),
+        description: t('campaigns.builder.basic.all_days_off', 'Cannot mark all days as off days'),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setCampaignData(prev => ({
+      ...prev,
+      recurringDailySettings: {
+        ...prev.recurringDailySettings!,
+        offDays: newOffDays
+      }
+    }));
+  };
+
+  const handleAutoDetectTimezone = () => {
+    const detectedTimezone = getBrowserTimezone();
+    setCampaignData(prev => ({
+      ...prev,
+      recurringDailySettings: {
+        ...prev.recurringDailySettings!,
+        timezone: detectedTimezone
+      }
+    }));
+    toast({
+      title: t('campaigns.builder.basic.timezone_detected', 'Timezone Detected'),
+      description: t('campaigns.builder.basic.timezone_set_to', 'Timezone set to {timezone}', { timezone: detectedTimezone }),
+    });
+  };
+
   const handleSegmentDelete = async (segmentId: number) => {
     if (!confirm(t('campaigns.builder.audience.delete_segment_confirm', 'Are you sure you want to delete this segment? This action cannot be undone.'))) {
       return;
@@ -705,6 +1014,33 @@ export function CampaignBuilder() {
   };
 
   const handleNext = () => {
+
+    if (currentStep === 0) {
+
+      if (!campaignData.name || !campaignData.name.trim()) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: t('campaigns.builder.basic.name_required', 'Please enter a campaign name before proceeding to the next step.'),
+          variant: 'destructive'
+        });
+        return;
+      }
+
+
+      const hasChannelSelected = 
+        (campaignData.channelIds && campaignData.channelIds.length > 0) ||
+        (campaignData.channelId !== undefined && campaignData.channelId !== null);
+      
+      if (!hasChannelSelected) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: t('campaigns.builder.basic.channel_required', 'Please select at least one WhatsApp connection before proceeding to the next step.'),
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
     if (currentStep < CAMPAIGN_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     }
@@ -780,8 +1116,9 @@ export function CampaignBuilder() {
       errors.push(t('campaigns.builder.validation.connection_required', 'At least one WhatsApp connection is required'));
     }
 
-    if (!campaignData.segmentId) {
-      errors.push(t('campaigns.builder.validation.segment_required', 'Audience segment is required'));
+
+    if (!campaignData.segmentId && (!campaignData.pipelineStageIds || campaignData.pipelineStageIds.length === 0)) {
+      errors.push(t('campaigns.builder.validation.segment_or_pipeline_required', 'Either an audience segment or a pipeline stage filter is required'));
     }
 
     if (!campaignData.content.trim()) {
@@ -799,6 +1136,29 @@ export function CampaignBuilder() {
       errors.push(t('campaigns.builder.validation.schedule_required', 'Scheduled date and time is required for scheduled campaigns'));
     }
 
+
+    if (campaignData.campaignType === 'recurring_daily') {
+      const settings = campaignData.recurringDailySettings;
+      if (!settings) {
+        errors.push(t('campaigns.builder.validation.recurring_settings_required', 'Recurring daily settings are required'));
+      } else {
+        if (!settings.sendTimes || settings.sendTimes.length === 0) {
+          errors.push(t('campaigns.builder.validation.send_times_required', 'At least one send time is required'));
+        } else {
+
+          const invalidTimes = settings.sendTimes.filter(time => !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time));
+          if (invalidTimes.length > 0) {
+            errors.push(t('campaigns.builder.validation.invalid_time_format', 'Invalid time format. Use HH:mm format'));
+          }
+        }
+        if (!settings.timezone || settings.timezone.trim() === '') {
+          errors.push(t('campaigns.builder.validation.timezone_required', 'Timezone is required'));
+        }
+        if (settings.offDays && settings.offDays.length === 7) {
+          errors.push(t('campaigns.builder.validation.all_days_off', 'Cannot mark all days as off days'));
+        }
+      }
+    }
 
     if (campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL) {
       if (campaignData.messageType === WHATSAPP_MESSAGE_TYPES.TEMPLATE && !campaignData.templateId) {
@@ -869,6 +1229,35 @@ export function CampaignBuilder() {
       const data = await response.json();
       if (data.success) {
         const campaignId = data.data.id;
+        const selectedSegment = segments.find(s => s.id === campaignData.segmentId);
+
+        const contactCount = selectedSegment?.contactCount || data.data.totalRecipients || 0;
+
+
+        if (campaignData.campaignType === 'scheduled' && campaignData.scheduledAt) {
+          const scheduledDate = new Date(campaignData.scheduledAt);
+          const now = new Date();
+          
+          if (scheduledDate > now) {
+
+            toast({
+              title: t('campaigns.builder.messages.scheduled_success_title', 'Campaign Scheduled Successfully! 📅'),
+              description: t('campaigns.builder.messages.scheduled_success_description', '"{{name}}" is scheduled for {{date}} and will send messages to {{count}} contacts', { 
+                name: campaignData.name, 
+                date: scheduledDate.toLocaleString(),
+                count: contactCount 
+              })
+            });
+
+            resetCampaignBuilder();
+
+            setTimeout(() => {
+              setLocation('/campaigns');
+            }, 2000);
+            return;
+          }
+        }
+
 
         const startResponse = await fetch(`/api/campaigns/${campaignId}/start`, {
           method: 'POST'
@@ -876,9 +1265,6 @@ export function CampaignBuilder() {
 
         const startData = await startResponse.json();
         if (startData.success) {
-          const selectedSegment = segments.find(s => s.id === campaignData.segmentId);
-          const contactCount = selectedSegment?.contactCount || 0;
-
           toast({
             title: t('campaigns.builder.messages.launch_success_title', 'Campaign Launched Successfully! 🚀'),
             description: t('campaigns.builder.messages.launch_success_description', '"{{name}}" is now running and will send messages to {{count}} contacts', { name: campaignData.name, count: contactCount })
@@ -1091,7 +1477,7 @@ export function CampaignBuilder() {
                 <SelectContent>
                   <SelectItem value={WHATSAPP_CHANNEL_TYPES.OFFICIAL}>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
                       <div>
                         <div className="font-medium">{t('campaigns.builder.basic.official_api', 'Official WhatsApp Business API')}</div>
                         <div className="text-xs text-muted-foreground">{t('campaigns.builder.basic.official_description', 'High volume, templates, interactive messages')}</div>
@@ -1100,7 +1486,7 @@ export function CampaignBuilder() {
                   </SelectItem>
                   <SelectItem value={WHATSAPP_CHANNEL_TYPES.UNOFFICIAL}>
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                      <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                       <div>
                         <div className="font-medium">{t('campaigns.builder.basic.unofficial_web', 'Unofficial WhatsApp Web/Desktop')}</div>
                         <div className="text-xs text-muted-foreground">{t('campaigns.builder.basic.unofficial_description', 'Lower volume, basic messages only')}</div>
@@ -1112,12 +1498,12 @@ export function CampaignBuilder() {
 
               {/* Channel Type Warnings */}
               {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.UNOFFICIAL && (
-                <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900 rounded-lg">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5" />
+                    <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5" />
                     <div className="text-sm">
-                      <div className="font-medium text-orange-800">{t('campaigns.builder.basic.unofficial_warning_title', 'Unofficial Channel Limitations')}</div>
-                      <ul className="mt-1 text-orange-700 space-y-1">
+                      <div className="font-medium text-orange-800 dark:text-orange-400">{t('campaigns.builder.basic.unofficial_warning_title', 'Unofficial Channel Limitations')}</div>
+                      <ul className="mt-1 text-orange-700 dark:text-orange-300 space-y-1">
                         <li>• {t('campaigns.builder.basic.unofficial_limit_1', 'Lower rate limits (20 messages/minute)')}</li>
                         <li>• {t('campaigns.builder.basic.unofficial_limit_2', 'Business hours restrictions recommended')}</li>
                         <li>• {t('campaigns.builder.basic.unofficial_limit_3', 'No delivery/read receipts')}</li>
@@ -1129,12 +1515,12 @@ export function CampaignBuilder() {
               )}
 
               {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL && (
-                <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="mt-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 rounded-lg">
                   <div className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                    <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5" />
                     <div className="text-sm">
-                      <div className="font-medium text-green-800">{t('campaigns.builder.basic.official_benefits_title', 'Official API Benefits')}</div>
-                      <ul className="mt-1 text-green-700 space-y-1">
+                      <div className="font-medium text-green-800 dark:text-green-400">{t('campaigns.builder.basic.official_benefits_title', 'Official API Benefits')}</div>
+                      <ul className="mt-1 text-green-700 dark:text-green-300 space-y-1">
                         <li>• {t('campaigns.builder.basic.official_benefit_1', 'High volume messaging (1000+ messages/minute)')}</li>
                         <li>• {t('campaigns.builder.basic.official_benefit_2', 'Delivery and read receipts')}</li>
                         <li>• {t('campaigns.builder.basic.official_benefit_3', 'Interactive messages and templates')}</li>
@@ -1156,10 +1542,10 @@ export function CampaignBuilder() {
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 </div>
               ) : whatsappConnections.length === 0 ? (
-                <div className="p-4 border border-dashed border-gray-300 rounded-lg text-center">
-                  <MessageSquare className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600 mb-2">{t('campaigns.builder.basic.no_connections', 'No WhatsApp connections available')}</p>
-                  <p className="text-xs text-gray-500">
+                <div className="p-4 border border-dashed border-border rounded-lg text-center">
+                  <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground mb-2">{t('campaigns.builder.basic.no_connections', 'No WhatsApp connections available')}</p>
+                  <p className="text-xs text-muted-foreground">
                     {t('campaigns.builder.basic.setup_connection', 'Please set up a WhatsApp connection in Settings > Channel Connections first')}
                   </p>
                 </div>
@@ -1197,12 +1583,12 @@ export function CampaignBuilder() {
                                 };
                               });
                             }}
-                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                            className="rounded border-border text-primary focus:ring-primary"
                           />
                           <label htmlFor={`connection-${connection.id}`} className="flex items-center gap-2 flex-1 cursor-pointer">
                             <i className="ri-whatsapp-line text-green-600"></i>
                             <span className="font-medium">{connection.accountName}</span>
-                            <Badge variant="secondary" className="ml-auto">
+                            <Badge variant="secondary" className="ml-auto !bg-muted !text-muted-foreground">
                               {connection.status}
                             </Badge>
                           </label>
@@ -1266,7 +1652,7 @@ export function CampaignBuilder() {
                 <SelectContent>
                   <SelectItem value="immediate">{t('campaigns.builder.basic.type_immediate', 'Send Immediately')}</SelectItem>
                   <SelectItem value="scheduled">{t('campaigns.builder.basic.type_scheduled', 'Schedule for Later')}</SelectItem>
-                  <SelectItem value="drip">{t('campaigns.builder.basic.type_drip', 'Drip Campaign')}</SelectItem>
+                  <SelectItem value="recurring_daily">{t('campaigns.builder.basic.type_recurring_daily', 'Recurring Daily')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1282,19 +1668,221 @@ export function CampaignBuilder() {
                 />
               </div>
             )}
+
+            {campaignData.campaignType === 'recurring_daily' && (
+              <div className="space-y-6">
+                {/* Send Times Section */}
+                <div>
+                  <Label>{t('campaigns.builder.basic.send_times_label', 'Send Times')}</Label>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {campaignData.recurringDailySettings?.sendTimes.map((time, index) => (
+                        <div key={index} className="flex items-center gap-1">
+                          {editingSendTimeIndex === index ? (
+                            <Input
+                              type="time"
+                              defaultValue={time}
+                              className="w-36 font-bold text-lg"
+                              autoFocus
+                              onBlur={(e) => {
+                                if (e.target.value) {
+                                  handleUpdateSendTime(index, e.target.value);
+                                } else {
+                                  setEditingSendTimeIndex(null);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const input = e.target as HTMLInputElement;
+                                  if (input.value) {
+                                    handleUpdateSendTime(index, input.value);
+                                  } else {
+                                    setEditingSendTimeIndex(null);
+                                  }
+                                } else if (e.key === 'Escape') {
+                                  setEditingSendTimeIndex(null);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <Badge 
+                              variant="secondary" 
+                              className="flex items-center gap-1 cursor-pointer hover:bg-muted/80 font-bold text-lg px-3 py-1.5 !bg-muted !text-muted-foreground"
+                              onClick={() => setEditingSendTimeIndex(index)}
+                            >
+                              <span className="font-bold text-lg">{formatTimeTo12Hour(time)}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveSendTime(index);
+                                }}
+                                className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="time"
+                        id="newSendTime"
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const input = e.target as HTMLInputElement;
+                            if (input.value) {
+                              handleAddSendTime(input.value);
+                              input.value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const input = document.getElementById('newSendTime') as HTMLInputElement;
+                          if (input?.value) {
+                            handleAddSendTime(input.value);
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        {t('campaigns.builder.basic.add_time', 'Add Time')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Off Days Section */}
+                <div>
+                  <Label>{t('campaigns.builder.basic.off_days_label', 'Off Days')}</Label>
+                  <p className="text-sm text-muted-foreground mt-1 mb-3">
+                    {t('campaigns.builder.basic.off_days_description', 'Select days when the campaign should NOT be sent')}
+                  </p>
+                  <div className="grid grid-cols-7 gap-2">
+                    {DAYS_OF_WEEK.map((day) => (
+                      <div key={day.value} className="flex flex-col items-center gap-1">
+                        <Checkbox
+                          id={`offDay-${day.value}`}
+                          checked={(campaignData.recurringDailySettings?.offDays || []).includes(day.value)}
+                          onCheckedChange={() => handleToggleOffDay(day.value)}
+                        />
+                        <Label
+                          htmlFor={`offDay-${day.value}`}
+                          className="text-xs cursor-pointer text-center"
+                        >
+                          {day.short}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Timezone Section */}
+                <div>
+                  <Label>{t('campaigns.builder.basic.timezone_label', 'Timezone')}</Label>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex gap-2">
+                      <TimezoneSelector
+                        value={campaignData.recurringDailySettings?.timezone || 'UTC'}
+                        onChange={(tz) => {
+                          setCampaignData(prev => ({
+                            ...prev,
+                            recurringDailySettings: {
+                              ...prev.recurringDailySettings!,
+                              timezone: tz
+                            }
+                          }));
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAutoDetectTimezone}
+                      >
+                        {t('campaigns.builder.basic.auto_detect_timezone', 'Auto-detect Timezone')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date Range Section (Optional) */}
+                <div>
+                  <Label>{t('campaigns.builder.basic.campaign_duration', 'Campaign Duration (Optional)')}</Label>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="recurringStartDate" className="text-xs text-muted-foreground">
+                        {t('campaigns.builder.basic.start_date', 'Start Date')}
+                      </Label>
+                      <Input
+                        id="recurringStartDate"
+                        type="date"
+                        value={campaignData.recurringDailySettings?.startDate || ''}
+                        onChange={(e) => {
+                          setCampaignData(prev => ({
+                            ...prev,
+                            recurringDailySettings: {
+                              ...prev.recurringDailySettings!,
+                              startDate: e.target.value || undefined
+                            }
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurringEndDate" className="text-xs text-muted-foreground">
+                        {t('campaigns.builder.basic.end_date', 'End Date')}
+                      </Label>
+                      <Input
+                        id="recurringEndDate"
+                        type="date"
+                        value={campaignData.recurringDailySettings?.endDate || ''}
+                        onChange={(e) => {
+                          setCampaignData(prev => ({
+                            ...prev,
+                            recurringDailySettings: {
+                              ...prev.recurringDailySettings!,
+                              endDate: e.target.value || undefined
+                            }
+                          }));
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 
       case 'audience':
+        const filteredSegments = segments.filter(segment => 
+          segment.name.toLowerCase().includes(segmentSearchQuery.toLowerCase()) ||
+          segment.description?.toLowerCase().includes(segmentSearchQuery.toLowerCase())
+        );
+
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>{t('campaigns.builder.audience.segment_label', 'Select Audience Segment')}</Label>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">{t('campaigns.builder.audience.segment_label', 'Select Audience Segment')}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {t('campaigns.builder.audience.segment_description', 'Choose a contact segment to target with this campaign')}
+                  </p>
+                </div>
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  size="default"
                   onClick={() => setIsSegmentModalOpen(true)}
                   className="flex items-center gap-2"
                 >
@@ -1302,52 +1890,102 @@ export function CampaignBuilder() {
                   {t('campaigns.builder.audience.create_segment', 'Create New Segment')}
                 </Button>
               </div>
-              <div className="flex gap-2">
-                <Select
-                  value={campaignData.segmentId?.toString()}
-                  onValueChange={handleSegmentSelect}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder={t('campaigns.builder.audience.segment_placeholder', 'Choose a segment')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {segments.map((segment) => (
-                      <SelectItem key={segment.id} value={segment.id.toString()}>
-                        <div className="flex justify-between items-center w-full">
-                          <span>{segment.name}</span>
-                          <Badge variant="secondary" className="ml-2">
-                            {segment.contactCount} {t('campaigns.builder.audience.contacts', 'contacts')}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {campaignData.segmentId && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditSegmentId(campaignData.segmentId!)}
-                      className="flex items-center gap-2"
-                    >
-                      <Edit className="w-4 h-4" />
-                      {t('common.edit', 'Edit')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSegmentDelete(campaignData.segmentId!)}
-                      className="flex items-center gap-2 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      {t('common.delete', 'Delete')}
-                    </Button>
-                  </>
-                )}
+
+              <div className="mb-4">
+                <Input
+                  placeholder={t('campaigns.builder.audience.search_segments', 'Search segments...')}
+                  value={segmentSearchQuery}
+                  onChange={(e) => setSegmentSearchQuery(e.target.value)}
+                  className="max-w-md"
+                />
               </div>
+
+              {segmentsLoading ? (
+                <SkeletonLoader type="card" count={4} />
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {filteredSegments.map((segment) => (
+                      <div key={segment.id} className="group">
+                        <SegmentCard
+                          segment={segment}
+                          isSelected={campaignData.segmentId === segment.id}
+                          onSelect={() => handleSegmentSelect(segment.id.toString())}
+                          onEdit={() => setEditSegmentId(segment.id)}
+                          onDelete={() => handleSegmentDelete(segment.id)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {filteredSegments.length === 0 && (
+                    <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                      <Users className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                      <p className="text-muted-foreground mb-2">
+                        {segmentSearchQuery
+                          ? t('campaigns.builder.audience.no_segments_found', 'No segments found matching your search')
+                          : t('campaigns.builder.audience.no_segments', 'No segments available')}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsSegmentModalOpen(true)}
+                        className="mt-2"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        {t('campaigns.builder.audience.create_first_segment', 'Create your first segment')}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div>
+              <Label>{t('campaigns.builder.audience.pipeline_stage_label', 'Filter by Pipeline Stage (Optional)')}</Label>
+              <Select
+                value={selectedPipelineStageId?.toString() || undefined}
+                onValueChange={(value) => {
+                  const stageId = value ? parseInt(value) : undefined;
+                  setSelectedPipelineStageId(stageId);
+
+                  setCampaignData(prev => ({
+                    ...prev,
+                    pipelineStageIds: stageId ? [stageId] : undefined
+                  }));
+                }}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder={t('campaigns.builder.audience.pipeline_stage_placeholder', 'Select a pipeline stage')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelineStages.map((stage) => (
+                    <SelectItem key={stage.id} value={stage.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Badge style={{ backgroundColor: stage.color }} className="w-3 h-3 rounded-full p-0" />
+                        <span>{stage.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPipelineStageId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPipelineStageId(undefined);
+                    setCampaignData(prev => ({
+                      ...prev,
+                      pipelineStageIds: undefined
+                    }));
+                  }}
+                  className="mt-2 text-xs"
+                >
+                  {t('common.clear', 'Clear selection')}
+                </Button>
+              )}
             </div>
 
             {campaignData.segmentId && (
@@ -1364,6 +2002,20 @@ export function CampaignBuilder() {
                             <p className="text-sm mt-2">
                               <strong>{segment.contactCount}</strong> {t('campaigns.builder.audience.unique_contacts_will_receive', 'unique contacts will receive this campaign')}
                             </p>
+                            {selectedPipelineStageId && (() => {
+                              const selectedStage = pipelineStages.find(s => s.id === selectedPipelineStageId);
+                              return selectedStage ? (
+                                <div className="mt-3 p-2 bg-muted rounded-md">
+                                  <div className="flex items-center gap-2">
+                                    <Badge style={{ backgroundColor: selectedStage.color }} className="w-3 h-3 rounded-full p-0" />
+                                    <span className="text-sm font-medium">{selectedStage.name}</span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {t('campaigns.builder.audience.pipeline_stage_filter_info', 'Contacts with deals in this stage will receive the campaign')}
+                                  </p>
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -1385,7 +2037,7 @@ export function CampaignBuilder() {
                     {t('campaigns.builder.content.template_label', 'Use Template (Optional)')}
                   </Label>
                   {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs !bg-muted !text-muted-foreground">
                       {t('campaigns.builder.content.approved_only', 'Approved only')}
                     </Badge>
                   )}
@@ -1419,7 +2071,7 @@ export function CampaignBuilder() {
                               {template.whatsappTemplateName && ` (${template.whatsappTemplateName})`}
                             </span>
                             {template.whatsappTemplateId && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
+                              <Badge variant="secondary" className="ml-2 text-xs !bg-muted !text-muted-foreground">
                                 Meta
                               </Badge>
                             )}
@@ -1453,7 +2105,7 @@ export function CampaignBuilder() {
                         {t('common.edit', 'Edit')}
                       </Button>
                       {isMetaTemplate && (
-                        <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-[9999] w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg pointer-events-none">
+                        <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-[9999] w-64 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg pointer-events-none">
                           {t('campaigns.builder.content.meta_template_readonly', 'This template is synced from Meta Business Manager and can only be edited there.')}
                         </div>
                       )}
@@ -1467,7 +2119,7 @@ export function CampaignBuilder() {
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="content">{t('campaigns.builder.content.message_label', 'Message Content')}</Label>
                 {isOfficialTemplateSelected() && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs !bg-muted !text-muted-foreground">
                     <Shield className="w-3 h-3 mr-1" />
                     {t('campaigns.builder.content.readonly_template', 'Approved Template (Read-only)')}
                   </Badge>
@@ -1496,8 +2148,8 @@ export function CampaignBuilder() {
               )}
 
               {isOfficialTemplateSelected() && (
-                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-800">
+                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md">
+                  <p className="text-sm text-blue-800 dark:text-blue-400">
                     <BadgeInfo className="w-4 h-4 inline mr-1" />
                     {t('campaigns.builder.content.template_readonly_info', 'This template content is approved by Meta and cannot be modified. Variables will be automatically replaced with recipient data when sending.')}
                   </p>
@@ -1505,52 +2157,6 @@ export function CampaignBuilder() {
               )}
             </div>
 
-         
-
-            {contentValidation && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    {t('campaigns.builder.content.validation_title', 'Content Validation')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span>{t('campaigns.builder.content.validation_score', 'Score')}:</span>
-                    <Badge variant={contentValidation.score >= 80 ? 'default' : 'destructive'}>
-                      {contentValidation.score}/100
-                    </Badge>
-                  </div>
-                  {contentValidation.issues.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2">{t('campaigns.builder.content.validation_issues', 'Issues')}:</p>
-                      <ul className="text-sm space-y-1">
-                        {contentValidation.issues.map((issue: string, index: number) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <AlertTriangle className="w-3 h-3 mt-0.5 text-yellow-500" />
-                            {issue}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {contentValidation.warnings && contentValidation.warnings.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-sm font-medium mb-2">{t('campaigns.builder.content.validation_warnings', 'Warnings')}:</p>
-                      <ul className="text-sm space-y-1">
-                        {contentValidation.warnings.map((warning: string, index: number) => (
-                          <li key={index} className="flex items-start gap-2">
-                            <AlertTriangle className="w-3 h-3 mt-0.5 text-orange-500" />
-                            {warning}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </div>
         );
 
@@ -1615,20 +2221,20 @@ export function CampaignBuilder() {
                 {/* Channel-specific rate limit warnings */}
                 <div className={`p-3 rounded-lg border ${
                   campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-orange-50 border-orange-200'
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900'
+                    : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-900'
                 }`}>
                   <div className="flex items-start gap-2">
                     {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL ? (
-                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5" />
+                      <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5" />
                     )}
                     <div className="text-sm">
                       <div className={`font-medium mb-1 ${
                         campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL
-                          ? 'text-green-800'
-                          : 'text-orange-800'
+                          ? 'text-green-800 dark:text-green-400'
+                          : 'text-orange-800 dark:text-orange-400'
                       }`}>
                         {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL
                           ? t('campaigns.builder.settings.official_limits_title', 'Official API Rate Limits')
@@ -1662,11 +2268,11 @@ export function CampaignBuilder() {
 
                 {/* Rate Limit Recommendations */}
                 {rateLimitCalculation && (
-                  <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="mt-4 p-4 bg-muted border border-border rounded-lg">
                     <div className="flex items-start gap-2">
-                      <Settings className="w-4 h-4 text-gray-600 mt-0.5" />
+                      <Settings className="w-4 h-4 text-muted-foreground mt-0.5" />
                       <div className="flex-1">
-                        <div className="font-medium text-gray-800 mb-2">
+                        <div className="font-medium text-foreground mb-2">
                           {t('campaigns.builder.settings.recommendations_title', 'WhatsApp Rate Limit Recommendations')}
                         </div>
                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1778,7 +2384,7 @@ export function CampaignBuilder() {
                       </div>
 
                       {/* Business Hours Preview */}
-                      <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="p-3 bg-muted rounded-lg">
                         <div className="text-sm font-medium mb-2">{t('campaigns.builder.antiban.schedule_preview', 'Schedule Preview')}</div>
                         <div className="text-sm text-muted-foreground">
                           {rateLimitCalculation && campaignData.segmentId && (
@@ -1854,20 +2460,20 @@ export function CampaignBuilder() {
                 {/* Channel-specific anti-ban importance warning */}
                 <div className={`p-3 rounded-lg border ${
                   campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.UNOFFICIAL
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-gray-50 border-gray-200'
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900'
+                    : 'bg-muted border-border'
                 }`}>
                   <div className="flex items-start gap-2">
                     {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.UNOFFICIAL ? (
-                      <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                      <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5" />
                     ) : (
-                      <BadgeInfo className="w-4 h-4 text-gray-600 mt-0.5" />
+                      <BadgeInfo className="w-4 h-4 text-muted-foreground mt-0.5" />
                     )}
                     <div className="text-sm">
                       <div className={`font-medium mb-1 ${
                         campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.UNOFFICIAL
-                          ? 'text-red-800'
-                          : 'text-gray-800'
+                          ? 'text-red-800 dark:text-red-400'
+                          : 'text-foreground'
                       }`}>
                         {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.UNOFFICIAL
                           ? t('campaigns.builder.antiban.unofficial_critical', 'Critical: Anti-Ban Protection Required')
@@ -1876,8 +2482,8 @@ export function CampaignBuilder() {
                       </div>
                       <div className={`${
                         campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.UNOFFICIAL
-                          ? 'text-red-700'
-                          : 'text-gray-700'
+                          ? 'text-red-700 dark:text-red-400'
+                          : 'text-muted-foreground'
                       }`}>
                         {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.UNOFFICIAL ? (
                           <p>{t('campaigns.builder.antiban.unofficial_critical_desc', 'Unofficial WhatsApp channels have high ban risk. Anti-ban protection is essential to avoid account restrictions. Use conservative settings and business hours.')}</p>
@@ -2040,64 +2646,10 @@ export function CampaignBuilder() {
                         />
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="messageVariation">{t('campaigns.builder.antiban.message_variation_label', 'Message Variation')}</Label>
-                        <p className="text-sm text-muted-foreground">{t('campaigns.builder.antiban.message_variation_desc', 'Add slight variations to avoid identical content')}</p>
-                      </div>
-                      <Switch
-                        id="messageVariation"
-                        checked={campaignData.antiBanSettings.messageVariation}
-                        onCheckedChange={(checked) => setCampaignData(prev => ({
-                          ...prev,
-                          antiBanSettings: { ...prev.antiBanSettings, messageVariation: checked }
-                        }))}
-                      />
-                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
-
-            {(campaignData.channelIds?.length || 0) > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    {t('campaigns.builder.antiban.account_health_title', 'Account Health Status')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {whatsappConnections
-                      .filter((conn: any) => campaignData.channelIds?.includes(conn.id))
-                      .map((connection: any) => (
-                        <div key={connection.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <i className="ri-whatsapp-line text-green-600"></i>
-                            <div>
-                              <p className="font-medium">{connection.accountName}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {t('campaigns.builder.antiban.last_active', 'Last active')}: {new Date(connection.lastActiveAt || Date.now()).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={connection.status === 'active' ? 'default' : 'secondary'}>
-                              {connection.status}
-                            </Badge>
-                            <div className="flex items-center gap-1">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              <span className="text-sm text-muted-foreground">{t('campaigns.builder.antiban.account_status_healthy', 'Healthy')}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         );
 
@@ -2114,7 +2666,7 @@ export function CampaignBuilder() {
                   <p><strong>{t('campaigns.builder.review.name_label', 'Name')}:</strong> {campaignData.name}</p>
                   <p><strong>{t('campaigns.builder.review.description_label', 'Description')}:</strong> {campaignData.description}</p>
                   <p><strong>{t('campaigns.builder.review.channel_label', 'WhatsApp Channel')}:</strong>
-                    <Badge variant={campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL ? 'default' : 'secondary'} className="ml-2">
+                    <Badge variant={campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL ? 'default' : 'secondary'} className={`ml-2 ${campaignData.whatsappChannelType !== WHATSAPP_CHANNEL_TYPES.OFFICIAL ? '!bg-muted !text-muted-foreground' : ''}`}>
                       {campaignData.whatsappChannelType === WHATSAPP_CHANNEL_TYPES.OFFICIAL ?
                         t('campaigns.builder.review.official_api', 'Official API') :
                         t('campaigns.builder.review.unofficial_web', 'Unofficial/Web')
@@ -2144,7 +2696,7 @@ export function CampaignBuilder() {
                             <div key={connection.id} className="flex items-center gap-2 text-sm">
                               <i className="ri-whatsapp-line text-green-600"></i>
                               <span>{connection.accountName}</span>
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge variant="secondary" className="text-xs !bg-muted !text-muted-foreground">
                                 {connection.status}
                               </Badge>
                             </div>
@@ -2230,7 +2782,7 @@ export function CampaignBuilder() {
                       <p className="text-sm font-medium">{t('campaigns.builder.review.media_attachments_label', 'Media Attachments')}:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {campaignData.mediaUrls.map((url, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
+                          <Badge key={index} variant="secondary" className="text-xs !bg-muted !text-muted-foreground">
                             {t('campaigns.builder.review.media_item_label', 'Media')} {index + 1}
                           </Badge>
                         ))}
@@ -2251,21 +2803,21 @@ export function CampaignBuilder() {
   return (
     <div className="max-w-8xl mx-auto space-y-6 pb-20 px-4 sm:px-6 lg:px-8">
       {/* Enhanced Header Section */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 rounded-xl p-6 mb-8 border border-gray-200 dark:border-gray-700">
+      <div className="bg-gradient-to-r from-muted to-muted/80 rounded-xl p-6 mb-8 border border-border">
         <div className="flex items-center gap-4 mb-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setLocation('/campaigns')}
-            className="hover:bg-white/60 dark:hover:bg-gray-800/60"
+            className="hover:bg-accent"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-brand-primary dark:text-white">
+            <h1 className="text-3xl font-bold text-foreground">
               {isEditMode ? t('campaigns.builder.header.edit', 'Edit Campaign') : t('campaigns.builder.header.create', 'Create Campaign')}
             </h1>
-            <p className="text-gray-600 dark:text-gray-300 mt-1">
+            <p className="text-muted-foreground mt-1">
               {t('campaigns.builder.header.step_progress', 'Step {{current}} of {{total}}: {{title}}', {
                 current: currentStep + 1,
                 total: CAMPAIGN_STEPS.length,
@@ -2275,16 +2827,16 @@ export function CampaignBuilder() {
           </div>
 
           {/* Progress Indicator */}
-          <div className="hidden md:flex items-center gap-2 bg-white/60 dark:bg-gray-800/60 rounded-full px-4 py-2 backdrop-blur-sm">
+          <div className="hidden md:flex items-center gap-2 bg-background/60 rounded-full px-4 py-2 backdrop-blur-sm">
             <div className="w-2 h-2 rounded-full bg-brand-primary"></div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span className="text-sm font-medium text-foreground">
               {Math.round(((currentStep + 1) / CAMPAIGN_STEPS.length) * 100)}% Complete
             </span>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4">
+        <div className="w-full bg-muted rounded-full h-2 mb-4">
           <div
             className="bg-brand-primary h-2 rounded-full"
             style={{ width: `${((currentStep + 1) / CAMPAIGN_STEPS.length) * 100}%` }}
@@ -2293,10 +2845,10 @@ export function CampaignBuilder() {
       </div>
 
       {/* Enhanced Step Navigation */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-8">
+      <div className="bg-card rounded-xl p-4 sm:p-6 shadow-sm border border-border mb-8">
         <div className="flex items-center justify-between relative overflow-x-auto">
           {/* Background Progress Line - Hidden on mobile */}
-          <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-200 dark:bg-gray-700 -translate-y-1/2 z-0 hidden sm:block"></div>
+          <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-muted -translate-y-1/2 z-0 hidden sm:block"></div>
           <div
             className="absolute top-1/2 left-0 h-0.5 bg-brand-primary -translate-y-1/2 z-0 hidden sm:block"
             style={{ width: `${(currentStep / (CAMPAIGN_STEPS.length - 1)) * 100}%` }}
@@ -2320,9 +2872,9 @@ export function CampaignBuilder() {
                       ? 'border-brand-primary bg-brand-primary text-white shadow-lg'
                       : isCompleted
                         ? 'border-green-500 bg-green-500 text-white cursor-pointer'
-                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                        : 'border-border bg-background text-muted-foreground'
                     }
-                    ${isClickable && !isActive ? 'hover:border-brand-primary hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer' : ''}
+                    ${isClickable && !isActive ? 'hover:border-brand-primary hover:bg-accent cursor-pointer' : ''}
                     ${!isClickable ? 'cursor-not-allowed opacity-50' : ''}
                   `}
                   aria-label={`${step.title} - ${isCompleted ? 'Completed' : isActive ? 'Current' : 'Upcoming'}`}
@@ -2339,10 +2891,10 @@ export function CampaignBuilder() {
                   <span className={`
                     text-xs sm:text-sm font-medium whitespace-nowrap
                     ${isActive
-                      ? 'text-brand-primary dark:text-white'
+                      ? 'text-foreground'
                       : isCompleted
                         ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-500 dark:text-gray-400'
+                        : 'text-muted-foreground'
                     }
                   `}>
                     <span className="hidden sm:inline">{step.title}</span>
@@ -2359,15 +2911,15 @@ export function CampaignBuilder() {
 
         {/* Step Description */}
         <div className="mt-6 text-center">
-          <p className="text-gray-600 dark:text-gray-300 text-sm">
+          <p className="text-muted-foreground text-sm">
             {getStepDescription(currentStep)}
           </p>
         </div>
       </div>
 
       {/* Enhanced Main Content Card */}
-      <Card className="shadow-lg border-0 bg-white dark:bg-gray-900 overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600">
+      <Card className="shadow-lg border-0 bg-card overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-muted to-muted/80 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-brand-primary flex items-center justify-center">
               {(() => {
@@ -2376,10 +2928,10 @@ export function CampaignBuilder() {
               })()}
             </div>
             <div>
-              <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">
+              <CardTitle className="text-xl font-semibold text-foreground">
                 {CAMPAIGN_STEPS[currentStep].title}
               </CardTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {getStepDescription(currentStep)}
               </p>
             </div>
@@ -2393,7 +2945,7 @@ export function CampaignBuilder() {
       </Card>
 
       {/* Enhanced Navigation */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mt-8">
+      <div className="bg-card rounded-xl p-6 shadow-sm border border-border mt-8">
         <div className="flex justify-between items-center">
           <Button
             variant="outline"
@@ -2403,7 +2955,7 @@ export function CampaignBuilder() {
               px-6 py-3
               ${currentStep === 0
                 ? 'opacity-50 cursor-not-allowed'
-                : 'hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+                : 'hover:bg-accent hover:border-border'
               }
             `}
           >
@@ -2416,7 +2968,7 @@ export function CampaignBuilder() {
               variant="outline"
               onClick={handleSaveDraft}
               disabled={loading}
-              className="px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600"
+              className="px-6 py-3 hover:bg-accent hover:border-border"
             >
               <Save className="w-4 h-4 mr-2" />
               {t('campaigns.builder.navigation.save_draft', 'Save Draft')}
@@ -2453,9 +3005,9 @@ export function CampaignBuilder() {
         </div>
 
         {/* Step Indicator at Bottom */}
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-4 pt-4 border-t border-border">
           <div className="flex items-center justify-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-muted-foreground">
               Step {currentStep + 1} of {CAMPAIGN_STEPS.length}
             </span>
             <div className="flex gap-1 ml-2">
@@ -2467,7 +3019,7 @@ export function CampaignBuilder() {
                       ? 'bg-brand-primary'
                       : index < currentStep
                         ? 'bg-green-500'
-                        : 'bg-gray-300 dark:bg-gray-600'
+                        : 'bg-muted-foreground/30'
                   }`}
                 />
               ))}
@@ -2484,14 +3036,14 @@ export function CampaignBuilder() {
             onClick={handleSaveDraft}
             disabled={loading}
             size="sm"
-            className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 shadow-lg hover:shadow-xl group"
+            className="w-12 h-12 rounded-full bg-background border-2 border-border shadow-lg hover:shadow-xl group"
             title={t('campaigns.builder.navigation.quick_save', 'Quick Save')}
           >
-            <Save className="w-4 h-4 text-gray-600 dark:text-gray-300 group-hover:text-brand-primary dark:group-hover:text-white" />
+            <Save className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
           </Button>
 
           {/* Progress Indicator */}
-          <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 shadow-lg flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-background border-2 border-border shadow-lg flex items-center justify-center">
             <div className="relative w-8 h-8">
               <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 32 32">
                 <circle
@@ -2501,7 +3053,7 @@ export function CampaignBuilder() {
                   stroke="currentColor"
                   strokeWidth="2"
                   fill="none"
-                  className="text-gray-200 dark:text-gray-600"
+                  className="text-muted-foreground/30"
                 />
                 <circle
                   cx="16"
@@ -2512,11 +3064,11 @@ export function CampaignBuilder() {
                   fill="none"
                   strokeDasharray={`${2 * Math.PI * 14}`}
                   strokeDashoffset={`${2 * Math.PI * 14 * (1 - (currentStep + 1) / CAMPAIGN_STEPS.length)}`}
-                  className="text-brand-primary"
+                  className="text-foreground"
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                <span className="text-xs font-medium text-muted-foreground">
                   {Math.round(((currentStep + 1) / CAMPAIGN_STEPS.length) * 100)}%
                 </span>
               </div>

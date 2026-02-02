@@ -1,16 +1,5 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useToast } from './use-toast';
-
-
-const useWebSocket = () => {
-  return {
-    socket: null,
-    subscribe: (_event: string, _callback: (data: any) => void) => {
-
-      return () => {};
-    }
-  };
-};
 
 interface ReactionSummary {
   emoji: string;
@@ -22,225 +11,50 @@ interface MessageReactions {
   [messageId: number]: ReactionSummary[];
 }
 
+const TIKTOK_REACTIONS_UNSUPPORTED_MESSAGE =
+  'TikTok Business Messaging does not support message reactions.';
+
 /**
- * Hook for managing message reactions
+ * Hook for message reactions on TikTok.
+ * TikTok Business Messaging API does not support reactions; returns empty state and shows toast on attempt.
  */
-export function useTikTokReactions(conversationId?: number) {
-  const { socket, subscribe } = useWebSocket();
+export function useTikTokReactions(_conversationId?: number) {
   const { toast } = useToast();
-  const [reactions, setReactions] = useState<MessageReactions>({});
-  const [availableEmojis, setAvailableEmojis] = useState<string[]>([]);
+  const [reactions] = useState<MessageReactions>({});
+  const [availableEmojis] = useState<string[]>([]);
 
-  /**
-   * Load available reaction emojis
-   */
-  useEffect(() => {
-    const loadAvailableEmojis = async () => {
-      try {
-        const response = await fetch('/api/tiktok/reactions/available');
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableEmojis(data.emojis || []);
-        }
-      } catch (error) {
-        console.error('Error loading available emojis:', error);
-      }
-    };
-
-    loadAvailableEmojis();
-  }, []);
-
-  /**
-   * Add reaction to a message
-   */
-  const addReaction = useCallback(async (messageId: number, emoji: string) => {
-    try {
-      const response = await fetch(`/api/tiktok/messages/${messageId}/reactions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ emoji })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to add reaction');
-      }
-
-
-      setReactions(prev => {
-        const messageReactions = prev[messageId] || [];
-        const existingReaction = messageReactions.find(r => r.emoji === emoji);
-        
-        if (existingReaction) {
-
-          return {
-            ...prev,
-            [messageId]: messageReactions.map(r =>
-              r.emoji === emoji
-                ? { ...r, count: r.count + 1 }
-                : r
-            )
-          };
-        } else {
-
-          return {
-            ...prev,
-            [messageId]: [...messageReactions, { emoji, count: 1, users: [] }]
-          };
-        }
-      });
-    } catch (error) {
-      console.error('Error adding reaction:', error);
-      toast({
-        title: 'Failed to add reaction',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: 'destructive'
-      });
-    }
-  }, [toast]);
-
-  /**
-   * Remove reaction from a message
-   */
-  const removeReaction = useCallback(async (messageId: number, emoji: string) => {
-    try {
-      const response = await fetch(`/api/tiktok/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove reaction');
-      }
-
-
-      setReactions(prev => {
-        const messageReactions = prev[messageId] || [];
-        return {
-          ...prev,
-          [messageId]: messageReactions
-            .map(r =>
-              r.emoji === emoji
-                ? { ...r, count: r.count - 1 }
-                : r
-            )
-            .filter(r => r.count > 0)
-        };
-      });
-    } catch (error) {
-      console.error('Error removing reaction:', error);
-      toast({
-        title: 'Failed to remove reaction',
-        description: 'Please try again',
-        variant: 'destructive'
-      });
-    }
-  }, [toast]);
-
-  /**
-   * Toggle reaction (add if not present, remove if present)
-   */
-  const toggleReaction = useCallback(async (messageId: number, emoji: string, userId: number) => {
-    const messageReactions = reactions[messageId] || [];
-    const existingReaction = messageReactions.find(r => r.emoji === emoji);
-    
-    if (existingReaction && existingReaction.users.includes(userId)) {
-      await removeReaction(messageId, emoji);
-    } else {
-      await addReaction(messageId, emoji);
-    }
-  }, [reactions, addReaction, removeReaction]);
-
-  /**
-   * Load reactions for a message
-   */
-  const loadReactions = useCallback(async (messageId: number) => {
-    try {
-      const response = await fetch(`/api/tiktok/messages/${messageId}/reactions`);
-      if (response.ok) {
-        const data = await response.json();
-        setReactions(prev => ({
-          ...prev,
-          [messageId]: data.reactions || []
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading reactions:', error);
-    }
-  }, []);
-
-  /**
-   * Listen to reaction updates via WebSocket
-   */
-  useEffect(() => {
-    if (!socket) return;
-
-    const unsubscribe = subscribe('messageReaction', (data: any) => {
-      if (conversationId && data.conversationId !== conversationId) return;
-
-      setReactions(prev => {
-        const messageReactions = prev[data.messageId] || [];
-        
-        if (data.action === 'add') {
-          const existingReaction = messageReactions.find(r => r.emoji === data.emoji);
-          
-          if (existingReaction) {
-            return {
-              ...prev,
-              [data.messageId]: messageReactions.map(r =>
-                r.emoji === data.emoji
-                  ? { ...r, count: r.count + 1, users: [...r.users, data.userId] }
-                  : r
-              )
-            };
-          } else {
-            return {
-              ...prev,
-              [data.messageId]: [...messageReactions, { emoji: data.emoji, count: 1, users: [data.userId] }]
-            };
-          }
-        } else if (data.action === 'remove') {
-          return {
-            ...prev,
-            [data.messageId]: messageReactions
-              .map(r =>
-                r.emoji === data.emoji
-                  ? { ...r, count: r.count - 1, users: r.users.filter(u => u !== data.userId) }
-                  : r
-              )
-              .filter(r => r.count > 0)
-          };
-        }
-        
-        return prev;
-      });
+  const addReaction = useCallback(async (_messageId: number, _emoji: string) => {
+    toast({
+      title: 'Reactions not supported',
+      description: TIKTOK_REACTIONS_UNSUPPORTED_MESSAGE,
+      variant: 'destructive'
     });
+  }, [toast]);
 
-    return () => {
-      unsubscribe();
-    };
-  }, [socket, conversationId, subscribe]);
+  const removeReaction = useCallback(async (_messageId: number, _emoji: string) => {
+    toast({
+      title: 'Reactions not supported',
+      description: TIKTOK_REACTIONS_UNSUPPORTED_MESSAGE,
+      variant: 'destructive'
+    });
+  }, [toast]);
 
-  /**
-   * Get reactions for a specific message
-   */
+  const toggleReaction = useCallback(async (messageId: number, emoji: string) => {
+    addReaction(messageId, emoji);
+  }, [addReaction]);
+
+  const loadReactions = useCallback(async (_messageId: number) => {
+
+  }, []);
+
   const getReactions = useCallback((messageId: number): ReactionSummary[] => {
     return reactions[messageId] || [];
   }, [reactions]);
 
-  /**
-   * Check if user reacted with specific emoji
-   */
-  const hasUserReacted = useCallback((messageId: number, userId: number, emoji: string): boolean => {
-    const messageReactions = reactions[messageId] || [];
-    const reaction = messageReactions.find(r => r.emoji === emoji);
-    return reaction ? reaction.users.includes(userId) : false;
-  }, [reactions]);
+  const hasUserReacted = useCallback((_messageId: number, _userId: number, _emoji: string): boolean => {
+    return false;
+  }, []);
 
-  /**
-   * Get total reaction count for a message
-   */
   const getTotalReactionCount = useCallback((messageId: number): number => {
     const messageReactions = reactions[messageId] || [];
     return messageReactions.reduce((sum, r) => sum + r.count, 0);
@@ -255,12 +69,13 @@ export function useTikTokReactions(conversationId?: number) {
     loadReactions,
     getReactions,
     hasUserReacted,
-    getTotalReactionCount
+    getTotalReactionCount,
+    supported: false
   };
 }
 
 /**
- * Hook for reaction picker
+ * Hook for reaction picker (TikTok: keep for API compatibility; UI should hide or disable for TikTok)
  */
 export function useReactionPicker() {
   const [isOpen, setIsOpen] = useState(false);
@@ -287,4 +102,3 @@ export function useReactionPicker() {
     closePicker
   };
 }
-

@@ -79,14 +79,14 @@ export function AdminProtectedRoute({ path, component: Component }: AdminProtect
         if (licenseError) {
           return (
             <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-500 to-purple-700">
-              <div className="bg-white rounded-lg shadow-xl p-8 max-w-md text-center">
-                <h1 className="text-2xl font-bold text-red-600 mb-4">⚠️ License Error</h1>
-                <p className="text-gray-700 mb-4">{licenseError.message}</p>
-                <div className="bg-gray-100 rounded p-4 mb-4">
-                  <p className="text-sm text-gray-600">
+              <div className="bg-card rounded-lg shadow-xl p-8 max-w-md text-center">
+                <h1 className="text-2xl font-bold text-destructive mb-4">⚠️ License Error</h1>
+                <p className="text-foreground mb-4">{licenseError.message}</p>
+                <div className="bg-muted rounded p-4 mb-4">
+                  <p className="text-sm text-muted-foreground">
                     <strong>Reason:</strong> {licenseError.reason || "License validation failed"}
                   </p>
-                  <p className="text-sm text-gray-600 mt-2">
+                  <p className="text-sm text-muted-foreground mt-2">
                     Please renew your license or contact support for assistance.
                   </p>
                 </div>

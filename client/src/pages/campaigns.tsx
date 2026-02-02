@@ -5,7 +5,7 @@ import { CampaignDashboard } from '@/components/campaigns/CampaignDashboard';
 
 export default function CampaignsPage() {
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Header />
       
       <div className="flex flex-1 overflow-hidden">

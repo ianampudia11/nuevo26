@@ -699,7 +699,7 @@ function FlowImportDialog({
               {isValidating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : importPreview ? (
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-600 dark:text-green-500" />
               ) : (
                 <Button
                   variant="ghost"
@@ -737,8 +737,8 @@ function FlowImportDialog({
                   </div>
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground p-3 bg-blue-50 border border-blue-200 rounded">
-                <p className="font-medium text-blue-800 mb-1">
+              <div className="text-xs text-muted-foreground p-3 bg-primary/10 dark:bg-primary/20 border border-primary/30 rounded">
+                <p className="font-medium text-primary dark:text-primary/90 mb-1">
                   {t('flows.import_note', 'Import Note:')}
                 </p>
                 <p>
@@ -825,7 +825,7 @@ function KeyboardShortcutsDialog({
                     <div className="flex items-center gap-1">
                       {shortcut.keys.map((key, keyIndex) => (
                         <div key={keyIndex} className="flex items-center gap-1">
-                          <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-300 rounded-lg">
+                          <kbd className="px-2 py-1 text-xs font-semibold text-foreground bg-muted border border-border rounded-lg">
                             {key}
                           </kbd>
                           {keyIndex < shortcut.keys.length - 1 && (
@@ -851,6 +851,29 @@ function KeyboardShortcutsDialog({
   );
 }
 
+/** Keys to strip from node.data on export so credentials never leave the app (lowercase for case-insensitive match) */
+const EXPORT_SENSITIVE_KEYS = new Set([
+  'apikey', 'api_key', 'apipassword', 'password', 'secret', 'authtoken', 'authheader',
+  'pineconeapikey', 'elevenlabsapikey', 'elevenlabscustomvoiceid'
+]);
+
+function sanitizeNodeDataForExport(data: Record<string, unknown>): Record<string, unknown> {
+  if (!data || typeof data !== 'object') return {};
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (EXPORT_SENSITIVE_KEYS.has(key.toLowerCase())) continue;
+    if (value !== null && typeof value === 'object' && !Array.isArray(value) && (key === 'headers' || key === 'auth')) {
+      out[key] = {}; // Redact nested auth/headers
+      continue;
+    }
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      out[key] = sanitizeNodeDataForExport(value as Record<string, unknown>);
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
 
 export default function FlowsPage() {
   const { toast } = useToast();
@@ -1194,7 +1217,10 @@ export default function FlowsPage() {
         name: flow.name,
         description: flow.description,
         status: flow.status,
-        nodes: flow.nodes,
+        nodes: (flow.nodes || []).map((node: any) => ({
+          ...node,
+          data: sanitizeNodeDataForExport(node.data || {})
+        })),
         edges: flow.edges,
         version: flow.version,
         createdAt: flow.createdAt,
@@ -1334,7 +1360,7 @@ export default function FlowsPage() {
     switch (status) {
       case 'active':
         return (
-          <Badge className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
+          <Badge className="bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 text-white flex items-center gap-1">
             <Play className="h-3 w-3" />
             {t('flows.active', 'Active')}
           </Badge>
@@ -1358,7 +1384,7 @@ export default function FlowsPage() {
 
   const StatusSelector = ({ flow }: { flow: any }) => {
     const statusOptions = [
-      { value: 'active', label: t('flows.active', 'Active'), color: 'bg-green-600', icon: Play },
+      { value: 'active', label: t('flows.active', 'Active'), color: 'bg-green-600 dark:bg-green-500', icon: Play },
       { value: 'draft', label: t('flows.draft', 'Draft'), color: 'bg-yellow-600', icon: Clock }
     ];
 
@@ -1396,7 +1422,7 @@ export default function FlowsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Header />
 
       <div className="flex flex-1 overflow-hidden">
@@ -1565,14 +1591,14 @@ export default function FlowsPage() {
                           <DropdownMenuItem onClick={() => handleBulkStatusChange('active')}>
                             <div className="flex items-center gap-2">
                               <Play className="h-3 w-3" />
-                              <div className="w-2 h-2 rounded-full bg-green-600" />
+                              <div className="w-2 h-2 rounded-full bg-green-600 dark:bg-green-500" />
                               {t('flows.active', 'Active')}
                             </div>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleBulkStatusChange('inactive')}>
                             <div className="flex items-center gap-2">
                               <Pause className="h-3 w-3" />
-                              <div className="w-2 h-2 rounded-full bg-gray-600" />
+                              <div className="w-2 h-2 rounded-full bg-muted-foreground" />
                               {t('flows.inactive', 'Inactive')}
                             </div>
                           </DropdownMenuItem>
@@ -1773,8 +1799,8 @@ export default function FlowsPage() {
 
                       <div className="grid md:grid-cols-3 gap-6 mb-8 max-w-4xl">
                         <div className="text-center space-y-3">
-                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto">
-                            <MessageSquare className="h-6 w-6 text-blue-600" />
+                          <div className="w-12 h-12 bg-primary/10 dark:bg-primary/20 rounded-lg flex items-center justify-center mx-auto">
+                            <MessageSquare className="h-6 w-6 text-primary" />
                           </div>
                           <h4 className="font-semibold">{t('flows.benefit_automate', 'Automate Conversations')}</h4>
                           <p className="text-sm text-muted-foreground">
@@ -1783,8 +1809,8 @@ export default function FlowsPage() {
                         </div>
                         
                         <div className="text-center space-y-3">
-                          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto">
-                            <Clock className="h-6 w-6 text-green-600" />
+                          <div className="w-12 h-12 bg-green-500/10 dark:bg-green-500/20 rounded-lg flex items-center justify-center mx-auto">
+                            <Clock className="h-6 w-6 text-green-600 dark:text-green-500" />
                           </div>
                           <h4 className="font-semibold">{t('flows.benefit_247', '24/7 Availability')}</h4>
                           <p className="text-sm text-muted-foreground">
@@ -1793,8 +1819,8 @@ export default function FlowsPage() {
                         </div>
                         
                         <div className="text-center space-y-3">
-                          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto">
-                            <Zap className="h-6 w-6 text-purple-600" />
+                          <div className="w-12 h-12 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg flex items-center justify-center mx-auto">
+                            <Zap className="h-6 w-6 text-purple-600 dark:text-purple-500" />
                           </div>
                           <h4 className="font-semibold">{t('flows.benefit_instant', 'Instant Responses')}</h4>
                           <p className="text-sm text-muted-foreground">

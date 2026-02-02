@@ -295,14 +295,14 @@ export default function ImportExportModal({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'export' ? 'Export Deals' : mode === 'import' ? 'Import Deals' : 'Import / Export Deals'}
+            {mode === 'export' ? t('pipeline.export_deals', 'Export Deals') : mode === 'import' ? t('pipeline.import_deals', 'Import Deals') : t('pipeline.import_export_deals', 'Import / Export Deals')}
           </DialogTitle>
           <DialogDescription>
             {mode === 'export' 
-              ? 'Download your deals data in CSV, Excel, or JSON format'
+              ? t('pipeline.download_deals_data', 'Download your deals data in CSV, Excel, or JSON format')
               : mode === 'import' 
-              ? 'Upload a CSV, Excel, or JSON file to import deals'
-              : 'Choose whether to import or export deals data'
+              ? t('pipeline.upload_file_to_import', 'Upload a CSV, Excel, or JSON file to import deals')
+              : t('pipeline.choose_import_export', 'Choose whether to import or export deals data')
             }
           </DialogDescription>
         </DialogHeader>
@@ -316,7 +316,7 @@ export default function ImportExportModal({
                 onClick={() => setMode('export')}
               >
                 <Download className="h-6 w-6" />
-                <span>Export Deals</span>
+                <span>{t('pipeline.export_deals', 'Export Deals')}</span>
               </Button>
               <Button
                 variant="outline"
@@ -324,7 +324,7 @@ export default function ImportExportModal({
                 onClick={() => setMode('import')}
               >
                 <Upload className="h-6 w-6" />
-                <span>Import Deals</span>
+                <span>{t('pipeline.import_deals', 'Import Deals')}</span>
               </Button>
             </div>
           )}
@@ -335,8 +335,8 @@ export default function ImportExportModal({
                 <Info className="h-4 w-4" />
                 <AlertDescription>
                   {currentStageFilter 
-                    ? 'Exporting deals from the current filtered stage only.'
-                    : 'Exporting all deals from your pipeline.'
+                    ? t('pipeline.exporting_from_stage', 'Exporting deals from the current filtered stage only.')
+                    : t('pipeline.exporting_all_deals', 'Exporting all deals from your pipeline.')
                   }
                 </AlertDescription>
               </Alert>
@@ -353,7 +353,7 @@ export default function ImportExportModal({
                   ) : (
                     <FileSpreadsheet className="h-6 w-6" />
                   )}
-                  <span>Export as CSV</span>
+                  <span>{t('pipeline.export_as_csv', 'Export as CSV')}</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -366,7 +366,7 @@ export default function ImportExportModal({
                   ) : (
                     <FileSpreadsheet className="h-6 w-6" />
                   )}
-                  <span>Export as Excel</span>
+                  <span>{t('pipeline.export_as_excel', 'Export as Excel')}</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -379,7 +379,7 @@ export default function ImportExportModal({
                   ) : (
                     <FileText className="h-6 w-6" />
                   )}
-                  <span>Export as JSON</span>
+                  <span>{t('pipeline.export_as_json', 'Export as JSON')}</span>
                 </Button>
               </div>
             </div>
@@ -390,7 +390,7 @@ export default function ImportExportModal({
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  Upload a CSV, Excel, or JSON file with deal data. Make sure your file includes the required fields.
+                  {t('pipeline.upload_file_description', 'Upload a CSV, Excel, or JSON file with deal data. Make sure your file includes the required fields.')}
                 </AlertDescription>
               </Alert>
 
@@ -399,17 +399,17 @@ export default function ImportExportModal({
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="mb-4">
                       <Download className="h-4 w-4 mr-2" />
-                      Download Template
+                      {t('pipeline.download_template', 'Download Template')}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem onClick={() => downloadTemplate('csv')}>
                       <FileSpreadsheet className="h-4 w-4 mr-2" />
-                      CSV Template
+                      {t('pipeline.csv_template', 'CSV Template')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => downloadTemplate('json')}>
                       <FileText className="h-4 w-4 mr-2" />
-                      JSON Template
+                      {t('pipeline.json_template', 'JSON Template')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -418,21 +418,21 @@ export default function ImportExportModal({
               <div 
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors relative ${
                   isDragOver 
-                    ? 'border-blue-400 bg-blue-50' 
-                    : 'border-gray-300 hover:border-gray-400'
+                    ? 'border-primary bg-primary/10' 
+                    : 'border-border hover:border-border/80'
                 }`}
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
               >
-                <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-600">
-                    Click to upload or drag and drop your file here
+                  <p className="text-sm text-foreground">
+                    {t('pipeline.click_to_upload', 'Click to upload or drag and drop your file here')}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    Supports CSV, Excel, and JSON files (max 10MB)
+                  <p className="text-xs text-muted-foreground">
+                    {t('pipeline.supports_file_formats', 'Supports CSV, Excel, and JSON files (max 10MB)')}
                   </p>
                 </div>
                 <input
@@ -447,7 +447,7 @@ export default function ImportExportModal({
               {isProcessing && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Processing file...</span>
+                    <span>{t('pipeline.processing_file', 'Processing file...')}</span>
                     <span>{importProgress}%</span>
                   </div>
                   <Progress value={importProgress} />
@@ -461,30 +461,30 @@ export default function ImportExportModal({
                       <CheckCircle className="h-5 w-5 text-green-600" />
                       <div>
                         <p className="font-medium text-green-800">{importResult.success}</p>
-                        <p className="text-sm text-green-600">Imported</p>
+                        <p className="text-sm text-green-600">{t('pipeline.imported', 'Imported')}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                       <AlertCircle className="h-5 w-5 text-red-600" />
                       <div>
                         <p className="font-medium text-red-800">{importResult.failed}</p>
-                        <p className="text-sm text-red-600">Failed</p>
+                        <p className="text-sm text-red-600">{t('pipeline.failed', 'Failed')}</p>
                       </div>
                     </div>
                   </div>
 
                   {importResult.errors.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="font-medium text-sm">Import Errors:</h4>
+                      <h4 className="font-medium text-sm">{t('pipeline.import_errors', 'Import Errors:')}</h4>
                       <div className="max-h-32 overflow-y-auto space-y-1">
                         {importResult.errors.slice(0, 5).map((error, index) => (
                           <div key={index} className="text-xs p-2 bg-red-50 border border-red-200 rounded">
-                            <span className="font-medium">Row {error.row}:</span> {error.error}
+                            <span className="font-medium">{t('pipeline.row', 'Row')} {error.row}:</span> {error.error}
                           </div>
                         ))}
                         {importResult.errors.length > 5 && (
-                          <p className="text-xs text-gray-500">
-                            +{importResult.errors.length - 5} more errors
+                          <p className="text-xs text-muted-foreground">
+                            +{importResult.errors.length - 5} {t('pipeline.more_errors', 'more errors')}
                           </p>
                         )}
                       </div>
@@ -499,11 +499,11 @@ export default function ImportExportModal({
         <DialogFooter>
           {mode && (
             <Button variant="outline" onClick={resetModal}>
-              Back
+              {t('pipeline.back', 'Back')}
             </Button>
           )}
           <Button variant="outline" onClick={handleClose}>
-            {importResult ? 'Done' : 'Cancel'}
+            {importResult ? t('pipeline.done', 'Done') : t('common.cancel', 'Cancel')}
           </Button>
         </DialogFooter>
       </DialogContent>

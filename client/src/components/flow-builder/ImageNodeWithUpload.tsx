@@ -189,7 +189,7 @@ export function ImageNodeWithUpload({ id, data, isConnectable }: ImageNodeProps)
       ) : (
         <div className="space-y-3">
           {mediaUrl ? (
-            <div className="relative aspect-video bg-secondary/30 rounded overflow-hidden flex items-center justify-center">
+            <div className="relative aspect-video  rounded overflow-hidden flex items-center justify-center">
               {mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                 <img 
                   src={mediaUrl} 
@@ -207,7 +207,7 @@ export function ImageNodeWithUpload({ id, data, isConnectable }: ImageNodeProps)
               <span className="absolute bottom-1 right-1 text-[10px] px-1 bg-background/80 rounded">{t('flow_builder.image_upload_image_label', 'Image')}</span>
             </div>
           ) : (
-            <div className="bg-secondary/30 p-3 rounded flex flex-col items-center justify-center">
+            <div className=" p-3 rounded flex flex-col items-center justify-center">
               <Image className="h-8 w-8 text-muted-foreground mb-1" />
               <span className="text-xs text-muted-foreground">{t('flow_builder.image_upload_no_image_selected', 'No image selected')}</span>
             </div>

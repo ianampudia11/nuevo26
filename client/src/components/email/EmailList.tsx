@@ -495,7 +495,7 @@ export default function EmailList({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading', 'Loading...')}</p>
+          <p className="text-muted-foreground">{t('common.loading', 'Loading...')}</p>
         </div>
       </div>
     );
@@ -504,8 +504,8 @@ export default function EmailList({
   if (emails.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <Mail className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+        <div className="text-center text-muted-foreground">
+          <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
           <h3 className="text-lg font-medium mb-2">
             {t('email.no_emails', 'No emails')}
           </h3>
@@ -521,7 +521,7 @@ export default function EmailList({
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Email List Header */}
       <div className={cn(
-        "border-b border-gray-200 bg-gray-50 transition-all duration-200 flex-shrink-0",
+        "border-b border-border bg-muted transition-all duration-200 flex-shrink-0",
         isMobile ? "p-2" : "p-3"
       )}>
         <div className="flex items-center justify-between">
@@ -662,8 +662,8 @@ export default function EmailList({
 
               isMobile ? "min-h-[72px]" : "min-h-[64px]",
 
-              selectedEmail?.id === email.id && "bg-gray-50 border-gray-300 shadow-sm",
-              !email.isRead ? "bg-white font-medium" : "bg-gray-50"
+              selectedEmail?.id === email.id && "bg-accent border-border shadow-sm",
+              !email.isRead ? "bg-background font-medium" : "bg-muted"
             )}
             onClick={() => onEmailSelect(email)}
           >

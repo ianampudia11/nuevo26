@@ -187,7 +187,7 @@ export function BotResetNode({ id, data, isConnectable }: BotResetNodeProps) {
               </button>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           {getResetScopeIcon()}
           <span className="font-medium text-green-600">Re-enable Bot</span>
@@ -222,7 +222,7 @@ export function BotResetNode({ id, data, isConnectable }: BotResetNodeProps) {
       </div>
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border rounded p-2 ">
           <div>
             <Label className="block mb-2 font-medium">Reset Scope</Label>
             <Select

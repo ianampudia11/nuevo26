@@ -70,7 +70,8 @@ export default function SubscriptionRenewalDialog({
       const res = await apiRequest("POST", "/api/enhanced-subscription/initiate-renewal", {
         paymentMethod,
         enableAutoRenewal,
-        planId: selectedPlanId
+        planId: selectedPlanId,
+        originUrl: window.location.origin
       });
       if (!res.ok) {
         const error = await res.json();

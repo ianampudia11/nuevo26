@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ContactAvatar } from '@/components/contacts/ContactAvatar';
+import { getInitials } from '@/lib/utils';
 import { Loader2, Download, Search, Users, Crown, Shield } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -238,15 +240,6 @@ export default function GroupParticipantsModal({
     return 'Hey there! I am using WhatsApp.'; // Default status
   };
 
-
-
-  const getParticipantAvatar = (participant: GroupParticipant) => {
-    const displayName = getParticipantDisplayName(participant);
-    const name = displayName || getFormattedPhoneNumber(participant);
-    return participant.contact?.avatarUrl ||
-           `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
@@ -255,7 +248,7 @@ export default function GroupParticipantsModal({
             <Users className="w-5 h-5" />
             {t('groups.participants.title', 'Group Participants')}
             {groupName && (
-              <span className="text-sm font-normal text-gray-500">
+              <span className="text-sm font-normal text-muted-foreground">
                 - {groupName}
               </span>
             )}
@@ -347,12 +340,19 @@ export default function GroupParticipantsModal({
                     <div key={participant.id} className="p-3 hover:bg-gray-50 cursor-pointer">
                       <div className="flex items-center gap-3">
                         {/* Profile Picture */}
-                        <Avatar className="w-12 h-12">
-                          <AvatarImage src={getParticipantAvatar(participant)} />
-                          <AvatarFallback className="bg-gray-300 text-gray-700 text-sm">
-                            {displayName ? displayName.charAt(0).toUpperCase() : phoneNumber.charAt(1)}
-                          </AvatarFallback>
-                        </Avatar>
+                        {participant.contact ? (
+                          <ContactAvatar
+                            contact={participant.contact}
+                            size="sm"
+                            showRefreshButton={false}
+                          />
+                        ) : (
+                          <Avatar className="h-12 w-12">
+                            <AvatarFallback>
+                              {getInitials(getParticipantDisplayName(participant) || getFormattedPhoneNumber(participant))}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
 
                         {/* Name and Status */}
                         <div className="flex-1 min-w-0">

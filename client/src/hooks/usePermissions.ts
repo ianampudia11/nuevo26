@@ -9,7 +9,11 @@ export const PERMISSIONS = {
   MANAGE_CONVERSATIONS: 'manage_conversations',
 
   VIEW_CONTACTS: 'view_contacts',
+  VIEW_OWN_CONTACTS: 'view_own_contacts',
+  VIEW_ASSIGNED_CONTACTS: 'view_assigned_contacts',
+  VIEW_COMPANY_CONTACTS: 'view_company_contacts',
   MANAGE_CONTACTS: 'manage_contacts',
+  VIEW_CONTACT_PHONE: 'view_contact_phone',
 
   VIEW_CHANNELS: 'view_channels',
   MANAGE_CHANNELS: 'manage_channels',
@@ -47,7 +51,12 @@ export const PERMISSIONS = {
   MANAGE_PAGES: 'manage_pages',
 
   VIEW_TASKS: 'view_tasks',
-  MANAGE_TASKS: 'manage_tasks'
+  MANAGE_TASKS: 'manage_tasks',
+
+  VIEW_CALL_LOGS: 'view_call_logs',
+  MANAGE_CALL_LOGS: 'manage_call_logs',
+  EXPORT_CALL_LOGS: 'export_call_logs',
+  DELETE_CALL_LOGS: 'delete_call_logs'
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
@@ -150,7 +159,42 @@ export const usePermissions = () => {
   };
 
   const canAccessContacts = (): boolean => {
-    return hasAnyPermission([PERMISSIONS.VIEW_CONTACTS, PERMISSIONS.MANAGE_CONTACTS]);
+    return hasAnyPermission([
+      PERMISSIONS.VIEW_CONTACTS,
+      PERMISSIONS.VIEW_OWN_CONTACTS,
+      PERMISSIONS.VIEW_ASSIGNED_CONTACTS,
+      PERMISSIONS.VIEW_COMPANY_CONTACTS,
+      PERMISSIONS.MANAGE_CONTACTS
+    ]);
+  };
+
+  const canViewOwnContacts = (): boolean => {
+    return hasPermission(PERMISSIONS.VIEW_OWN_CONTACTS);
+  };
+
+  const canViewAssignedContacts = (): boolean => {
+    return hasPermission(PERMISSIONS.VIEW_ASSIGNED_CONTACTS);
+  };
+
+  const canViewCompanyContacts = (): boolean => {
+    return hasPermission(PERMISSIONS.VIEW_COMPANY_CONTACTS);
+  };
+
+  const canViewContactPhone = (): boolean => {
+    return hasPermission(PERMISSIONS.VIEW_CONTACT_PHONE);
+  };
+
+  const getContactViewScope = (): 'own' | 'assigned' | 'company' | null => {
+    if (user?.isSuperAdmin || hasPermission(PERMISSIONS.VIEW_COMPANY_CONTACTS)) {
+      return 'company';
+    }
+    if (hasPermission(PERMISSIONS.VIEW_ASSIGNED_CONTACTS)) {
+      return 'assigned';
+    }
+    if (hasPermission(PERMISSIONS.VIEW_OWN_CONTACTS)) {
+      return 'own';
+    }
+    return null;
   };
 
   const canAccessCalendar = (): boolean => {
@@ -175,6 +219,18 @@ export const usePermissions = () => {
     return hasAnyPermission([PERMISSIONS.VIEW_TASKS, PERMISSIONS.MANAGE_TASKS]);
   };
 
+  const canAccessCallLogs = (): boolean => {
+    return hasAnyPermission([PERMISSIONS.VIEW_CALL_LOGS, PERMISSIONS.MANAGE_CALL_LOGS]);
+  };
+
+  const canManageCallLogs = (): boolean => {
+    return hasPermission(PERMISSIONS.MANAGE_CALL_LOGS);
+  };
+
+  const canExportCallLogs = (): boolean => {
+    return hasPermission(PERMISSIONS.EXPORT_CALL_LOGS);
+  };
+
   return {
     permissions,
     isLoading,
@@ -194,9 +250,17 @@ export const usePermissions = () => {
     canAccessFlows,
     canAccessChannels,
     canAccessContacts,
+    canViewOwnContacts,
+    canViewAssignedContacts,
+    canViewCompanyContacts,
+    canViewContactPhone,
+    getContactViewScope,
     canAccessCalendar,
     canAccessCampaigns,
     canAccessTasks,
+    canAccessCallLogs,
+    canManageCallLogs,
+    canExportCallLogs,
     PERMISSIONS
   };
 };

@@ -1552,7 +1552,7 @@ export default function BackupManagement() {
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="text-sm font-medium">{t('admin.backup.cleanup.title', 'Backup Cleanup')}</h4>
                     {lastCleanup && (
-                      <Badge variant={lastCleanup.status === 'success' ? 'default' : 'destructive'} className="text-xs">
+                      <Badge variant={lastCleanup.status === 'success' ? 'success' : 'destructive'} className="text-xs">
                         {lastCleanup.status === 'success'
                           ? t('admin.backup.cleanup.last_success', 'Last: ') + new Date(lastCleanup.timestamp).toLocaleDateString()
                           : t('admin.backup.cleanup.last_failed', 'Last failed')}
@@ -1937,7 +1937,7 @@ export default function BackupManagement() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={schedule.enabled ? 'default' : 'secondary'}>
+                            <Badge variant={schedule.enabled ? 'success' : 'secondary'}>
                               {schedule.enabled ? t('admin.backup.schedules.status.enabled', 'Enabled') : t('admin.backup.schedules.status.disabled', 'Disabled')}
                             </Badge>
                           </TableCell>
@@ -2138,7 +2138,7 @@ export default function BackupManagement() {
                   </div>
                   <div className="flex items-center gap-2">
                     {oauthConfig?.configured ? (
-                      <Badge variant="default" className="bg-green-100 text-green-800">
+                      <Badge variant="success">
                         <CheckCircle className="h-3 w-3 mr-1" />
                         {t('admin.backup.oauth.configured_status', 'Configured')}
                       </Badge>
@@ -2650,7 +2650,7 @@ export default function BackupManagement() {
                         <p className="text-sm text-red-700 mb-3">
                           {t('admin.backup.restore.confirmation_text', 'To proceed with the database restoration, please type the backup filename exactly as shown below:')}
                         </p>
-                        <div className="bg-white border rounded px-3 py-2 font-mono text-sm">
+                        <div className="bg-card border rounded px-3 py-2 font-mono text-sm">
                           {getRequiredConfirmationText()}
                         </div>
                       </div>

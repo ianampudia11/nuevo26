@@ -1093,12 +1093,12 @@ export default function PlansPage() {
                       <CardDescription className="mt-1">{plan.description}</CardDescription>
                       <div className="flex gap-2 mt-2">
                         {plan.isFree && (
-                          <span className="bg-green-100 text-green-800 text-xs font-medium py-1 px-2 rounded-full">
+                          <span className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 text-xs font-medium py-1 px-2 rounded-full">
                             Free
                           </span>
                         )}
                         {plan.hasTrialPeriod && plan.trialDays > 0 && (
-                          <span className="bg-blue-100 text-blue-800 text-xs font-medium py-1 px-2 rounded-full">
+                          <span className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 text-xs font-medium py-1 px-2 rounded-full">
                             {plan.trialDays} day trial
                           </span>
                         )}

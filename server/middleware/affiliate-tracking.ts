@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { affiliates, affiliateReferrals, affiliateClicks } from "../../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { affiliates, affiliateReferrals, affiliateClicks, affiliateEarningsBalance, affiliateEarningsTransactions } from "../../shared/schema";
+import { eq, and, isNull } from "drizzle-orm";
 
 interface AffiliateTrackingData {
   affiliateCode?: string;
@@ -237,7 +237,8 @@ export async function createAffiliateReferral(
 export async function convertAffiliateReferral(
   referralId: number,
   conversionValue: number,
-  commissionAmount?: number
+  commissionAmount?: number,
+  paymentTransactionId?: number
 ) {
   try {
     const [referral] = await db
@@ -250,6 +251,11 @@ export async function convertAffiliateReferral(
       throw new Error('Referral not found');
     }
 
+
+    if (referral.status === 'converted') {
+
+      return { referral, commissionAmount: Number(referral.commissionAmount) || 0 };
+    }
 
     const commissionRate = Number(referral.commissionRate) || 0;
     const finalCommissionAmount = commissionAmount ||
@@ -267,9 +273,11 @@ export async function convertAffiliateReferral(
       })
       .where(eq(affiliateReferrals.id, referralId));
 
-
     const affiliateId = referral.affiliateId;
+    const companyId = referral.companyId;
+    
     if (affiliateId) {
+
       const [affiliate] = await db
         .select()
         .from(affiliates)
@@ -287,6 +295,64 @@ export async function convertAffiliateReferral(
           })
           .where(eq(affiliates.id, affiliate.id));
       }
+
+
+      const [existingBalance] = await db
+        .select()
+        .from(affiliateEarningsBalance)
+        .where(and(
+          eq(affiliateEarningsBalance.affiliateId, affiliateId),
+          companyId ? eq(affiliateEarningsBalance.companyId, companyId) : isNull(affiliateEarningsBalance.companyId)
+        ))
+        .limit(1);
+
+      const newTotalEarned = (Number(existingBalance?.totalEarned) || 0) + finalCommissionAmount;
+      const newAvailableBalance = (Number(existingBalance?.availableBalance) || 0) + finalCommissionAmount;
+
+      const currentPendingPayout = Number(existingBalance?.pendingPayout) || 0;
+
+      if (existingBalance) {
+        await db
+          .update(affiliateEarningsBalance)
+          .set({
+            totalEarned: newTotalEarned.toString(),
+            availableBalance: newAvailableBalance.toString(),
+
+            lastUpdated: new Date()
+          })
+          .where(eq(affiliateEarningsBalance.id, existingBalance.id));
+      } else {
+        await db
+          .insert(affiliateEarningsBalance)
+          .values({
+            companyId: companyId || null,
+            affiliateId: affiliateId,
+            totalEarned: newTotalEarned.toString(),
+            availableBalance: newAvailableBalance.toString(),
+            pendingPayout: "0.00", // Start at zero, only set when generating payouts
+            appliedToPlans: "0.00",
+            paidOut: "0.00",
+            lastUpdated: new Date(),
+            createdAt: new Date()
+          });
+      }
+
+
+      await db
+        .insert(affiliateEarningsTransactions)
+        .values({
+          companyId: companyId || null,
+          affiliateId: affiliateId,
+          transactionType: 'earned',
+          amount: finalCommissionAmount.toString(),
+          balanceAfter: newAvailableBalance.toString(),
+          referralId: referralId,
+          paymentTransactionId: paymentTransactionId || null,
+          payoutId: null,
+          description: `Commission earned from referral conversion. Conversion value: ${conversionValue}`,
+          metadata: {},
+          createdAt: new Date()
+        });
     }
 
     return { referral, commissionAmount: finalCommissionAmount };

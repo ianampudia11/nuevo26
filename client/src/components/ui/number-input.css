@@ -25,3 +25,14 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+.dark input[type="number"] {
+  background-color: #2a3942;
+  border-color: #2a3942;
+  color: #e9edef;
+}
+
+.dark input[type="number"]:focus {
+  border-color: #00a884;
+  outline-color: #00a884;
+}

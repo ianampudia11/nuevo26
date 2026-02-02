@@ -16,10 +16,12 @@ import { useBranding } from '@/contexts/branding-context';
 import { Button } from '@/components/ui/button';
 import { LanguageSwitcher } from '@/components/ui/language-switcher';
 import { ProfileLanguageSelector } from '@/components/ui/profile-language-selector';
+import ThemeToggle from '@/components/ui/theme-toggle';
 import { usePermissions, PermissionGate } from '@/hooks/usePermissions';
 import { useDebouncedSearch } from '@/hooks/use-debounced-search';
 import { SearchDropdown } from '@/components/ui/search-dropdown';
 import { useConversations } from '@/context/ConversationContext';
+import { useTheme } from 'next-themes';
 
 function adjustColor(color: string, amount: number): string {
   try {
@@ -55,6 +57,8 @@ export default function Header() {
   const { user, company, logoutMutation, isImpersonating, returnFromImpersonationMutation } = useAuth();
   const { branding } = useBranding();
   const { PERMISSIONS } = usePermissions();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [brandingUpdateKey, setBrandingUpdateKey] = useState(0);
@@ -141,7 +145,10 @@ export default function Header() {
     e.preventDefault();
   };
 
-  const headerStyle = company ? {
+  const headerStyle = isDark ? {
+    headerBg: { backgroundColor: 'hsl(var(--card))' },
+    borderColor: { borderColor: 'hsl(var(--border))' }
+  } : company ? {
     headerBg: { backgroundColor: adjustColor(company.primaryColor ?? '#1f2937', -40) },
     borderColor: { borderColor: adjustColor(company.primaryColor ?? '#1f2937', -30) }
   } : {
@@ -176,22 +183,24 @@ export default function Header() {
             <img
               src={company?.logo || branding.logoUrl}
               alt={company?.name || branding.appName}
-              className="h-8 w-8 object-contain"
+              className="h-10 w-auto max-w-md object-contain"
             />
           ) : (
-            <svg className="h-8 w-8 text-primary-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8
-              S16.41,20,12,20z M14.59,8.59L16,10l-6,6l-4-4l1.41-1.41L10,13.17L14.59,8.59z"></path>
-            </svg>
-          )}
-          <span className="ml-2 text-xl text-white">
-            {company?.name || branding.appName}
-            {isImpersonating && (
-              <span className="ml-2 text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded-full">
-                {t('admin.impersonating', 'Impersonating')}
+            <>
+              <svg className="h-8 w-8 text-primary-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8
+                S16.41,20,12,20z M14.59,8.59L16,10l-6,6l-4-4l1.41-1.41L10,13.17L14.59,8.59z"></path>
+              </svg>
+              <span className="ml-2 text-xl text-white">
+                {company?.name || branding.appName}
+                {isImpersonating && (
+                  <span className="ml-2 text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded-full">
+                    {t('admin.impersonating', 'Impersonating')}
+                  </span>
+                )}
               </span>
-            )}
-          </span>
+            </>
+          )}
         </div>
 
       </div>
@@ -203,7 +212,7 @@ export default function Header() {
               <input
                 type="search"
                 placeholder={t('common.search_placeholder', 'Search conversations, contacts, templates...')}
-                className="w-full px-4 py-2 pr-10 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-2 pr-10 rounded-lg bg-background/20 border border-input/50 text-white placeholder-muted-foreground focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onFocus={openDropdown}
@@ -212,12 +221,12 @@ export default function Header() {
                 <button
                   type="button"
                   onClick={clearSearch}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-white"
                 >
                   <X className="h-4 w-4" />
                 </button>
               ) : (
-                <Search className="h-4 w-4 absolute right-3 top-2.5 text-gray-400" />
+                <Search className="h-4 w-4 absolute right-3 top-2.5 text-muted-foreground" />
               )}
             </div>
           </form>
@@ -235,19 +244,19 @@ export default function Header() {
 
       <div className="flex items-center justify-end space-x-4">
         <button
-          className="md:hidden flex items-center justify-center h-8 w-8 rounded-full bg-gray-700 hover:bg-gray-600"
+          className="md:hidden flex items-center justify-center h-8 w-8 rounded-full bg-background/20 hover:bg-background/30"
           onClick={() => setIsMobileSearchOpen(true)}
         >
           <Search className="h-4 w-4 text-white" />
         </button>
 
-        
+        <ThemeToggle variant="compact" className="flex items-center justify-center h-8 w-8 rounded-full bg-background/20 hover:bg-background/30 text-white" />
 
         <LanguageSwitcher variant="compact" />
 
         <PermissionGate permissions={[PERMISSIONS.VIEW_SETTINGS, PERMISSIONS.MANAGE_SETTINGS]}>
           <button
-            className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-700 hover:bg-gray-600"
+            className="flex items-center justify-center h-8 w-8 rounded-full bg-background/20 hover:bg-background/30"
             onClick={() => navigate('/settings')}
           >
             <i className="ri-settings-3-line text-white"></i>
@@ -328,7 +337,7 @@ export default function Header() {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setIsMobileSearchOpen(false)}
-                className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-700 hover:bg-gray-600"
+                className="flex items-center justify-center h-8 w-8 rounded-full bg-background/20 hover:bg-background/30"
               >
                 <X className="h-4 w-4 text-white" />
               </button>
@@ -336,7 +345,7 @@ export default function Header() {
                 <input
                   type="search"
                   placeholder={t('common.search_placeholder', 'Search conversations, contacts, templates...')}
-                  className="w-full px-4 py-2 pr-10 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-4 py-2 pr-10 rounded-lg bg-background/20 border border-input/50 text-white placeholder-muted-foreground focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   autoFocus
@@ -345,12 +354,12 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={clearSearch}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-white"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 ) : (
-                  <Search className="h-4 w-4 absolute right-3 top-2.5 text-gray-400" />
+                  <Search className="h-4 w-4 absolute right-3 top-2.5 text-muted-foreground" />
                 )}
               </div>
             </div>

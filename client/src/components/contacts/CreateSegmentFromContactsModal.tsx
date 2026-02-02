@@ -156,7 +156,7 @@ export function CreateSegmentFromContactsModal({
           <div className="space-y-6">
             <div className="text-center py-6">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-foreground mb-2">
                 {t('segments.create_from_contacts.success_message', 'Segment "{{name}}" created successfully!', {
                   name: successState.segmentName
                 })}

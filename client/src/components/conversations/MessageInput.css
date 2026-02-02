@@ -57,6 +57,18 @@
   background: linear-gradient(135deg, #20b358 0%, #1da851 100%);
 }
 
+.dark .mic-button-hover:hover {
+  background: #2a3942;
+}
+
+.dark .send-button-gradient {
+  background: #00a884;
+}
+
+.dark .send-button-gradient:hover {
+  background: #008f75;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -123,28 +135,22 @@
   background: #10b981;
 }
 
-@media (prefers-color-scheme: dark) {
-  .mic-button-hover:hover {
-    background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-  }
+.dark .tooltip::before {
+  background: rgba(255, 255, 255, 0.9);
+  color: black;
+}
 
-  .tooltip::before {
-    background: rgba(255, 255, 255, 0.9);
-    color: black;
-  }
+.dark .recording-interface-white {
+  background: #202c33;
+  border: 1px solid #2a3942;
+}
 
-  .recording-interface-white {
-    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
-    border: 1px solid #4b5563;
-  }
+.dark .recording-timer-white {
+  color: #34d399;
+}
 
-  .recording-timer-white {
-    color: #34d399;
-  }
-
-  .recording-wave-white {
-    background: #34d399;
-  }
+.dark .recording-wave-white {
+  background: #34d399;
 }
 
 @media (max-width: 768px) {

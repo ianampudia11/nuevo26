@@ -172,3 +172,9 @@ export const TemplatesRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     {children}
   </ProtectedRoute>
 );
+
+export const CallLogsRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ProtectedRoute permissions={['view_call_logs', 'manage_call_logs']} requireAll={false}>
+    {children}
+  </ProtectedRoute>
+);

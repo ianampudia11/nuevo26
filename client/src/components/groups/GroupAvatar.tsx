@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 
 interface GroupAvatarProps {
   groupName: string;
@@ -41,15 +41,6 @@ export function GroupAvatar({
 
 
   const avatarUrl = groupAvatarUrl || groupMetadata?.profilePictureUrl;
-  
-  const getGroupInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map(part => part[0])
-      .join("")
-      .toUpperCase()
-      .substring(0, 2);
-  };
   
   const sizeClasses = {
     sm: "h-8 w-8 text-xs",
@@ -91,9 +82,17 @@ export function GroupAvatar({
       onMouseLeave={() => setIsHovered(false)}
     >
       <Avatar className={cn(sizeClasses[size], className)}>
-        <AvatarImage src={avatarUrl || ""} alt={groupName} />
+        <AvatarImage 
+          src={avatarUrl || ""} 
+          alt={groupName}
+          onError={(e) => {
+            if (avatarUrl) {
+              console.warn(`Failed to load group avatar:`, avatarUrl);
+            }
+          }}
+        />
         <AvatarFallback className="bg-blue-100 text-blue-700">
-          {groupName ? getGroupInitials(groupName) : (
+          {groupName ? getInitials(groupName) : (
             <Users className={iconSizeClasses[size]} />
           )}
         </AvatarFallback>

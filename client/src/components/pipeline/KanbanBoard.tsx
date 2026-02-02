@@ -11,7 +11,10 @@ import { Deal, PipelineStage } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
-import { PlusCircle, Edit2, Trash2, MoreHorizontal, Plus, CheckSquare, Download } from 'lucide-react';
+import { usePipeline } from '@/contexts/PipelineContext';
+import { PlusCircle, Edit2, Trash2, MoreHorizontal, Plus, CheckSquare, Download, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,10 +36,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface KanbanBoardProps {
   onAddDeal: () => void;
-  searchTerm?: string;
+  activePipelineId: number | null;
 }
 
-export default function KanbanBoard({ onAddDeal, searchTerm }: KanbanBoardProps) {
+export default function KanbanBoard({ onAddDeal, activePipelineId }: KanbanBoardProps) {
+  const { filters } = usePipeline();
   const { toast } = useToast();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -95,27 +99,113 @@ export default function KanbanBoard({ onAddDeal, searchTerm }: KanbanBoardProps)
     data: pipelineStages = [],
     isLoading: isLoadingStages
   } = useQuery({
-    queryKey: ['/api/pipeline/stages'],
+    queryKey: ['/api/pipeline/stages', activePipelineId],
     queryFn: async () => {
-      const res = await apiRequest('GET', '/api/pipeline/stages');
+      const queryParams = new URLSearchParams();
+      if (activePipelineId) {
+        queryParams.append('pipelineId', activePipelineId.toString());
+      }
+      const url = `/api/pipeline/stages${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const res = await apiRequest('GET', url);
       const data = await res.json();
       return data;
     },
+    enabled: !!activePipelineId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const {
     data: deals = [],
     isLoading: isLoadingDeals
   } = useQuery({
-    queryKey: ['/api/deals', searchTerm],
+    queryKey: ['/api/deals', filters, activePipelineId],
     queryFn: async () => {
       const queryParams = new URLSearchParams();
-      if (searchTerm) {
-        queryParams.append('generalSearch', searchTerm);
+      
+      if (filters.searchTerm) {
+        queryParams.append('generalSearch', filters.searchTerm);
       }
+      
+      if (activePipelineId) {
+        queryParams.append('pipelineId', activePipelineId.toString());
+      }
+      
+      if (filters.stageIds && filters.stageIds.length > 0) {
+        queryParams.append('stageIds', filters.stageIds.join(','));
+      }
+      
+      if (filters.priorities && filters.priorities.length > 0) {
+        queryParams.append('priorities', filters.priorities.join(','));
+      }
+      
+      if (filters.minValue !== undefined) {
+        queryParams.append('minValue', filters.minValue.toString());
+      }
+      
+      if (filters.maxValue !== undefined) {
+        queryParams.append('maxValue', filters.maxValue.toString());
+      }
+      
+      if (filters.dueDateFrom) {
+        queryParams.append('dueDateFrom', filters.dueDateFrom);
+      }
+      
+      if (filters.dueDateTo) {
+        queryParams.append('dueDateTo', filters.dueDateTo);
+      }
+      
+      if (filters.assignedUserIds && filters.assignedUserIds.length > 0) {
+        queryParams.append('assignedUserIds', filters.assignedUserIds.join(','));
+      }
+      
+      if (filters.includeUnassigned) {
+        queryParams.append('includeUnassigned', 'true');
+      }
+      
+      if (filters.tags && filters.tags.length > 0) {
+        queryParams.append('tags', filters.tags.join(','));
+      }
+      
+      if (filters.status) {
+        queryParams.append('status', filters.status);
+      }
+      
+      if (filters.createdFrom) {
+        queryParams.append('createdFrom', filters.createdFrom);
+      }
+      
+      if (filters.createdTo) {
+        queryParams.append('createdTo', filters.createdTo);
+      }
+      
+      if (filters.customFields && Object.keys(filters.customFields).length > 0) {
+        queryParams.append('customFields', JSON.stringify(filters.customFields));
+      }
+      
+      queryParams.append('includeReverts', 'true');
 
       const url = `/api/deals${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const res = await apiRequest('GET', url);
+      return res.json();
+    },
+    enabled: !!activePipelineId,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+
+  useEffect(() => {
+    if (activePipelineId) {
+      queryClient.invalidateQueries({ queryKey: ['/api/pipeline/stages', activePipelineId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/deals', filters, activePipelineId] });
+    }
+  }, [activePipelineId, queryClient]);
+
+  const { data: revertStats } = useQuery({
+    queryKey: ['/api/pipeline-reverts/stats'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/pipeline-reverts/stats');
       return res.json();
     },
   });
@@ -156,10 +246,14 @@ export default function KanbanBoard({ onAddDeal, searchTerm }: KanbanBoardProps)
 
   const createStageMutation = useMutation({
     mutationFn: async ({ name, color }: { name: string; color: string }) => {
+      if (!activePipelineId) {
+        throw new Error('No active pipeline selected');
+      }
       const response = await apiRequest('POST', '/api/pipeline/stages', {
         name,
         color,
-        order: pipelineStages.length + 1
+        order: pipelineStages.length + 1,
+        pipelineId: activePipelineId,
       });
       const data = await response.json();
       return data;
@@ -399,48 +493,89 @@ export default function KanbanBoard({ onAddDeal, searchTerm }: KanbanBoardProps)
 
   };
 
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pipeline-reverts/stats'] });
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [queryClient]);
+
   const isLoading = isLoadingStages || isLoadingDeals;
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl ">{t('nav.pipeline', 'Pipeline')}</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl">{t('nav.pipeline', 'Pipeline')}</h1>
+          {revertStats && revertStats.totalScheduled > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/20 border-orange-300">
+                    <Clock className="w-3 h-3 mr-1" />
+                    <span className="hidden sm:inline">{revertStats.totalScheduled} revert{revertStats.totalScheduled !== 1 ? 's' : ''} scheduled</span>
+                    <span className="sm:hidden">{revertStats.totalScheduled}</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="space-y-1">
+                    <p className="font-semibold">Pipeline Stage Revert Statistics</p>
+                    <p>Scheduled: {revertStats.totalScheduled}</p>
+                    <p>Executed: {revertStats.totalExecuted}</p>
+                    <p>Failed: {revertStats.totalFailed}</p>
+                    <p>Skipped: {revertStats.totalSkipped}</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={showSelectionMode ? "default" : "outline"}
             size="sm"
             onClick={handleToggleSelectionMode}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 flex-1 sm:flex-initial"
           >
             <CheckSquare className="h-4 w-4" />
-            {showSelectionMode ? 'Exit Selection' : 'Select Deals'}
+            <span className="hidden sm:inline">{showSelectionMode ? 'Exit Selection' : 'Select Deals'}</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowImportExportModal(true)}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 flex-1 sm:flex-initial"
           >
             <Download className="h-4 w-4" />
-            Import/Export
+            <span className="hidden sm:inline">Import/Export</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsAddingStage(true)}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 flex-1 sm:flex-initial"
           >
             <Plus className="h-4 w-4" />
-            {t('pipeline.add_stage', 'Add Stage')}
+            <span className="hidden sm:inline">{t('pipeline.add_stage', 'Add Stage')}</span>
           </Button>
-          <Button onClick={onAddDeal} className="flex items-center gap-1 btn-brand-primary">
+          <Button 
+            onClick={onAddDeal} 
+            className="flex items-center gap-1 btn-brand-primary flex-1 sm:flex-initial"
+          >
             <PlusCircle className="h-4 w-4" />
-            {t('pipeline.add_deal', 'Add Deal')}
+            <span className="hidden sm:inline">{t('pipeline.add_deal', 'Add Deal')}</span>
           </Button>
         </div>
       </div>
 
-      {isLoading ? (
+      {!activePipelineId ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <p className="text-muted-foreground mb-4">No pipeline selected. Please select a pipeline to view stages and deals.</p>
+        </div>
+      ) : isLoading ? (
         <PipelineLoadingSkeleton />
       ) : (
         <>
@@ -471,8 +606,8 @@ export default function KanbanBoard({ onAddDeal, searchTerm }: KanbanBoardProps)
                           {...provided.droppableProps}
                           className={`flex-1 p-2 rounded-md shadow-sm border transition-colors ${
                             snapshot.isDraggingOver 
-                              ? 'bg-blue-50 border-blue-300' 
-                              : 'bg-gray-50/50 border-gray-200'
+                              ? 'bg-primary/10 border-primary/30' 
+                              : 'bg-muted/50 border-border'
                           }`}
                           style={{
                             minHeight: '60vh',
@@ -501,7 +636,7 @@ export default function KanbanBoard({ onAddDeal, searchTerm }: KanbanBoardProps)
                                       isSelected={selectedDeals.some(d => d.id === deal.id)}
                                       onSelect={handleDealSelect}
                                       showSelectionMode={showSelectionMode}
-                                      searchTerm={searchTerm || ''}
+                                      searchTerm={filters.searchTerm || ''}
                                     />
                                   </div>
                                 )}

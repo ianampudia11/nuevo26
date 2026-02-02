@@ -220,14 +220,11 @@ export function InviteTeamMemberModal({ isOpen, onClose, onSuccess }: InviteTeam
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Administrator</SelectItem>
                 <SelectItem value="agent">Agent</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500">
-              {role === 'admin' ?
-                'Administrators have full access to all features. Permissions can be customized in Settings → Roles & Permissions.' :
-                'Agents have limited access by default. Permissions can be customized in Settings → Roles & Permissions.'}
+              Agents have limited access by default. Permissions can be customized in Settings → Roles & Permissions.
             </p>
           </div>
 

@@ -6,6 +6,7 @@ import { useBranding } from "@/contexts/branding-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { ProfileLanguageSelector } from "@/components/ui/profile-language-selector";
+import ThemeToggle from "@/components/ui/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useTheme } from "next-themes";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -29,6 +31,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { branding } = useBranding();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [brandingUpdateKey, setBrandingUpdateKey] = useState(0);
@@ -91,8 +95,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-primary text-white px-6 py-3 flex justify-between items-center relative z-50"
-              style={{ backgroundColor: branding.primaryColor }}>
+      <header className="text-white px-6 py-3 flex justify-between items-center relative z-50"
+              style={{ backgroundColor: isDark ? 'hsl(var(--card))' : (branding.primaryColor || '#1f2937') }}>
         <div className="flex items-center">
           <Button
             variant="ghost"
@@ -107,18 +111,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <img
               src={branding.logoUrl}
               alt={branding.appName}
-              className="h-8 w-8 object-contain"
+              className="h-10 w-auto max-w-md object-contain"
             />
           ) : (
-            <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8
-              S16.41,20,12,20z M14.59,8.59L16,10l-6,6l-4-4l1.41-1.41L10,13.17L14.59,8.59z"></path>
-            </svg>
+            <>
+              <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8
+                S16.41,20,12,20z M14.59,8.59L16,10l-6,6l-4-4l1.41-1.41L10,13.17L14.59,8.59z"></path>
+              </svg>
+              <span className="ml-2 text-xl font-bold">{branding.appName}</span>
+            </>
           )}
-          <span className="ml-2 text-xl font-bold">{branding.appName}</span>
         </div>
 
         <div className="flex items-center space-x-4">
+          <ThemeToggle variant="compact" className="flex items-center justify-center h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white" />
           <LanguageSwitcher variant="compact" />
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center cursor-pointer hover:opacity-80">
@@ -167,7 +174,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             w-64 text-white transition-transform duration-300 ease-in-out z-50
             ${isMobile ? 'h-full' : 'h-auto'}
           `}
-          style={{ backgroundColor: branding.primaryColor || '#1f2937' }}
+          style={{ backgroundColor: isDark ? 'hsl(var(--card))' : (branding.primaryColor || '#1f2937') }}
         >
           {false && !isMobile && (
             <Button
@@ -266,7 +273,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </Button>
             </Link>
             {/* For Kaif Ahmad */}
-            {/* <Link href="/admin/affiliate">
+            <Link href="/admin/affiliate">
               <Button
                 variant="ghost"
                 className={`w-full justify-start text-white transition-colors ${
@@ -278,7 +285,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <UserCheck className="mr-2 h-5 w-5" />
                 {t('admin.affiliate.title', 'Affiliate Management')}
               </Button>
-            </Link> */}
+            </Link>
 
             <Link href="/admin/analytics">
               <Button
@@ -342,7 +349,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         </aside>
 
-        <main className={`flex-1 bg-gray-50 overflow-auto transition-all duration-300 ${
+        <main className={`flex-1 bg-gray-50 dark:bg-gray-900 overflow-auto transition-all duration-300 ${
           isMobile ? 'w-full' : sidebarOpen ? 'ml-0' : 'ml-0'
         }`}>
           {children}

@@ -33,7 +33,6 @@ import AdminLoginPage from "@/pages/admin/login";
 import AdminDashboard from "@/pages/admin/dashboard";
 import CompanyDetailPage from "@/pages/admin/companies/[id]";
 import NewCompanyPage from "@/pages/admin/companies/new";
-import Dialog360Callback from "@/pages/360dialog-callback";
 import { FacebookSDKLoader } from "@/components/FacebookSDKLoader";
 import { ConversationProvider } from "./context/ConversationContext";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -55,7 +54,8 @@ import {
   CalendarRoute,
   CampaignsRoute,
   PagesRoute,
-  TemplatesRoute
+  TemplatesRoute,
+  CallLogsRoute
 } from "@/components/auth/ProtectedRoute";
 import AccessDenied from "@/pages/AccessDenied";
 
@@ -64,8 +64,10 @@ import PagesPage from "./pages/pages";
 import LandingPage from "./pages/landing";
 import ProtectedLandingPage from "./components/ProtectedLandingPage";
 import Templates from "./pages/templates";
+import CallLogsPage from "./pages/call-logs";
 import RootRedirect from "./components/RootRedirect";
 import { CustomScriptsProvider } from "@/components/CustomScriptsProvider";
+import { CustomCssProvider } from "@/components/CustomCssProvider";
 import { ManualRenewalProvider } from "@/contexts/manual-renewal-context";
 import { initializeGoogleTranslateCompatibility } from "@/utils/google-translate-compatibility";
 import { initializeEmbedContext, preserveEmbedParam } from "@/utils/embed-context";
@@ -148,6 +150,12 @@ function Router() {
           </CampaignsRoute>
         </Route>
 
+        <Route path="/call-logs">
+          <CallLogsRoute>
+            <CallLogsPage />
+          </CallLogsRoute>
+        </Route>
+
         <Route path="/templates">
           <TemplatesRoute>
             <Templates />
@@ -172,7 +180,6 @@ function Router() {
           </PagesRoute>
         </Route>
 
-        <Route path="/settings/channels/360dialog/callback" component={Dialog360Callback} />
 
         <ProtectedRoute path="/profile" component={ProfilePage} />
 
@@ -254,7 +261,7 @@ function App() {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center font-poppins">
         <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-        <p className="text-gray-500">Initializing...</p>
+        <p className="text-muted-foreground">Initializing...</p>
       </div>
     );
   }
@@ -264,29 +271,31 @@ function App() {
       <CustomScriptsProvider>
         <SubdomainProvider>
           <AuthProvider>
-            <BrandingProvider>
-              <CurrencyProvider>
-                <TranslationProvider>
-                  <ActiveChannelProvider>
-                    <ConversationProvider>
-                      <PlanUpdatesProvider>
-                        <ManualRenewalProvider>
-                          <TooltipProvider>
-                            <SubscriptionGuard>
-                            <div className="font-poppins">
-                              <Toaster />
-                              <FacebookSDKLoader />
-                              <Router />
-                            </div>
-                          </SubscriptionGuard>
-                        </TooltipProvider>
-                      </ManualRenewalProvider>
-                    </PlanUpdatesProvider>
-                  </ConversationProvider>
-                </ActiveChannelProvider>
-              </TranslationProvider>
-              </CurrencyProvider>
-            </BrandingProvider>
+            <CustomCssProvider>
+              <BrandingProvider>
+                <CurrencyProvider>
+                  <TranslationProvider>
+                    <ActiveChannelProvider>
+                      <ConversationProvider>
+                        <PlanUpdatesProvider>
+                          <ManualRenewalProvider>
+                            <TooltipProvider>
+                              <SubscriptionGuard>
+                              <div className="font-poppins">
+                                <Toaster />
+                                <FacebookSDKLoader />
+                                <Router />
+                              </div>
+                            </SubscriptionGuard>
+                          </TooltipProvider>
+                        </ManualRenewalProvider>
+                      </PlanUpdatesProvider>
+                    </ConversationProvider>
+                  </ActiveChannelProvider>
+                </TranslationProvider>
+                </CurrencyProvider>
+              </BrandingProvider>
+            </CustomCssProvider>
           </AuthProvider>
         </SubdomainProvider>
       </CustomScriptsProvider>

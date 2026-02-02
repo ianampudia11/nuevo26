@@ -4,10 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from '@/hooks/use-translation';
 import { Loader2, CheckCircle, User } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+
+const GOOGLE_MAPS_SCRAPE_MAX_RESULTS = 700;
 
 interface ScrapedContact {
   phoneNumber: string;
@@ -33,15 +37,12 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-
-  useEffect(() => {
-    if (isOpen) {
-
-    }
-  }, [isOpen]);
-
+  const [scrapingSource, setScrapingSource] = useState<'whatsapp' | 'googlemaps'>('whatsapp');
   const [startingNumber, setStartingNumber] = useState('');
   const [count, setCount] = useState('100');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [maxResults, setMaxResults] = useState('20');
+  const [location, setLocation] = useState('');
   const [selectedConnectionId, setSelectedConnectionId] = useState<number | null>(null);
 
 
@@ -70,47 +71,16 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
 
     select: (data: WhatsAppConnection[]) => {
 
-      console.log('[WhatsApp Scraping] All connections summary:', data.map((c: any) => ({
-        id: c.id,
-        name: c.accountName,
-        type: c.channelType,
-        status: c.status
-      })));
-
-
 
       const filtered = data.filter((conn: WhatsAppConnection) =>
         (conn.channelType === 'whatsapp_unofficial' || conn.channelType === 'whatsapp') &&
         conn.status === 'active'
       );
 
-
-
-      console.log('[WhatsApp Scraping] Filtered connections summary:', filtered.map((c: any) => ({
-        id: c.id,
-        name: c.accountName,
-        type: c.channelType,
-        status: c.status
-      })));
-
       return filtered;
     },
     enabled: isOpen
   });
-
-
-  useEffect(() => {
-    console.log('[WhatsApp Scraping] Connections state updated:', {
-      count: connections.length,
-      isLoading: isLoadingConnections,
-      connections: connections.map((c: any) => ({
-        id: c.id,
-        name: c.accountName,
-        type: c.channelType,
-        status: c.status
-      }))
-    });
-  }, [connections, isLoadingConnections]);
 
 
   useEffect(() => {
@@ -121,7 +91,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
   }, [connections, selectedConnectionId]);
 
 
-  const startScrapingWithSSE = async (data: { startingNumber: string; count: number; connectionId: number }) => {
+  const startScrapingWithSSE = async (data: { startingNumber?: string; count?: number; searchTerm?: string; maxResults?: number; connectionId: number; location?: string }) => {
     try {
       setIsScrapingInProgress(true);
       setScrapingResults([]);
@@ -129,18 +99,26 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
         totalChecked: 0,
         validCount: 0,
         errors: [],
-        totalToCheck: data.count,
+        totalToCheck: scrapingSource === 'whatsapp' ? (data.count || 100) : (data.maxResults || 20),
         progress: 0,
         isCompleted: false
       });
       setScrapingStatus('Connecting...');
 
-      const response = await fetch('/api/contacts/scrape-whatsapp', {
+      const endpoint = scrapingSource === 'whatsapp' 
+        ? '/api/contacts/scrape-whatsapp'
+        : '/api/contacts/scrape-google-maps';
+
+      const requestBody = scrapingSource === 'whatsapp'
+        ? { startingNumber: data.startingNumber, count: data.count, connectionId: data.connectionId }
+        : { searchTerm: data.searchTerm, maxResults: data.maxResults, connectionId: data.connectionId, location: data.location };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -195,7 +173,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
   const handleScrapingUpdate = (update: any) => {
     switch (update.type) {
       case 'started':
-        setScrapingStatus('Scraping started...');
+        setScrapingStatus(update.message || 'Scraping started...');
         setScrapingStats(prev => ({
           ...prev,
           totalToCheck: update.totalToCheck,
@@ -203,6 +181,21 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
           validCount: 0,
           errors: [],
           progress: 0
+        }));
+        break;
+
+      case 'query_expanded':
+        setScrapingStatus(update.message || 'Expanding search...');
+        break;
+
+      case 'place_found':
+        setScrapingStatus(`Processing: ${update.placeName || 'Unknown place'}`);
+        setScrapingStats(prev => ({
+          ...prev,
+          totalChecked: update.totalChecked,
+          validCount: update.validCount,
+          progress: update.progress,
+          errors: prev?.errors || []
         }));
         break;
 
@@ -269,7 +262,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
           ...prev,
           totalChecked: update.totalChecked,
           validCount: update.validCount,
-          errors: [...(prev?.errors || []), update.error],
+          errors: update.error ? [...(prev?.errors || []), update.error] : (prev?.errors || []),
           progress: update.progress
         }));
         break;
@@ -372,8 +365,12 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
   });
 
   const resetModal = () => {
+    setScrapingSource('whatsapp');
     setStartingNumber('');
     setCount('100');
+    setSearchTerm('');
+    setMaxResults('20');
+    setLocation('');
     setSelectedConnectionId(null);
     setIsScrapingInProgress(false);
     setScrapingResults([]);
@@ -384,15 +381,6 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
   };
 
   const handleStartScraping = () => {
-    if (!startingNumber.trim()) {
-      toast({
-        title: t('common.error', 'Error'),
-        description: t('contacts.scraping.starting_number_required', 'Starting phone number is required'),
-        variant: 'destructive'
-      });
-      return;
-    }
-
     if (!selectedConnectionId) {
       toast({
         title: t('common.error', 'Error'),
@@ -402,31 +390,79 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
       return;
     }
 
-    const phoneRegex = /^\d{10,15}$/;
-    if (!phoneRegex.test(startingNumber)) {
-      toast({
-        title: t('common.error', 'Error'),
-        description: t('contacts.scraping.invalid_phone_format', 'Invalid phone number format. Use digits only (10-15 digits)'),
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (scrapingSource === 'whatsapp') {
+      if (!startingNumber.trim()) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: t('contacts.scraping.starting_number_required', 'Starting phone number is required'),
+          variant: 'destructive'
+        });
+        return;
+      }
 
-    const countNum = parseInt(count);
-    if (isNaN(countNum) || countNum < 1 || countNum > 1000) {
-      toast({
-        title: t('common.error', 'Error'),
-        description: t('contacts.scraping.invalid_count', 'Count must be between 1 and 1000'),
-        variant: 'destructive'
-      });
-      return;
-    }
+      const phoneRegex = /^\d{10,15}$/;
+      if (!phoneRegex.test(startingNumber)) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: t('contacts.scraping.invalid_phone_format', 'Invalid phone number format. Use digits only (10-15 digits)'),
+          variant: 'destructive'
+        });
+        return;
+      }
 
-    startScrapingWithSSE({
-      startingNumber: startingNumber.trim(),
-      count: countNum,
-      connectionId: selectedConnectionId
-    });
+      const countNum = parseInt(count);
+      if (isNaN(countNum) || countNum < 1 || countNum > 1000) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: t('contacts.scraping.invalid_count', 'Count must be between 1 and 1000'),
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      startScrapingWithSSE({
+        startingNumber: startingNumber.trim(),
+        count: countNum,
+        connectionId: selectedConnectionId,
+        location: undefined
+      });
+    } else {
+
+      if (!searchTerm.trim()) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: 'Search term is required',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (searchTerm.length > 200) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: 'Search term cannot exceed 200 characters',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const maxResultsNum = parseInt(maxResults);
+      if (isNaN(maxResultsNum) || maxResultsNum < 1 || maxResultsNum > GOOGLE_MAPS_SCRAPE_MAX_RESULTS) {
+        toast({
+          title: t('common.error', 'Error'),
+          description: `Max results must be between 1 and ${GOOGLE_MAPS_SCRAPE_MAX_RESULTS}`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      startScrapingWithSSE({
+        searchTerm: searchTerm.trim(),
+        maxResults: maxResultsNum,
+        connectionId: selectedConnectionId,
+        location: location.trim() || undefined
+      });
+    }
   };
 
   const handleContactToggle = (phoneNumber: string) => {
@@ -490,10 +526,14 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
         <div className="flex flex-col h-full max-h-[90vh] overflow-hidden">
         <DialogHeader className="px-4 sm:px-6 py-4 border-b flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
-            {t('contacts.scraping.title', 'Scrape WhatsApp Contacts')}
+            {scrapingSource === 'whatsapp' 
+              ? t('contacts.scraping.title', 'Scrape WhatsApp Contacts')
+              : 'Scrape Google Maps Contacts'}
           </DialogTitle>
           <DialogDescription className="text-sm sm:text-base">
-            {t('contacts.scraping.description', 'Check sequential phone numbers for active WhatsApp accounts and add them to your contacts.')}
+            {scrapingSource === 'whatsapp'
+              ? t('contacts.scraping.description', 'Check sequential phone numbers for active WhatsApp accounts and add them to your contacts.')
+              : 'Search Google Maps for businesses and validate their phone numbers on WhatsApp.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -501,24 +541,40 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
 
           {!isScrapingInProgress && scrapingResults.length === 0 && (
             <div className="space-y-4 sm:space-y-6">
+              {/* Scraping Source Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="scrapingSource" className="text-sm sm:text-base font-medium">
+                  Scraping Source
+                </Label>
+                <Select value={scrapingSource} onValueChange={(value: 'whatsapp' | 'googlemaps') => setScrapingSource(value)}>
+                  <SelectTrigger id="scrapingSource" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp Sequential Numbers</SelectItem>
+                    <SelectItem value="googlemaps">Google Maps Businesses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* WhatsApp Connection Selection */}
               <div className="space-y-2">
                 <Label htmlFor="connection" className="text-sm sm:text-base font-medium">
                   {t('contacts.scraping.connection_label', 'WhatsApp Connection')}
                 </Label>
                 {isLoadingConnections ? (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {t('contacts.scraping.loading_connections', 'Loading connections...')}
                   </div>
                 ) : connections.length === 0 ? (
-                  <div className="text-sm text-red-600 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-sm text-red-600 dark:text-red-400 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900">
                     {t('contacts.scraping.no_connections', 'No active WhatsApp connections found. Please set up a WhatsApp connection first.')}
                   </div>
                 ) : (
                   <select
                     id="connection"
-                    className="w-full p-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    className="w-full p-3 text-sm sm:text-base border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-primary bg-background text-foreground"
                     value={selectedConnectionId || ''}
                     onChange={(e) => setSelectedConnectionId(e.target.value ? parseInt(e.target.value) : null)}
                   >
@@ -532,42 +588,104 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                 )}
               </div>
 
-              {/* Starting Number Input */}
-              <div className="space-y-2">
-                <Label htmlFor="startingNumber" className="text-sm sm:text-base font-medium">
-                  {t('contacts.scraping.starting_number_label', 'Starting Phone Number')}
-                </Label>
-                <Input
-                  id="startingNumber"
-                  type="text"
-                  placeholder="923059002132"
-                  value={startingNumber}
-                  onChange={(e) => setStartingNumber(e.target.value.replace(/\D/g, ''))}
-                  className="font-mono text-sm sm:text-base p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
-                <p className="text-xs sm:text-sm text-gray-500">
-                  {t('contacts.scraping.starting_number_help', 'Enter the starting phone number (digits only, including country code)')}
-                </p>
-              </div>
+              {/* Conditional Input Fields */}
+              {scrapingSource === 'whatsapp' ? (
+                <>
+                  {/* Starting Number Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="startingNumber" className="text-sm sm:text-base font-medium">
+                      {t('contacts.scraping.starting_number_label', 'Starting Phone Number')}
+                    </Label>
+                    <Input
+                      id="startingNumber"
+                      type="text"
+                      placeholder="923059002132"
+                      value={startingNumber}
+                      onChange={(e) => setStartingNumber(e.target.value.replace(/\D/g, ''))}
+                      className="font-mono text-sm sm:text-base p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {t('contacts.scraping.starting_number_help', 'Enter the starting phone number (digits only, including country code)')}
+                    </p>
+                  </div>
 
-              {/* Count Input */}
-              <div className="space-y-2">
-                <Label htmlFor="count" className="text-sm sm:text-base font-medium">
-                  {t('contacts.scraping.count_label', 'Number of Contacts to Check')}
-                </Label>
-                <Input
-                  id="count"
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={count}
-                  onChange={(e) => setCount(e.target.value)}
-                  className="text-sm sm:text-base p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
-                <p className="text-xs sm:text-sm text-gray-500">
-                  {t('contacts.scraping.count_help', 'How many sequential numbers to check (maximum 1000)')}
-                </p>
-              </div>
+                  {/* Count Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="count" className="text-sm sm:text-base font-medium">
+                      {t('contacts.scraping.count_label', 'Number of Contacts to Check')}
+                    </Label>
+                    <Input
+                      id="count"
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={count}
+                      onChange={(e) => setCount(e.target.value)}
+                      className="text-sm sm:text-base p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {t('contacts.scraping.count_help', 'How many sequential numbers to check (maximum 1000)')}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Search Term Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="searchTerm" className="text-sm sm:text-base font-medium">
+                      Search Term
+                    </Label>
+                    <Input
+                      id="searchTerm"
+                      type="text"
+                      placeholder="Software Companies In Argentina"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="text-sm sm:text-base p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Enter a search query to find businesses on Google Maps (e.g., "Restaurants in Buenos Aires")
+                    </p>
+                  </div>
+
+                  {/* Location Input (Optional) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="location" className="text-sm sm:text-base font-medium">
+                      Location (Optional)
+                    </Label>
+                    <Input
+                      id="location"
+                      type="text"
+                      placeholder="e.g., Buenos Aires, Argentina"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="text-sm sm:text-base p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Add a city/country to enable multi-query expansion for more results (up to ~700 total).
+                    </p>
+                  </div>
+
+                  {/* Max Results Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="maxResults" className="text-sm sm:text-base font-medium">
+                      Max Results
+                    </Label>
+                    <Input
+                      id="maxResults"
+                      type="number"
+                      min="1"
+                      max={GOOGLE_MAPS_SCRAPE_MAX_RESULTS}
+                      value={maxResults}
+                      onChange={(e) => setMaxResults(e.target.value)}
+                      className="text-sm sm:text-base p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Maximum number of businesses to check (1-{GOOGLE_MAPS_SCRAPE_MAX_RESULTS}). With location, uses multiple queries for broader coverage (Google typically limits single queries to ~60). Requires Google Maps API key configured in admin settings.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -579,43 +697,43 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                 <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-green-600" />
                 <div className="text-center sm:text-left">
                   <h3 className="text-base sm:text-lg font-medium">{t('contacts.scraping.in_progress', 'Scraping in progress...')}</h3>
-                  <p className="text-xs sm:text-sm text-gray-500 break-words">{scrapingStatus}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">{scrapingStatus}</p>
                 </div>
               </div>
 
               {/* Progress Bar */}
               {scrapingStats && (
                 <div className="space-y-3 sm:space-y-4">
-                  <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
+                  <div className="w-full bg-muted rounded-full h-2 sm:h-3">
                     <div
-                      className="bg-green-600 h-2 sm:h-3 rounded-full transition-all duration-300"
+                      className="bg-green-600 dark:bg-green-500 h-2 sm:h-3 rounded-full transition-all duration-300"
                       style={{ width: `${scrapingStats.progress || 0}%` }}
                     ></div>
                   </div>
 
                   {/* Live Statistics */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
-                    <div className="text-center p-2 bg-gray-50 rounded-lg">
-                      <div className="font-medium text-gray-900 text-sm sm:text-base">{scrapingStats.totalChecked || 0}</div>
-                      <div className="text-gray-500 text-xs">{t('contacts.scraping.checked', 'Checked')}</div>
+                    <div className="text-center p-2 bg-muted rounded-lg">
+                      <div className="font-medium text-foreground text-sm sm:text-base">{scrapingStats.totalChecked || 0}</div>
+                      <div className="text-muted-foreground text-xs">{t('contacts.scraping.checked', 'Checked')}</div>
                     </div>
-                    <div className="text-center p-2 bg-green-50 rounded-lg">
-                      <div className="font-medium text-green-600 text-sm sm:text-base">{scrapingStats.validCount || 0}</div>
-                      <div className="text-gray-500 text-xs">{t('contacts.scraping.found', 'Found')}</div>
+                    <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="font-medium text-green-600 dark:text-green-400 text-sm sm:text-base">{scrapingStats.validCount || 0}</div>
+                      <div className="text-muted-foreground text-xs">{t('contacts.scraping.found', 'Found')}</div>
                     </div>
-                    <div className="text-center p-2 bg-red-50 rounded-lg">
-                      <div className="font-medium text-red-600 text-sm sm:text-base">{scrapingStats.errors?.length || 0}</div>
-                      <div className="text-gray-500 text-xs">{t('contacts.scraping.errors', 'Errors')}</div>
+                    <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <div className="font-medium text-red-600 dark:text-red-400 text-sm sm:text-base">{scrapingStats.errors?.length || 0}</div>
+                      <div className="text-muted-foreground text-xs">{t('contacts.scraping.errors', 'Errors')}</div>
                     </div>
-                    <div className="text-center p-2 bg-blue-50 rounded-lg">
-                      <div className="font-medium text-blue-600 text-sm sm:text-base">{scrapingStats.progress || 0}%</div>
-                      <div className="text-gray-500 text-xs">{t('contacts.scraping.progress', 'Progress')}</div>
+                    <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="font-medium text-blue-600 dark:text-blue-400 text-sm sm:text-base">{scrapingStats.progress || 0}%</div>
+                      <div className="text-muted-foreground text-xs">{t('contacts.scraping.progress', 'Progress')}</div>
                     </div>
                   </div>
 
                   {/* Batch Progress */}
                   {scrapingStats.currentBatch && scrapingStats.totalBatches && (
-                    <div className="text-center text-xs sm:text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">
+                    <div className="text-center text-xs sm:text-sm text-muted-foreground bg-muted p-2 rounded-lg">
                       {t('contacts.scraping.batch_progress', 'Batch {{current}} of {{total}}', {
                         current: scrapingStats.currentBatch,
                         total: scrapingStats.totalBatches
@@ -625,7 +743,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
 
                   {/* Current Phone Number */}
                   {scrapingStats.currentPhoneNumber && (
-                    <div className="text-center text-xs sm:text-sm text-gray-600 font-mono bg-blue-50 p-2 rounded-lg break-all">
+                    <div className="text-center text-xs sm:text-sm text-muted-foreground font-mono bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg break-all">
                       {t('contacts.scraping.checking', 'Checking: +{{phone}}', {
                         phone: scrapingStats.currentPhoneNumber
                       })}
@@ -638,7 +756,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
               {scrapingResults.length > 0 && (
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                    <h4 className="font-medium text-foreground text-sm sm:text-base">
                       {t('contacts.scraping.found_contacts', 'Found Contacts ({{count}})', {
                         count: scrapingResults.length
                       })}
@@ -667,8 +785,8 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                           key={contact.phoneNumber}
                           className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 border-b last:border-b-0 transition-all duration-500 ${
                             isRecentlyFound
-                              ? 'bg-green-50 border-green-200 animate-pulse'
-                              : 'hover:bg-gray-50'
+                              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900 animate-pulse'
+                              : 'hover:bg-accent'
                           }`}
                         >
                           <Checkbox
@@ -677,7 +795,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                           />
 
                           {/* Profile Picture */}
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
                             {contact.profilePicture ? (
                               <img
                                 src={contact.profilePicture}
@@ -688,30 +806,30 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                                 }}
                               />
                             ) : (
-                              <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+                              <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                             )}
                           </div>
 
                           {/* Contact Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-xs sm:text-sm truncate">
+                            <div className="font-medium text-xs sm:text-sm truncate text-foreground">
                               {contact.name || contact.phoneNumber}
                             </div>
-                            <div className="text-xs text-gray-500 font-mono truncate">
+                            <div className="text-xs text-muted-foreground font-mono truncate">
                               +{contact.phoneNumber}
                             </div>
                           </div>
 
                           {/* WhatsApp Status & New Indicator */}
                           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                            <div className="flex items-center gap-1 text-green-600">
+                            <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                               <CheckCircle className="h-2 w-2 sm:h-3 sm:w-3" />
                               <span className="text-xs hidden sm:inline">WhatsApp</span>
                             </div>
 
                             {/* Recently Found Indicator */}
                             {isRecentlyFound && (
-                              <div className="text-xs bg-green-100 text-green-700 px-1 sm:px-2 py-1 rounded-full">
+                              <div className="text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-1 sm:px-2 py-1 rounded-full">
                                 {t('contacts.scraping.new', 'New!')}
                               </div>
                             )}
@@ -729,32 +847,32 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
           {!isScrapingInProgress && scrapingResults.length > 0 && (
             <div className="space-y-4 sm:space-y-6">
               {/* Results Summary */}
-              <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+              <div className="bg-muted p-3 sm:p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                  <h3 className="font-medium text-sm sm:text-base">{t('contacts.scraping.results_title', 'Scraping Results')}</h3>
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+                  <h3 className="font-medium text-sm sm:text-base text-foreground">{t('contacts.scraping.results_title', 'Scraping Results')}</h3>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
                   <div className="flex justify-between sm:block">
-                    <span className="text-gray-600">{t('contacts.scraping.total_checked', 'Total Checked:')}</span>
-                    <span className="ml-2 font-medium">{scrapingStats?.totalChecked || 0}</span>
+                    <span className="text-muted-foreground">{t('contacts.scraping.total_checked', 'Total Checked:')}</span>
+                    <span className="ml-2 font-medium text-foreground">{scrapingStats?.totalChecked || 0}</span>
                   </div>
                   <div className="flex justify-between sm:block">
-                    <span className="text-gray-600">{t('contacts.scraping.valid_found', 'Valid Found:')}</span>
-                    <span className="ml-2 font-medium text-green-600">{scrapingStats?.validCount || 0}</span>
+                    <span className="text-muted-foreground">{t('contacts.scraping.valid_found', 'Valid Found:')}</span>
+                    <span className="ml-2 font-medium text-green-600 dark:text-green-400">{scrapingStats?.validCount || 0}</span>
                   </div>
                   <div className="flex justify-between sm:block">
-                    <span className="text-gray-600">{t('contacts.scraping.errors', 'Errors:')}</span>
-                    <span className="ml-2 font-medium text-red-600">{scrapingStats?.errors?.length || 0}</span>
+                    <span className="text-muted-foreground">{t('contacts.scraping.errors', 'Errors:')}</span>
+                    <span className="ml-2 font-medium text-red-600 dark:text-red-400">{scrapingStats?.errors?.length || 0}</span>
                   </div>
                 </div>
                 {scrapingStats?.errors && scrapingStats.errors.length > 0 && (
                   <div className="mt-3">
                     <details className="text-xs sm:text-sm">
-                      <summary className="cursor-pointer text-red-600 hover:text-red-700">
+                      <summary className="cursor-pointer text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
                         {t('contacts.scraping.view_errors', 'View Errors')}
                       </summary>
-                      <div className="mt-2 max-h-24 sm:max-h-32 overflow-y-auto bg-red-50 p-2 rounded text-red-700">
+                      <div className="mt-2 max-h-24 sm:max-h-32 overflow-y-auto bg-red-50 dark:bg-red-900/20 p-2 rounded text-red-700 dark:text-red-400">
                         {scrapingStats.errors.map((error, index) => (
                           <div key={index} className="text-xs break-words">{error}</div>
                         ))}
@@ -779,7 +897,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                     }
                   </Label>
                 </div>
-                <span className="text-xs sm:text-sm text-gray-500">
+                <span className="text-xs sm:text-sm text-muted-foreground">
                   {t('contacts.scraping.selected_count', '{{selected}} of {{total}} selected', {
                     selected: selectedContacts.size,
                     total: scrapingResults.length
@@ -792,7 +910,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                 {scrapingResults.map((contact) => (
                   <div
                     key={contact.phoneNumber}
-                    className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 border-b last:border-b-0 hover:bg-gray-50"
+                    className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 border-b last:border-b-0 hover:bg-accent"
                   >
                     <Checkbox
                       checked={selectedContacts.has(contact.phoneNumber)}
@@ -800,7 +918,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                     />
 
                     {/* Profile Picture */}
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
                       {contact.profilePicture ? (
                         <img
                           src={contact.profilePicture}
@@ -811,22 +929,22 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                           }}
                         />
                       ) : (
-                        <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                        <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                       )}
                     </div>
 
                     {/* Contact Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-xs sm:text-sm truncate">
+                      <div className="font-medium text-xs sm:text-sm truncate text-foreground">
                         {contact.name || contact.phoneNumber}
                       </div>
-                      <div className="text-xs text-gray-500 font-mono truncate">
+                      <div className="text-xs text-muted-foreground font-mono truncate">
                         +{contact.phoneNumber}
                       </div>
                     </div>
 
                     {/* WhatsApp Status */}
-                    <div className="flex items-center gap-1 text-green-600 flex-shrink-0">
+                    <div className="flex items-center gap-1 text-green-600 dark:text-green-400 flex-shrink-0">
                       <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       <span className="text-xs hidden sm:inline">WhatsApp</span>
                     </div>
@@ -846,8 +964,13 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
                 </Button>
                 <Button
                   onClick={handleStartScraping}
-                  disabled={!selectedConnectionId || !startingNumber.trim() || connections.length === 0}
-                  className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                  disabled={
+                    !selectedConnectionId || 
+                    connections.length === 0 ||
+                    (scrapingSource === 'whatsapp' && !startingNumber.trim()) ||
+                    (scrapingSource === 'googlemaps' && !searchTerm.trim())
+                  }
+                  className="bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 w-full sm:w-auto"
                 >
                   {t('contacts.scraping.start_scraping', 'Start Scraping')}
                 </Button>
@@ -897,7 +1020,7 @@ export function WhatsAppScrapingModal({ isOpen, onClose }: WhatsAppScrapingModal
 
             {isScrapingInProgress && (
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto sm:items-center">
-                <div className="flex-1 text-xs sm:text-sm text-gray-600 order-2 sm:order-1">
+                <div className="flex-1 text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
                   {scrapingStats && (
                     <span className="break-words">
                       <span className="hidden sm:inline">

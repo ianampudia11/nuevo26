@@ -63,7 +63,7 @@ export class SubscriptionManager extends EventEmitter {
 
     if (config.stripeSecretKey) {
       this.stripe = new Stripe(config.stripeSecretKey, {
-        apiVersion: '2025-08-27.basil'
+        apiVersion: '2025-09-30.clover' as any
       });
     }
   }

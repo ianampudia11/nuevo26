@@ -567,7 +567,7 @@ export function PageEditor({ page, onSave, onCancel, isLoading = false }: PageEd
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg p-6 bg-white min-h-96">
+              <div className="border rounded-lg p-6 bg-card min-h-96">
                 <h1 className="text-3xl font-bold mb-4">{formData.title || t('pages.untitled', 'Untitled Page')}</h1>
                 <div 
                   className="prose max-w-none"

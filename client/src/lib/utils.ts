@@ -88,3 +88,25 @@ export function formatDate(dateString: string): string {
     return 'Invalid date';
   }
 }
+
+/**
+ * Extracts initials from a name string, handling edge cases like empty names,
+ * single-character names, and names with special characters.
+ * 
+ * @param name - The name string to extract initials from
+ * @returns A string containing up to 2 uppercase initials, or '?' for empty names
+ */
+export function getInitials(name: string): string {
+  if (!name || !name.trim()) {
+    return '?'; // Fallback for empty names
+  }
+  
+  return name
+    .trim()
+    .split(/\s+/) // Split on one or more whitespace characters
+    .filter(part => part.length > 0) // Remove empty parts
+    .map(part => part[0])
+    .join("")
+    .toUpperCase()
+    .substring(0, 2);
+}

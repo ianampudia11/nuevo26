@@ -15,10 +15,13 @@ import { createCipheriv, createDecipheriv, randomBytes as cryptoRandomBytes } fr
 import axios from "axios";
 import { registerAffiliateRoutes } from "./routes/admin/affiliate-routes";
 import adminAiCredentialsRoutes from "./routes/admin-ai-credentials";
-import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
 import { databaseBackupLogs } from "../shared/schema";
 import { desc, sql } from "drizzle-orm";
 import { invalidateSubdomainCache } from "./middleware/subdomain";
+import { generateWebhookVerifyToken, validateWebhookToken } from "./utils/webhook-token-generator";
+import { testWebhookDelivery, getAppWebhookFieldSubscriptions } from "./services/meta-webhook-configurator";
+import { checkConfigurationHealth } from "./services/meta-configuration-monitor";
+import { cleanupOldAuthBackground } from "./utils/file-system";
 
 interface SMTPConfig {
   enabled: boolean;
@@ -214,7 +217,6 @@ async function testSMTPConnection(config: SMTPConfig, testEmail: string): Promis
     const result = await transporter.sendMail(mailOptions);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('SMTP test connection error:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
@@ -253,7 +255,6 @@ async function sendTestEmail(config: SMTPConfig, testEmail: string): Promise<Ema
     const result = await transporter.sendMail(mailOptions);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('SMTP test email error:', error);
     throw new Error(`SMTP test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -283,7 +284,6 @@ async function sendEmail(to: string, subject: string, html: string, options: Rec
     const result = await transporter.sendMail(mailOptions);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('Email sending error:', error);
     throw error;
   }
 }
@@ -294,6 +294,129 @@ const ensureAuthenticated = (req: Request, res: Response, next: NextFunction) =>
   }
   res.status(401).json({ message: 'Unauthorized' });
 };
+
+/**
+ * Validate color format (hex, rgb, rgba, hsl, hsla)
+ */
+function validateColorFormat(color: string): boolean {
+  if (!color || typeof color !== 'string') {
+    return false;
+  }
+
+
+  const hexPattern = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+  if (hexPattern.test(color)) {
+    return true;
+  }
+
+
+  const rgbPattern = /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*[\d.]+)?\s*\)$/;
+  if (rgbPattern.test(color)) {
+    return true;
+  }
+
+
+  const hslPattern = /^hsla?\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%\s*(,\s*[\d.]+)?\s*\)$/;
+  if (hslPattern.test(color)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Validate gradient configuration
+ */
+function validateGradientConfig(gradientConfig: any): { valid: boolean; error?: string } {
+  if (!gradientConfig || typeof gradientConfig !== 'object') {
+    return { valid: false, error: 'Gradient config must be an object' };
+  }
+
+  if (gradientConfig.mode !== 'simple' && gradientConfig.mode !== 'advanced') {
+    return { valid: false, error: 'Gradient mode must be "simple" or "advanced"' };
+  }
+
+  if (gradientConfig.mode === 'simple') {
+    if (!gradientConfig.simple || typeof gradientConfig.simple !== 'object') {
+      return { valid: false, error: 'Simple gradient config is required' };
+    }
+
+    const { startColor, endColor, direction } = gradientConfig.simple;
+
+    if (!startColor || !validateColorFormat(startColor)) {
+      return { valid: false, error: 'Valid startColor is required for simple gradient' };
+    }
+
+    if (!endColor || !validateColorFormat(endColor)) {
+      return { valid: false, error: 'Valid endColor is required for simple gradient' };
+    }
+
+    const validDirections = ['to-right', 'to-left', 'to-top', 'to-bottom', 'to-br', 'to-bl', 'to-tr', 'to-tl'];
+    if (!direction || !validDirections.includes(direction)) {
+      return { valid: false, error: `Direction must be one of: ${validDirections.join(', ')}` };
+    }
+  } else if (gradientConfig.mode === 'advanced') {
+    if (!gradientConfig.advanced || typeof gradientConfig.advanced !== 'object') {
+      return { valid: false, error: 'Advanced gradient config is required' };
+    }
+
+    const { stops, angle } = gradientConfig.advanced;
+
+    if (!Array.isArray(stops) || stops.length < 2) {
+      return { valid: false, error: 'Advanced gradient must have at least 2 stops' };
+    }
+
+    for (const stop of stops) {
+      if (!stop.color || !validateColorFormat(stop.color)) {
+        return { valid: false, error: 'All gradient stops must have valid colors' };
+      }
+
+      if (typeof stop.position !== 'number' || stop.position < 0 || stop.position > 100) {
+        return { valid: false, error: 'Gradient stop positions must be numbers between 0 and 100' };
+      }
+    }
+
+    if (typeof angle !== 'number' || angle < 0 || angle > 360) {
+      return { valid: false, error: 'Gradient angle must be a number between 0 and 360' };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate auth background configuration
+ */
+function validateAuthBackgroundConfig(config: any): { valid: boolean; error?: string } {
+  if (!config || typeof config !== 'object') {
+    return { valid: false, error: 'Config must be an object' };
+  }
+
+  const validPriorities = ['image', 'color', 'layer'];
+  if (config.priority && !validPriorities.includes(config.priority)) {
+    return { valid: false, error: `Priority must be one of: ${validPriorities.join(', ')}` };
+  }
+
+  if (config.backgroundColor && !validateColorFormat(config.backgroundColor)) {
+    return { valid: false, error: 'Invalid backgroundColor format' };
+  }
+
+  if (config.gradientConfig) {
+    const gradientValidation = validateGradientConfig(config.gradientConfig);
+    if (!gradientValidation.valid) {
+      return gradientValidation;
+    }
+  }
+
+
+  if (config.priority === 'color') {
+    if (!config.backgroundColor && !config.gradientConfig) {
+      return { valid: false, error: 'backgroundColor or gradientConfig is required when priority is "color"' };
+    }
+  }
+
+  return { valid: true };
+}
 
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -327,11 +450,11 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
 
     const allowedMimeTypes = [
-      'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
       'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'
     ];
 
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.ico'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.ico'];
 
     const ext = path.extname(file.originalname).toLowerCase();
     if (!allowedExtensions.includes(ext)) {
@@ -374,7 +497,6 @@ function registerAdminRoutes(app: Express) {
 
       res.json(safeUsers);
     } catch (error) {
-      console.error("Error fetching users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
     }
   });
@@ -392,7 +514,6 @@ function registerAdminRoutes(app: Express) {
 
       res.json(safeUser);
     } catch (error) {
-      console.error("Error fetching user:", error);
       res.status(500).json({ error: "Failed to fetch user" });
     }
   });
@@ -433,7 +554,6 @@ function registerAdminRoutes(app: Express) {
 
       res.status(201).json(safeUser);
     } catch (error) {
-      console.error("Error creating user:", error);
       res.status(500).json({ error: "Failed to create user" });
     }
   });
@@ -468,7 +588,6 @@ function registerAdminRoutes(app: Express) {
 
       res.json(safeUser);
     } catch (error) {
-      console.error("Error updating user:", error);
       res.status(500).json({ error: "Failed to update user" });
     }
   });
@@ -497,7 +616,6 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ message: "Password updated successfully" });
     } catch (error) {
-      console.error("Error changing user password:", error);
       res.status(500).json({ error: "Failed to change password" });
     }
   });
@@ -526,7 +644,6 @@ function registerAdminRoutes(app: Express) {
         temporaryPassword
       });
     } catch (error) {
-      console.error("Error resetting user password:", error);
       res.status(500).json({ error: "Failed to reset password" });
     }
   });
@@ -552,7 +669,6 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ message: "User deleted successfully" });
     } catch (error) {
-      console.error("Error deleting user:", error);
       res.status(500).json({ error: "Failed to delete user" });
     }
   });
@@ -584,7 +700,6 @@ function registerAdminRoutes(app: Express) {
       const settings = await storage.getAllAppSettings();
       res.json(settings);
     } catch (error) {
-      console.error("Error fetching settings:", error);
       res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
@@ -600,7 +715,6 @@ function registerAdminRoutes(app: Express) {
 
       res.json(setting);
     } catch (error) {
-      console.error("Error fetching setting:", error);
       res.status(500).json({ error: "Failed to fetch setting" });
     }
   });
@@ -626,7 +740,7 @@ function registerAdminRoutes(app: Express) {
           });
         }
       } catch (error) {
-        console.error('Error broadcasting logo update:', error);
+
       }
 
       res.json({
@@ -634,7 +748,6 @@ function registerAdminRoutes(app: Express) {
         logoUrl
       });
     } catch (error) {
-      console.error("Error uploading logo:", error);
       res.status(500).json({ error: "Failed to upload logo" });
     }
   });
@@ -659,7 +772,7 @@ function registerAdminRoutes(app: Express) {
           });
         }
       } catch (error) {
-        console.error('Error broadcasting favicon update:', error);
+
       }
 
       res.json({
@@ -667,8 +780,215 @@ function registerAdminRoutes(app: Express) {
         faviconUrl
       });
     } catch (error) {
-      console.error("Error uploading favicon:", error);
       res.status(500).json({ error: "Failed to upload favicon" });
+    }
+  });
+
+  app.post("/api/admin/settings/branding/admin-auth-background", ensureSettingsAccess, upload.single('adminAuthBackground'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+
+      const oldSetting = await storage.getAppSetting('branding_admin_auth_background');
+      const oldUrl = oldSetting?.value as string | undefined;
+
+      const timestamp = Date.now();
+      const backgroundUrl = `/uploads/branding/${req.file.filename}?v=${timestamp}`;
+
+      await storage.saveAppSetting('branding_admin_auth_background', backgroundUrl);
+
+
+      if (oldUrl) {
+        await cleanupOldAuthBackground(oldUrl);
+      }
+
+      try {
+        if ((global as any).broadcastToAllClients) {
+          (global as any).broadcastToAllClients({
+            type: 'settingsUpdated',
+            key: 'branding_admin_auth_background',
+            value: backgroundUrl
+          });
+        }
+      } catch (error) {
+
+      }
+
+      res.json({
+        message: "Admin auth background uploaded successfully",
+        backgroundUrl
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to upload admin auth background" });
+    }
+  });
+
+  app.post("/api/admin/settings/branding/user-auth-background", ensureSettingsAccess, upload.single('userAuthBackground'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+
+      const oldSetting = await storage.getAppSetting('branding_user_auth_background');
+      const oldUrl = oldSetting?.value as string | undefined;
+
+      const timestamp = Date.now();
+      const backgroundUrl = `/uploads/branding/${req.file.filename}?v=${timestamp}`;
+
+      await storage.saveAppSetting('branding_user_auth_background', backgroundUrl);
+
+
+      if (oldUrl) {
+        await cleanupOldAuthBackground(oldUrl);
+      }
+
+      try {
+        if ((global as any).broadcastToAllClients) {
+          (global as any).broadcastToAllClients({
+            type: 'settingsUpdated',
+            key: 'branding_user_auth_background',
+            value: backgroundUrl
+          });
+        }
+      } catch (error) {
+
+      }
+
+      res.json({
+        message: "User auth background uploaded successfully",
+        backgroundUrl
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to upload user auth background" });
+    }
+  });
+
+  app.delete("/api/admin/settings/branding/admin-auth-background", ensureSettingsAccess, async (req, res) => {
+    try {
+      const oldSetting = await storage.getAppSetting('branding_admin_auth_background');
+      const oldUrl = oldSetting?.value as string | undefined;
+
+
+      if (oldUrl) {
+        await cleanupOldAuthBackground(oldUrl);
+      }
+
+
+      await storage.deleteAppSetting('branding_admin_auth_background');
+
+      try {
+        if ((global as any).broadcastToAllClients) {
+          (global as any).broadcastToAllClients({
+            type: 'settingsUpdated',
+            key: 'branding_admin_auth_background',
+            value: null
+          });
+        }
+      } catch (error) {
+
+      }
+
+      res.json({
+        message: "Admin auth background deleted successfully"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete admin auth background" });
+    }
+  });
+
+  app.delete("/api/admin/settings/branding/user-auth-background", ensureSettingsAccess, async (req, res) => {
+    try {
+      const oldSetting = await storage.getAppSetting('branding_user_auth_background');
+      const oldUrl = oldSetting?.value as string | undefined;
+
+
+      if (oldUrl) {
+        await cleanupOldAuthBackground(oldUrl);
+      }
+
+
+      await storage.deleteAppSetting('branding_user_auth_background');
+
+      try {
+        if ((global as any).broadcastToAllClients) {
+          (global as any).broadcastToAllClients({
+            type: 'settingsUpdated',
+            key: 'branding_user_auth_background',
+            value: null
+          });
+        }
+      } catch (error) {
+
+      }
+
+      res.json({
+        message: "User auth background deleted successfully"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user auth background" });
+    }
+  });
+
+  app.post("/api/admin/settings/branding/auth-backgrounds", ensureSettingsAccess, async (req, res) => {
+    try {
+      const { adminAuthBackground, userAuthBackground } = req.body;
+
+      const config: any = {};
+
+
+      if (adminAuthBackground) {
+        const validation = validateAuthBackgroundConfig(adminAuthBackground);
+        if (!validation.valid) {
+          return res.status(400).json({ error: `Invalid admin auth background config: ${validation.error}` });
+        }
+        config.adminAuthBackground = {
+          backgroundColor: adminAuthBackground.backgroundColor,
+          gradientConfig: adminAuthBackground.gradientConfig,
+          priority: adminAuthBackground.priority || 'image'
+        };
+      }
+
+
+      if (userAuthBackground) {
+        const validation = validateAuthBackgroundConfig(userAuthBackground);
+        if (!validation.valid) {
+          return res.status(400).json({ error: `Invalid user auth background config: ${validation.error}` });
+        }
+        config.userAuthBackground = {
+          backgroundColor: userAuthBackground.backgroundColor,
+          gradientConfig: userAuthBackground.gradientConfig,
+          priority: userAuthBackground.priority || 'image'
+        };
+      }
+
+
+      await storage.saveAppSetting('auth_background_config', config);
+
+      try {
+        if ((global as any).broadcastToAllClients) {
+          (global as any).broadcastToAllClients({
+            type: 'settingsUpdated',
+            key: 'auth_background_config',
+            value: config
+          });
+        }
+      } catch (error) {
+
+      }
+
+      res.json({
+        message: "Auth background configuration saved successfully",
+        config
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        res.status(500).json({ error: error.message || "Failed to save auth background configuration" });
+      } else {
+        res.status(500).json({ error: "Failed to save auth background configuration" });
+      }
     }
   });
 
@@ -713,7 +1033,7 @@ function registerAdminRoutes(app: Express) {
       try {
         invalidateSubdomainCache(existingCompany.slug);
       } catch (error) {
-        console.warn('Cache invalidation failed:', error);
+
       }
 
       res.json({
@@ -722,24 +1042,33 @@ function registerAdminRoutes(app: Express) {
         company: updatedCompany
       });
     } catch (error) {
-      console.error("Error uploading company logo:", error);
       res.status(500).json({ error: "Failed to upload company logo" });
     }
   });
 
   app.post("/api/admin/settings/branding", ensureSettingsAccess, async (req, res) => {
     try {
-      const { appName, primaryColor, secondaryColor } = req.body;
+      const { appName, primaryColor, secondaryColor, defaultTheme } = req.body;
 
       if (!appName) {
         return res.status(400).json({ error: "Application name is required" });
       }
 
-      const brandingSettings = {
+
+      if (defaultTheme !== undefined && defaultTheme !== null && defaultTheme !== '' && defaultTheme !== 'dark' && defaultTheme !== 'light') {
+        return res.status(400).json({ error: "defaultTheme must be either 'dark' or 'light'" });
+      }
+
+      const brandingSettings: any = {
         appName: appName,
         primaryColor: primaryColor || '#333235',
         secondaryColor: secondaryColor || '#4F46E5'
       };
+
+
+      if (defaultTheme === 'dark' || defaultTheme === 'light') {
+        brandingSettings.defaultTheme = defaultTheme;
+      }
 
       await storage.saveAppSetting('branding', brandingSettings);
 
@@ -750,7 +1079,7 @@ function registerAdminRoutes(app: Express) {
 
 
       } catch (error) {
-        console.warn('Cache invalidation note:', error);
+
       }
 
       try {
@@ -761,11 +1090,9 @@ function registerAdminRoutes(app: Express) {
             key: 'branding',
             value: brandingSettings
           });
-        } else {
-          console.error('broadcastToAllClients not available');
         }
       } catch (error) {
-        console.error('Error broadcasting settings update:', error);
+
       }
 
       res.json({
@@ -773,7 +1100,6 @@ function registerAdminRoutes(app: Express) {
         settings: brandingSettings
       });
     } catch (error) {
-      console.error("Error saving branding settings:", error);
       if (error instanceof Error) {
         res.status(500).json({ error: error.message || "Failed to save branding settings" });
       } else {
@@ -812,7 +1138,7 @@ function registerAdminRoutes(app: Express) {
         settings: registrationSettings
       });
     } catch (error) {
-      console.error("Error saving registration settings:", error);
+
       res.status(500).json({ error: "Failed to save registration settings" });
     }
   });
@@ -904,7 +1230,7 @@ function registerAdminRoutes(app: Express) {
           });
         }
       } catch (error) {
-        console.error('Error broadcasting general settings update:', error);
+
       }
 
       res.json({
@@ -912,7 +1238,7 @@ function registerAdminRoutes(app: Express) {
         settings: generalSettings
       });
     } catch (error) {
-      console.error("❌ Error saving general settings:", error);
+
       res.status(500).json({ error: "Failed to save general settings" });
     }
   });
@@ -933,7 +1259,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(customScriptsSetting.value);
     } catch (error) {
-      console.error("Error fetching custom scripts settings:", error);
+
       res.status(500).json({ error: "Failed to fetch custom scripts settings" });
     }
   });
@@ -971,7 +1297,7 @@ function registerAdminRoutes(app: Express) {
           });
         }
       } catch (error) {
-        console.error('Error broadcasting custom scripts update:', error);
+
       }
 
       res.json({
@@ -979,8 +1305,70 @@ function registerAdminRoutes(app: Express) {
         settings: customScriptsSettings
       });
     } catch (error) {
-      console.error("Error saving custom scripts settings:", error);
+
       res.status(500).json({ error: "Failed to save custom scripts settings" });
+    }
+  });
+
+  app.get("/api/admin/settings/custom-css", ensureSettingsAccess, async (_req, res) => {
+    try {
+      const customCssSetting = await storage.getAppSetting('custom_css');
+
+      if (!customCssSetting) {
+        const defaultConfig = {
+          enabled: false,
+          css: '',
+          lastModified: new Date().toISOString()
+        };
+        return res.json(defaultConfig);
+      }
+
+      res.json(customCssSetting.value);
+    } catch (error) {
+
+      res.status(500).json({ error: "Failed to fetch custom CSS settings" });
+    }
+  });
+
+  app.post("/api/admin/settings/custom-css", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { enabled, css } = req.body;
+
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "Enabled must be a boolean value" });
+      }
+
+      if (typeof css !== 'string') {
+        return res.status(400).json({ error: "CSS must be a string" });
+      }
+
+      const customCssSettings = {
+        enabled: Boolean(enabled),
+        css: css || '',
+        lastModified: new Date().toISOString()
+      };
+
+      await storage.saveAppSetting('custom_css', customCssSettings);
+
+
+      try {
+        if ((global as any).broadcastToAllClients) {
+          (global as any).broadcastToAllClients({
+            type: 'customCssUpdated',
+            data: customCssSettings
+          });
+        }
+      } catch (error) {
+
+      }
+
+      res.json({
+        message: "Custom CSS settings saved successfully",
+        settings: customCssSettings
+      });
+    } catch (error) {
+
+      res.status(500).json({ error: "Failed to save custom CSS settings" });
     }
   });
 
@@ -1011,7 +1399,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config);
     } catch (error) {
-      console.error("Error fetching SMTP settings:", error);
+
       res.status(500).json({ error: "Failed to fetch SMTP settings" });
     }
   });
@@ -1061,7 +1449,7 @@ function registerAdminRoutes(app: Express) {
         config: responseConfig
       });
     } catch (error) {
-      console.error("Error saving SMTP settings:", error);
+
       res.status(500).json({ error: "Failed to save SMTP settings" });
     }
   });
@@ -1102,7 +1490,7 @@ function registerAdminRoutes(app: Express) {
         });
       }
     } catch (error) {
-      console.error("Error testing SMTP connection:", error);
+
       res.status(500).json({ error: "Failed to test SMTP connection" });
     }
   });
@@ -1127,12 +1515,12 @@ function registerAdminRoutes(app: Express) {
           });
         }
       } catch (error) {
-        console.error('Error broadcasting settings update:', error);
+
       }
 
       res.json(setting);
     } catch (error) {
-      console.error("Error saving setting:", error);
+
       res.status(500).json({ error: "Failed to save setting" });
     }
   });
@@ -1148,7 +1536,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ message: "Setting deleted successfully" });
     } catch (error) {
-      console.error("Error deleting setting:", error);
+
       res.status(500).json({ error: "Failed to delete setting" });
     }
   });
@@ -1180,7 +1568,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving Stripe settings:", error);
+
       res.status(500).json({ error: "Failed to save Stripe settings" });
     }
   });
@@ -1196,7 +1584,7 @@ function registerAdminRoutes(app: Express) {
       const stripeSettings = stripeSettingObj.value as any;
 
       const stripe = new Stripe(stripeSettings.secretKey, {
-        apiVersion: '2025-08-27.basil'
+        apiVersion: '2025-09-30.clover' as any
       });
 
       const account = await stripe.accounts.retrieve();
@@ -1211,7 +1599,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error testing Stripe connection:", error);
+
       res.status(500).json({
         error: "Failed to connect to Stripe",
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -1246,7 +1634,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving Mercado Pago settings:", error);
+
       res.status(500).json({ error: "Failed to save Mercado Pago settings" });
     }
   });
@@ -1281,13 +1669,13 @@ function registerAdminRoutes(app: Express) {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          console.error('Mercado Pago API test error response:', errorData);
+
           throw new Error(`Failed to connect to Mercado Pago API: ${response.status} ${response.statusText}`);
         }
 
         paymentMethods = await response.json();
       } catch (error) {
-        console.error('Error in Mercado Pago API test call:', error);
+
         throw error;
       }
 
@@ -1308,13 +1696,13 @@ function registerAdminRoutes(app: Express) {
 
         if (!userResponse.ok) {
           const errorData = await userResponse.json().catch(() => ({}));
-          console.error('Mercado Pago user API error response:', errorData);
+
           throw new Error(`Failed to fetch user information from Mercado Pago API: ${userResponse.status} ${userResponse.statusText}`);
         }
 
         userData = await userResponse.json();
       } catch (error) {
-        console.error('Error fetching Mercado Pago user information:', error);
+
         throw error;
       }
 
@@ -1332,7 +1720,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error testing Mercado Pago connection:", error);
+
       res.status(500).json({
         error: "Failed to connect to Mercado Pago",
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -1365,7 +1753,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving Moyasar settings:", error);
+
       res.status(500).json({ error: "Failed to save Moyasar settings" });
     }
   });
@@ -1415,7 +1803,7 @@ function registerAdminRoutes(app: Express) {
           return;
         } else if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          console.error('Moyasar API test error response:', errorData);
+
           throw new Error(`API test failed: ${response.status} ${response.statusText}`);
         }
 
@@ -1431,13 +1819,83 @@ function registerAdminRoutes(app: Express) {
           }
         });
       } catch (error) {
-        console.error('Error in Moyasar API test call:', error);
+
         throw error;
       }
     } catch (error) {
-      console.error("Error testing Moyasar connection:", error);
+
       res.status(500).json({
         error: "Failed to test Moyasar connection",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  app.post("/api/admin/settings/payment/paystack", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { publicKey, secretKey, testMode, subaccount, webhookSecret } = req.body;
+
+      if (!publicKey || !secretKey) {
+        return res.status(400).json({ error: "Public Key and Secret Key are required" });
+      }
+
+      const paystackSettings = {
+        publicKey,
+        secretKey,
+        subaccount: subaccount || '',
+        webhookSecret: webhookSecret || '',
+        testMode: !!testMode,
+        enabled: true
+      };
+
+      await storage.saveAppSetting('payment_paystack', paystackSettings);
+
+      res.json({
+        message: "Paystack settings saved successfully",
+        settings: {
+          ...paystackSettings,
+          secretKey: '••••••••'
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save Paystack settings" });
+    }
+  });
+
+  app.post("/api/admin/settings/payment/paystack/test", ensureSuperAdmin, async (_req, res) => {
+    try {
+      const paystackSettingObj = await storage.getAppSetting('payment_paystack');
+      if (!paystackSettingObj || !paystackSettingObj.value) {
+        return res.status(400).json({ error: "Paystack is not configured" });
+      }
+
+      const paystackSettings = paystackSettingObj.value as any;
+      if (!paystackSettings.secretKey) {
+        return res.status(400).json({ error: "Paystack secret key is missing" });
+      }
+
+      const response = await fetch('https://api.paystack.co/bank', {
+        headers: {
+          'Authorization': `Bearer ${paystackSettings.secretKey}`
+        }
+      });
+
+      if (response.status === 401) {
+        throw new Error('Invalid Paystack secret key');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.message || `Paystack API error: ${response.statusText}`);
+      }
+
+      res.json({
+        message: "Paystack connection successful",
+        testMode: !!paystackSettings.testMode
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to test Paystack connection",
         details: error instanceof Error ? error.message : String(error)
       });
     }
@@ -1451,9 +1909,18 @@ function registerAdminRoutes(app: Express) {
         return res.status(400).json({ error: "Client ID and Client Secret are required" });
       }
 
+
+      const trimmedClientId = clientId.trim();
+      const trimmedClientSecret = clientSecret.trim();
+
+
+      if (!trimmedClientId || !trimmedClientSecret) {
+        return res.status(400).json({ error: "Client ID and Client Secret cannot be empty or whitespace only" });
+      }
+
       const paypalSettings = {
-        clientId,
-        clientSecret,
+        clientId: trimmedClientId,
+        clientSecret: trimmedClientSecret,
         testMode: !!testMode,
         enabled: true
       };
@@ -1468,7 +1935,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving PayPal settings:", error);
+
       res.status(500).json({ error: "Failed to save PayPal settings" });
     }
   });
@@ -1483,16 +1950,32 @@ function registerAdminRoutes(app: Express) {
 
       const paypalSettings = paypalSettingObj.value as any;
 
+
+      const clientId = (paypalSettings.clientId || '').trim();
+      const clientSecret = (paypalSettings.clientSecret || '').trim();
+
+
+      if (!clientId || !clientSecret) {
+        console.error('PayPal credentials validation failed in test endpoint:', {
+          hasClientId: !!paypalSettings.clientId,
+          hasClientSecret: !!paypalSettings.clientSecret,
+          clientIdLength: clientId?.length || 0,
+          clientSecretLength: clientSecret?.length || 0,
+          testMode: paypalSettings.testMode
+        });
+        return res.status(400).json({ error: "Invalid PayPal credentials. Please check your PayPal settings and remove any extra whitespace." });
+      }
+
       let environment;
       if (paypalSettings.testMode) {
         environment = new paypal.core.SandboxEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
+          clientId,
+          clientSecret
         );
       } else {
         environment = new paypal.core.LiveEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
+          clientId,
+          clientSecret
         );
       }
 
@@ -1524,9 +2007,10 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error testing PayPal connection:", error);
+
+      console.error('PayPal connection test error:', error);
       res.status(500).json({
-        error: "Failed to connect to PayPal",
+        error: "Failed to connect to PayPal. Please verify your credentials are correct and don't contain extra whitespace.",
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -1560,7 +2044,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving MPESA settings:", error);
+
       res.status(500).json({ error: "Failed to save MPESA settings" });
     }
   });
@@ -1611,12 +2095,12 @@ function registerAdminRoutes(app: Express) {
         });
 
       } catch (fetchError: any) {
-        console.error('MPESA test connection error:', fetchError);
+
         throw new Error(fetchError.message || 'Failed to connect to MPESA API');
       }
 
     } catch (error: any) {
-      console.error("Error testing MPESA connection:", error);
+
       res.status(500).json({
         error: "Failed to test MPESA connection",
         details: error.message || 'Unknown error'
@@ -1657,7 +2141,7 @@ function registerAdminRoutes(app: Express) {
         settings: bankSettings
       });
     } catch (error) {
-      console.error("Error saving bank transfer settings:", error);
+
       res.status(500).json({ error: "Failed to save bank transfer settings" });
     }
   });
@@ -1704,7 +2188,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config);
     } catch (error) {
-      console.error("Error fetching Google Calendar OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to fetch Google Calendar OAuth settings" });
     }
   });
@@ -1741,7 +2225,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving Google Calendar OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to save Google Calendar OAuth settings" });
     }
   });
@@ -1775,7 +2259,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config);
     } catch (error) {
-      console.error("Error fetching Zoho Calendar OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to fetch Zoho Calendar OAuth settings" });
     }
   });
@@ -1819,7 +2303,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving Zoho Calendar OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to save Zoho Calendar OAuth settings" });
     }
   });
@@ -1876,7 +2360,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(validationResults);
     } catch (error) {
-      console.error("Error testing Zoho Calendar configuration:", error);
+
       res.status(500).json({
         success: false,
         error: "Failed to test Zoho Calendar configuration"
@@ -1917,7 +2401,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config);
     } catch (error) {
-      console.error("Error fetching Calendly OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to fetch Calendly OAuth settings" });
     }
   });
@@ -1955,7 +2439,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving Calendly OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to save Calendly OAuth settings" });
     }
   });
@@ -1987,7 +2471,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config);
     } catch (error) {
-      console.error("Error fetching Google Sheets OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to fetch Google Sheets OAuth settings" });
     }
   });
@@ -2024,7 +2508,7 @@ function registerAdminRoutes(app: Express) {
         }
       });
     } catch (error) {
-      console.error("Error saving Google Sheets OAuth settings:", error);
+
       res.status(500).json({ error: "Failed to save Google Sheets OAuth settings" });
     }
   });
@@ -2040,7 +2524,7 @@ function registerAdminRoutes(app: Express) {
       const stripeSettings = stripeSettingObj.value as any;
 
       const stripe = new Stripe(stripeSettings.secretKey, {
-        apiVersion: '2025-08-27.basil'
+        apiVersion: '2025-09-30.clover' as any
       });
 
       const signature = req.headers['stripe-signature'] as string;
@@ -2057,7 +2541,7 @@ function registerAdminRoutes(app: Express) {
           stripeSettings.webhookSecret
         );
       } catch (err) {
-        console.error('Webhook signature verification failed:', err);
+
         return res.status(400).send(`Webhook Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
 
@@ -2106,7 +2590,7 @@ function registerAdminRoutes(app: Express) {
                   }, companyId);
                 }
               } catch (broadcastError) {
-                console.error('Error broadcasting plan update after payment:', broadcastError);
+
               }
             }
           }
@@ -2128,7 +2612,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ received: true });
     } catch (error) {
-      console.error('Error handling Stripe webhook:', error);
+
       res.status(500).json({ error: 'Failed to process webhook' });
     }
   });
@@ -2208,7 +2692,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ received: true });
     } catch (error) {
-      console.error('Error handling Mercado Pago webhook:', error);
+
       res.status(500).json({ error: 'Failed to process webhook' });
     }
   });
@@ -2276,12 +2760,12 @@ function registerAdminRoutes(app: Express) {
           });
         }
       } else {
-        console.error('Invalid PayPal IPN message:', body);
+
       }
 
       res.status(200).end();
     } catch (error) {
-      console.error('Error handling PayPal webhook:', error);
+
       res.status(200).end();
     }
   });
@@ -2291,7 +2775,7 @@ function registerAdminRoutes(app: Express) {
       const moyasarSettingObj = await storage.getAppSetting('payment_moyasar');
 
       if (!moyasarSettingObj || !moyasarSettingObj.value) {
-        console.error('Moyasar webhook received but Moyasar is not configured');
+
         return res.status(400).json({ error: "Moyasar is not configured" });
       }
 
@@ -2299,7 +2783,7 @@ function registerAdminRoutes(app: Express) {
 
 
       if (!body.type || !body.data) {
-        console.error('Invalid Moyasar webhook payload:', body);
+
         return res.status(400).json({ error: "Invalid webhook payload" });
       }
 
@@ -2318,7 +2802,7 @@ function registerAdminRoutes(app: Express) {
         );
 
         if (!transaction) {
-          console.error(`No transaction found for Moyasar payment ID: ${paymentId}`);
+
           return res.status(404).json({ error: "Transaction not found" });
         }
 
@@ -2372,7 +2856,7 @@ function registerAdminRoutes(app: Express) {
                   }, transaction.companyId);
                 }
               } catch (broadcastError) {
-                console.error('Error broadcasting plan update after subscription activation:', broadcastError);
+
               }
             }
           }
@@ -2381,7 +2865,7 @@ function registerAdminRoutes(app: Express) {
 
       res.status(200).json({ received: true });
     } catch (error) {
-      console.error('Error handling Moyasar webhook:', error);
+
       res.status(500).json({ error: 'Failed to process webhook' });
     }
   });
@@ -2391,7 +2875,7 @@ function registerAdminRoutes(app: Express) {
       const mpesaSettingObj = await storage.getAppSetting('payment_mpesa');
 
       if (!mpesaSettingObj || !mpesaSettingObj.value) {
-        console.error('MPESA webhook received but MPESA is not configured');
+
         return res.status(400).json({ error: "MPESA is not configured" });
       }
 
@@ -2400,7 +2884,7 @@ function registerAdminRoutes(app: Express) {
 
 
       if (!body.Body || !body.Body.stkCallback) {
-        console.error('Invalid MPESA webhook payload:', body);
+
         return res.status(400).json({ error: "Invalid webhook payload" });
       }
 
@@ -2417,7 +2901,7 @@ function registerAdminRoutes(app: Express) {
       );
 
       if (!transaction) {
-        console.error(`No transaction found for MPESA checkout request ID: ${checkoutRequestId}`);
+
         return res.status(404).json({ error: "Transaction not found" });
       }
 
@@ -2492,7 +2976,7 @@ function registerAdminRoutes(app: Express) {
               }, transaction.companyId);
             }
           } catch (broadcastError) {
-            console.error('Error broadcasting plan update:', broadcastError);
+
           }
         }
 
@@ -2530,7 +3014,7 @@ function registerAdminRoutes(app: Express) {
       });
 
     } catch (error) {
-      console.error('Error handling MPESA webhook:', error);
+
       res.status(200).json({
         ResultCode: 1,
         ResultDesc: "Failed to process webhook"
@@ -2698,7 +3182,7 @@ function registerAdminRoutes(app: Express) {
         activeUsersByDay
       });
     } catch (error) {
-      console.error("Error fetching analytics data:", error);
+
       res.status(500).json({ error: "Failed to fetch analytics data" });
     }
   });
@@ -2711,7 +3195,7 @@ function registerAdminRoutes(app: Express) {
       const transactions = await storage.getAllPaymentTransactions();
       res.json(transactions);
     } catch (error) {
-      console.error("Error fetching payment transactions:", error);
+
       res.status(500).json({ error: "Failed to fetch payment transactions" });
     }
   });
@@ -2722,8 +3206,75 @@ function registerAdminRoutes(app: Express) {
       const transactions = await storage.getPaymentTransactionsByCompany(companyId);
       res.json(transactions);
     } catch (error) {
-      console.error("Error fetching company payment transactions:", error);
+
       res.status(500).json({ error: "Failed to fetch company payment transactions" });
+    }
+  });
+
+  app.get("/api/admin/companies/:companyId/data-retention-policy/:platform", ensureSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const companyId = parseInt(req.params.companyId);
+      const platform = req.params.platform;
+      if (isNaN(companyId) || !platform) {
+        return res.status(400).json({ error: "Company ID and platform are required" });
+      }
+      const policy = await storage.getDataRetentionPolicy(companyId, platform);
+      res.json({ policy: policy ?? null });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch data retention policy" });
+    }
+  });
+
+  app.put("/api/admin/companies/:companyId/data-retention-policy/:platform", ensureSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const companyId = parseInt(req.params.companyId);
+      const platform = req.params.platform;
+      const raw = req.body;
+      if (isNaN(companyId) || !platform) {
+        return res.status(400).json({ error: "Company ID and platform are required" });
+      }
+      if (!raw || typeof raw.enabled !== 'boolean') {
+        return res.status(400).json({ error: "Valid policy config (enabled, retentionDays, etc.) is required" });
+      }
+      const parsedRetention = typeof raw.retentionDays === 'number' && Number.isFinite(raw.retentionDays)
+        ? raw.retentionDays
+        : parseInt(String(raw.retentionDays), 10);
+      if (!Number.isFinite(parsedRetention) || parsedRetention <= 0) {
+        return res.status(400).json({ error: "retentionDays must be a finite positive number" });
+      }
+      const policyConfig = {
+        enabled: raw.enabled,
+        retentionDays: parsedRetention,
+        autoAnonymize: typeof raw.autoAnonymize === 'boolean' ? raw.autoAnonymize : false,
+        deleteInactiveConversations: typeof raw.deleteInactiveConversations === 'boolean' ? raw.deleteInactiveConversations : false,
+        inactivityThresholdDays: typeof raw.inactivityThresholdDays === 'number' && Number.isFinite(raw.inactivityThresholdDays) && raw.inactivityThresholdDays >= 0
+          ? raw.inactivityThresholdDays
+          : (parseInt(String(raw.inactivityThresholdDays), 10) >= 0 ? parseInt(String(raw.inactivityThresholdDays), 10) : 0),
+        notifyBeforeDeletion: raw.notifyBeforeDeletion === true,
+        notificationDays: typeof raw.notificationDays === 'number' && Number.isFinite(raw.notificationDays) && raw.notificationDays >= 0
+          ? raw.notificationDays
+          : undefined
+      };
+      await storage.setDataRetentionPolicy(companyId, platform, policyConfig);
+      const policy = await storage.getDataRetentionPolicy(companyId, platform);
+      res.json({ message: "Data retention policy updated", policy });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update data retention policy" });
+    }
+  });
+
+  app.get("/api/admin/companies/:companyId/deletion-audit-logs", ensureSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const companyId = parseInt(req.params.companyId);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      if (isNaN(companyId)) {
+        return res.status(400).json({ error: "Company ID is required" });
+      }
+      const result = await storage.getCompanyDeletionAuditLogs(companyId, { page, limit });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch deletion audit logs" });
     }
   });
 
@@ -2743,7 +3294,7 @@ function registerAdminRoutes(app: Express) {
         transaction
       });
     } catch (error) {
-      console.error("Error updating payment transaction:", error);
+
       res.status(500).json({ error: "Failed to update payment transaction" });
     }
   });
@@ -2758,7 +3309,7 @@ function registerAdminRoutes(app: Express) {
         requireApproval: registrationSettings.requireApproval ?? false
       });
     } catch (error) {
-      console.error('Error getting registration status:', error);
+
       res.status(500).json({ error: 'Failed to get registration status' });
     }
   });
@@ -2785,7 +3336,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config?.value || defaultConfig);
     } catch (error) {
-      console.error("Error fetching backup config:", error);
+
       res.status(500).json({ error: "Failed to fetch backup configuration" });
     }
   });
@@ -2797,7 +3348,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ message: "Backup configuration saved successfully" });
     } catch (error) {
-      console.error("Error saving backup config:", error);
+
       res.status(500).json({ error: "Failed to save backup configuration" });
     }
   });
@@ -2827,7 +3378,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(backup);
     } catch (error) {
-      console.error("Error creating backup:", error);
+
       res.status(500).json({ error: "Failed to create backup" });
     }
   });
@@ -2840,7 +3391,7 @@ function registerAdminRoutes(app: Express) {
       const backups = await backupService.listBackups();
       res.json(backups);
     } catch (error) {
-      console.error("Error listing backups:", error);
+
       res.status(500).json({ error: "Failed to list backups" });
     }
   });
@@ -2859,7 +3410,7 @@ function registerAdminRoutes(app: Express) {
       const filePath = await backupService.getBackupFilePath(backup);
       res.download(filePath, backup.filename);
     } catch (error) {
-      console.error("Error downloading backup:", error);
+
       res.status(500).json({ error: "Failed to download backup" });
     }
   });
@@ -2873,7 +3424,7 @@ function registerAdminRoutes(app: Express) {
       const result = await backupService.preflightRestoreChecks(id);
       res.json(result);
     } catch (error) {
-      console.error("Error performing preflight checks:", error);
+
       res.status(500).json({
         error: "Failed to perform preflight checks",
         details: error instanceof Error ? error.message : String(error)
@@ -2908,7 +3459,7 @@ function registerAdminRoutes(app: Express) {
         res.json(result);
       }
     } catch (error) {
-      console.error("Error restoring backup:", error);
+
       const errorMessage = error instanceof Error ? error.message : "Failed to restore backup";
       if (!res.headersSent) {
         res.status(500).json({
@@ -2933,7 +3484,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(status);
     } catch (error) {
-      console.error("Error fetching restore status:", error);
+
       res.status(500).json({ error: "Failed to fetch restore status" });
     }
   });
@@ -2947,7 +3498,7 @@ function registerAdminRoutes(app: Express) {
       await backupService.deleteBackup(id);
       res.json({ message: "Backup deleted successfully" });
     } catch (error) {
-      console.error("Error deleting backup:", error);
+
       res.status(500).json({ error: "Failed to delete backup" });
     }
   });
@@ -2961,7 +3512,7 @@ function registerAdminRoutes(app: Express) {
       const result = await backupService.verifyBackup(id);
       res.json(result);
     } catch (error) {
-      console.error("Error verifying backup:", error);
+
       res.status(500).json({ error: "Failed to verify backup" });
     }
   });
@@ -2975,7 +3526,7 @@ function registerAdminRoutes(app: Express) {
       const result = await backupService.verifyDeep(id);
       res.json(result);
     } catch (error) {
-      console.error("Error performing deep verification:", error);
+
       res.status(500).json({
         error: "Failed to perform deep verification",
         details: error instanceof Error ? error.message : String(error)
@@ -3002,7 +3553,7 @@ function registerAdminRoutes(app: Express) {
         retentionDays
       });
     } catch (error) {
-      console.error("Error performing backup cleanup:", error);
+
       res.status(500).json({
         error: "Failed to perform backup cleanup",
         details: error instanceof Error ? error.message : String(error)
@@ -3036,7 +3587,7 @@ function registerAdminRoutes(app: Express) {
         offset
       });
     } catch (error) {
-      console.error("Error fetching backup logs:", error);
+
       res.status(500).json({ error: "Failed to fetch backup logs" });
     }
   });
@@ -3116,14 +3667,14 @@ function registerAdminRoutes(app: Express) {
 
       res.json(result);
     } catch (error) {
-      console.error("Error uploading backup:", error);
+
 
 
       if (req.file && req.file.path) {
         try {
           fs.unlinkSync(req.file.path);
         } catch (cleanupError) {
-          console.error("Error cleaning up uploaded file:", cleanupError);
+
         }
       }
 
@@ -3216,7 +3767,7 @@ function registerAdminRoutes(app: Express) {
         });
       }
     } catch (error) {
-      console.error("Error validating URL:", error);
+
       res.status(500).json({
         accessible: false,
         error: "Failed to validate URL"
@@ -3325,14 +3876,14 @@ function registerAdminRoutes(app: Express) {
 
       res.json(result);
     } catch (error) {
-      console.error("Error uploading backup from URL:", error);
+
 
 
       if (tempFilePath && fs.existsSync(tempFilePath)) {
         try {
           fs.unlinkSync(tempFilePath);
         } catch (cleanupError) {
-          console.error("Error cleaning up downloaded file:", cleanupError);
+
         }
       }
 
@@ -3370,7 +3921,7 @@ function registerAdminRoutes(app: Express) {
       const authUrl = await googleDriveService.getAuthUrl();
       res.json({ authUrl });
     } catch (error) {
-      console.error("Error getting Google Drive auth URL:", error);
+
       res.status(500).json({ error: "Failed to get Google Drive auth URL" });
     }
   });
@@ -3397,7 +3948,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ message: "Google Drive connected successfully" });
     } catch (error) {
-      console.error("Error handling Google Drive callback:", error);
+
       res.status(500).json({ error: "Failed to connect Google Drive" });
     }
   });
@@ -3410,7 +3961,7 @@ function registerAdminRoutes(app: Express) {
       const result = await googleDriveService.testConnection();
       res.json(result);
     } catch (error) {
-      console.error("Error testing Google Drive connection:", error);
+
       res.status(500).json({ error: "Failed to test Google Drive connection" });
     }
   });
@@ -3423,7 +3974,7 @@ function registerAdminRoutes(app: Express) {
       const config = await googleDriveService.getOAuthConfig();
       res.json(config);
     } catch (error) {
-      console.error("Error getting OAuth config:", error);
+
       res.status(500).json({ error: "Failed to get OAuth configuration" });
     }
   });
@@ -3447,7 +3998,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(result);
     } catch (error) {
-      console.error("Error saving OAuth config:", error);
+
       res.status(500).json({ error: "Failed to save OAuth configuration" });
     }
   });
@@ -3460,7 +4011,7 @@ function registerAdminRoutes(app: Express) {
       const result = await googleDriveService.clearOAuthConfig();
       res.json(result);
     } catch (error) {
-      console.error("Error clearing OAuth config:", error);
+
       res.status(500).json({ error: "Failed to clear OAuth configuration" });
     }
   });
@@ -3473,7 +4024,7 @@ function registerAdminRoutes(app: Express) {
       const result = await googleDriveService.validateOAuthConfig();
       res.json(result);
     } catch (error) {
-      console.error("Error validating OAuth config:", error);
+
       res.status(500).json({ error: "Failed to validate OAuth configuration" });
     }
   });
@@ -3486,7 +4037,7 @@ function registerAdminRoutes(app: Express) {
       const stats = await backupService.getBackupStats();
       res.json(stats);
     } catch (error) {
-      console.error("Error getting backup stats:", error);
+
       res.status(500).json({ error: "Failed to get backup statistics" });
     }
   });
@@ -3499,7 +4050,7 @@ function registerAdminRoutes(app: Express) {
       const tools = await backupService.checkPostgresTools();
       res.json(tools);
     } catch (error) {
-      console.error("Error checking PostgreSQL tools:", error);
+
       res.status(500).json({ error: "Failed to check PostgreSQL tools" });
     }
   });
@@ -3518,7 +4069,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config);
     } catch (error) {
-      console.error('Error getting partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to get partner configuration' });
     }
   });
@@ -3527,10 +4078,44 @@ function registerAdminRoutes(app: Express) {
   app.post('/api/admin/partner-configurations', ensureSuperAdmin, async (req: Request, res: Response) => {
     try {
       const configData = req.body;
+      
+
+      if (configData.provider === 'meta') {
+
+        if (!configData.partnerApiKey) {
+          return res.status(400).json({ error: 'App ID (partnerApiKey) is required for Meta provider' });
+        }
+        
+
+        if (!configData.webhookVerifyToken) {
+
+          configData.webhookVerifyToken = generateWebhookVerifyToken(32);
+          
+        } else {
+
+          const tokenValidation = validateWebhookToken(configData.webhookVerifyToken);
+          if (!tokenValidation.isValid) {
+            configData.webhookVerifyToken = generateWebhookVerifyToken(32);
+          }
+        }
+      }
+      
+
+      const allConfigs = await storage.getAllPartnerConfigurations();
+      const existingConfig = allConfigs.find(c => c.provider === configData.provider);
+      
+      if (existingConfig) {
+
+        const config = await storage.updatePartnerConfiguration(existingConfig.id, configData);
+        return res.status(200).json(config);
+      }
+      
+
       const config = await storage.createPartnerConfiguration(configData);
       res.status(201).json(config);
     } catch (error) {
-      console.error('Error creating partner configuration:', error);
+      console.error('Error creating/updating partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to create partner configuration' });
     }
   });
@@ -3540,10 +4125,31 @@ function registerAdminRoutes(app: Express) {
     try {
       const { id } = req.params;
       const configData = req.body;
+      
+
+      const allConfigs = await storage.getAllPartnerConfigurations();
+      const existingConfig = allConfigs.find(c => c.id === parseInt(id));
+      
+
+      if (existingConfig?.provider === 'meta' || configData.provider === 'meta') {
+
+        if (!configData.webhookVerifyToken && !existingConfig?.webhookVerifyToken) {
+
+          configData.webhookVerifyToken = generateWebhookVerifyToken(32);
+          
+        } else if (configData.webhookVerifyToken) {
+
+          const tokenValidation = validateWebhookToken(configData.webhookVerifyToken);
+          if (!tokenValidation.isValid) {
+            configData.webhookVerifyToken = generateWebhookVerifyToken(32);
+          }
+        }
+      }
+      
       const config = await storage.updatePartnerConfiguration(parseInt(id), configData);
       res.json(config);
     } catch (error) {
-      console.error('Error updating partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to update partner configuration' });
     }
   });
@@ -3553,71 +4159,67 @@ function registerAdminRoutes(app: Express) {
     const { provider, partnerApiKey, partnerId, appId, appSecret, businessManagerId, accessToken } = req.body;
 
     try {
-
-      if (provider === '360dialog') {
-
-        if (!partnerApiKey || !partnerId) {
-          return res.status(400).json({
-            valid: false,
-            error: 'Partner API Key and Partner ID are required'
-          });
-        }
-
-        
-
-        const response = await axios.get(`https://hub.360dialog.io/api/v2/partners/${partnerId}`, {
-          headers: {
-            'x-api-key': partnerApiKey,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        });
-
-        
-        if (response.status === 200) {
-          if (response.data.id === partnerId) {
-            res.json({
-              valid: true,
-              message: 'Partner credentials are valid',
-              partnerInfo: {
-                id: response.data.id,
-                name: response.data.brand_name || 'Unknown Partner',
-                authMethod: 'api_key'
-              }
-            });
-          } else {
-            res.status(400).json({
-              valid: false,
-              error: `Partner ID mismatch. Expected: ${partnerId}, Got: ${response.data.id}`,
-              details: 'The Partner ID in your configuration does not match the one associated with your API key.'
-            });
-          }
-        } else {
-          res.status(400).json({
-            valid: false,
-            error: 'Invalid partner credentials',
-            details: 'The API returned an unexpected status code.'
-          });
-        }
-      } else if (provider === 'meta') {
+      if (provider === 'meta') {
 
         if (!appId || !appSecret || !businessManagerId) {
           return res.status(400).json({ valid: false, error: 'App ID, App Secret, and Business Manager ID are required' });
         }
 
+        const validationResults: any = {
+          credentials: { valid: false, error: null },
+          webhook: { reachable: false, error: null }
+        };
 
-        const testUrl = `https://graph.facebook.com/v22.0/${businessManagerId}`;
-        const response = await axios.get(testUrl, {
-          params: {
-            access_token: accessToken || `${appId}|${appSecret}`,
-            fields: 'id,name'
+
+        try {
+          const testUrl = `https://graph.facebook.com/v24.0/${businessManagerId}`;
+          const response = await axios.get(testUrl, {
+            params: {
+              access_token: accessToken || `${appId}|${appSecret}`,
+              fields: 'id,name'
+            },
+            timeout: 10000
+          });
+
+          if (response.status === 200 && response.data.id === businessManagerId) {
+            validationResults.credentials.valid = true;
+          } else {
+            validationResults.credentials.error = 'Business Manager ID mismatch';
           }
-        });
+        } catch (error: any) {
+          validationResults.credentials.error = error.response?.data?.error?.message || 'Invalid credentials';
+        }
 
-        if (response.status === 200 && response.data.id === businessManagerId) {
-          res.json({ valid: true, message: 'Meta Partner API credentials are valid' });
+
+        const { webhookUrl, webhookVerifyToken } = req.body;
+        if (webhookUrl) {
+          try {
+            const webhookTest = await testWebhookDelivery(webhookUrl, webhookVerifyToken || '');
+            validationResults.webhook.reachable = webhookTest.success;
+            if (!webhookTest.success) {
+              validationResults.webhook.error = webhookTest.message;
+            }
+          } catch (error: any) {
+            validationResults.webhook.error = error.message || 'Webhook test failed';
+          }
         } else {
-          res.status(400).json({ valid: false, error: 'Business Manager ID mismatch' });
+          validationResults.webhook.error = 'Webhook URL not provided';
+        }
+
+        const allValid = validationResults.credentials.valid && validationResults.webhook.reachable;
+        
+        if (allValid) {
+          res.json({ 
+            valid: true, 
+            message: 'Meta Partner API credentials and webhook are valid',
+            details: validationResults
+          });
+        } else {
+          res.status(400).json({ 
+            valid: false, 
+            error: 'Validation failed',
+            details: validationResults
+          });
         }
       } else if (provider === 'tiktok') {
 
@@ -3653,7 +4255,7 @@ function registerAdminRoutes(app: Express) {
             warning: 'TikTok Business Messaging API requires partner access. Ensure you have been approved as a TikTok Messaging Partner.'
           });
         } catch (validationError: any) {
-          console.error('TikTok validation error:', validationError);
+
           res.status(400).json({
             valid: false,
             error: 'Failed to validate TikTok credentials',
@@ -3664,39 +4266,11 @@ function registerAdminRoutes(app: Express) {
         res.status(400).json({ valid: false, error: 'Unsupported provider' });
       }
     } catch (error: any) {
-      console.error('Error validating partner credentials:', error);
 
-
-      if (provider === '360dialog') {
-        const dialog360Error = parseDialog360Error(error);
-        const errorResponse = createErrorResponse(dialog360Error);
-
-
-        let specificGuidance = '';
-        if (error.response?.status === 401) {
-          specificGuidance = 'The API key is invalid or has been revoked. Please check your 360Dialog Partner dashboard and generate a new API key.';
-        } else if (error.response?.status === 403) {
-          specificGuidance = 'The API key does not have sufficient permissions. Ensure your partner account has the necessary permissions.';
-        } else if (error.response?.status === 404) {
-          specificGuidance = 'The partner endpoint was not found. This may indicate an issue with the 360Dialog API.';
-        } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-          specificGuidance = 'Unable to connect to 360Dialog API. Please check your internet connection.';
-        }
-
-        res.status(400).json({
-          valid: false,
-          error: dialog360Error.userMessage,
-          details: specificGuidance || dialog360Error.suggestedAction,
-          errorCode: dialog360Error.code,
-          retryable: dialog360Error.retryable
-        });
-      } else {
-
-        res.status(400).json({
-          valid: false,
-          error: error.response?.data?.message || 'Failed to validate partner credentials'
-        });
-      }
+      res.status(400).json({
+        valid: false,
+        error: error.response?.data?.message || 'Failed to validate partner credentials'
+      });
     }
   });
 
@@ -3704,9 +4278,33 @@ function registerAdminRoutes(app: Express) {
   app.get('/api/admin/partner-configurations', ensureSuperAdmin, async (req: Request, res: Response) => {
     try {
       const configs = await storage.getAllPartnerConfigurations();
-      res.json(configs);
+      
+
+      const configsWithStats = await Promise.all(configs.map(async (config) => {
+        let usageCount = 0;
+        
+        if (config.provider === 'meta') {
+
+          try {
+            const result = await pool.query(
+              'SELECT COUNT(DISTINCT company_id) as count FROM meta_whatsapp_clients'
+            );
+            usageCount = parseInt(result.rows[0]?.count || '0', 10);
+          } catch (error) {
+
+          }
+        }
+        
+        return {
+          ...config,
+          usageCount,
+          lastUsedAt: config.lastUsedAt || null
+        };
+      }));
+      
+      res.json(configsWithStats);
     } catch (error) {
-      console.error('Error getting partner configurations:', error);
+
       res.status(500).json({ error: 'Failed to get partner configurations' });
     }
   });
@@ -3718,8 +4316,147 @@ function registerAdminRoutes(app: Express) {
       await storage.deletePartnerConfiguration(parseInt(id));
       res.status(204).send();
     } catch (error) {
-      console.error('Error deleting partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to delete partner configuration' });
+    }
+  });
+
+
+  app.post('/api/admin/partner-configurations/test-webhook', ensureSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { webhookUrl, webhookVerifyToken } = req.body;
+
+      if (!webhookUrl) {
+        return res.status(400).json({ error: 'Webhook URL is required' });
+      }
+
+      const result = await testWebhookDelivery(webhookUrl, webhookVerifyToken || '');
+
+      if (result.success) {
+        res.json({ success: true, message: result.message });
+      } else {
+        res.status(400).json({ success: false, error: result.message, details: result.error });
+      }
+    } catch (error: any) {
+
+      res.status(500).json({ error: 'Failed to test webhook', details: error.message });
+    }
+  });
+
+
+  app.get('/api/admin/partner-configurations/:provider/health', ensureSuperAdmin, async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const config = await storage.getPartnerConfiguration(provider);
+
+      if (!config) {
+        return res.status(404).json({ error: 'Configuration not found' });
+      }
+
+      const healthResult = await checkConfigurationHealth(config.id);
+
+
+      const configMetadata: any = {};
+      if (config.apiVersion) {
+        configMetadata.apiVersion = config.apiVersion;
+      }
+      
+
+      let webhookFieldSubscriptions: { [field: string]: { subscribed: boolean } } = {
+        messages: { subscribed: false },
+        message_template_status_update: { subscribed: false }
+      };
+
+      if (config.partnerApiKey && config.partnerSecret) {
+        try {
+          
+          const subscriptionsResult = await getAppWebhookFieldSubscriptions(
+            config.partnerApiKey,
+            config.partnerSecret,
+            config.accessToken ?? undefined
+          );
+
+          if (subscriptionsResult.success) {
+            webhookFieldSubscriptions = subscriptionsResult.fields;
+            
+            
+
+            await storage.updatePartnerConfiguration(config.id, {
+              webhookFieldSubscriptions: webhookFieldSubscriptions
+            });
+          } else {
+
+
+            if (config.webhookFieldSubscriptions) {
+              if (typeof config.webhookFieldSubscriptions === 'string') {
+                try {
+                  const parsed = JSON.parse(config.webhookFieldSubscriptions);
+                  webhookFieldSubscriptions = parsed;
+                } catch (e) {
+
+                }
+              } else if (typeof config.webhookFieldSubscriptions === 'object') {
+                webhookFieldSubscriptions = config.webhookFieldSubscriptions as any;
+              }
+            }
+          }
+        } catch (error: any) {
+
+
+          if (config.webhookFieldSubscriptions) {
+            if (typeof config.webhookFieldSubscriptions === 'string') {
+              try {
+                const parsed = JSON.parse(config.webhookFieldSubscriptions);
+                webhookFieldSubscriptions = parsed;
+              } catch (e) {
+
+              }
+            } else if (typeof config.webhookFieldSubscriptions === 'object') {
+              webhookFieldSubscriptions = config.webhookFieldSubscriptions as any;
+            }
+          }
+        }
+      } else {
+
+        if (config.webhookFieldSubscriptions) {
+          if (typeof config.webhookFieldSubscriptions === 'string') {
+            try {
+              webhookFieldSubscriptions = JSON.parse(config.webhookFieldSubscriptions);
+            } catch (e) {
+
+            }
+          } else if (typeof config.webhookFieldSubscriptions === 'object') {
+            webhookFieldSubscriptions = config.webhookFieldSubscriptions as any;
+          }
+        }
+      }
+
+
+      const expectedFields = ['messages', 'message_template_status_update'];
+      const formattedSubscriptions: any = {};
+      for (const field of expectedFields) {
+        if (webhookFieldSubscriptions[field]) {
+          formattedSubscriptions[field] = typeof webhookFieldSubscriptions[field] === 'object' 
+            ? webhookFieldSubscriptions[field]
+            : { subscribed: !!webhookFieldSubscriptions[field] };
+        } else {
+          formattedSubscriptions[field] = { subscribed: false };
+        }
+      }
+      configMetadata.webhookFieldSubscriptions = formattedSubscriptions;
+
+      res.json({
+        configId: config.id,
+        provider: config.provider,
+        health: healthResult,
+        lastValidatedAt: config.lastValidatedAt,
+        usageCount: config.usageCount || 0,
+        lastUsedAt: config.lastUsedAt,
+        config: configMetadata
+      });
+    } catch (error: any) {
+
+      res.status(500).json({ error: 'Failed to check configuration health', details: error.message });
     }
   });
 
@@ -3734,7 +4471,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(config);
     } catch (error) {
-      console.error('Error getting TikTok partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to get TikTok partner configuration' });
     }
   });
@@ -3747,6 +4484,10 @@ function registerAdminRoutes(app: Express) {
       };
 
 
+      if (!configData.webhookVerifyToken) {
+        configData.webhookVerifyToken = randomBytes(32).toString('hex');
+      }
+
       const existingConfig = await storage.getPartnerConfiguration('tiktok');
       if (existingConfig) {
         return res.status(400).json({
@@ -3757,7 +4498,7 @@ function registerAdminRoutes(app: Express) {
       const config = await storage.createPartnerConfiguration(configData);
       res.status(201).json(config);
     } catch (error) {
-      console.error('Error creating TikTok partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to create TikTok partner configuration' });
     }
   });
@@ -3775,10 +4516,15 @@ function registerAdminRoutes(app: Express) {
         provider: 'tiktok'
       };
 
+
+      if (!configData.webhookVerifyToken && !existingConfig.webhookVerifyToken) {
+        configData.webhookVerifyToken = randomBytes(32).toString('hex');
+      }
+
       const config = await storage.updatePartnerConfiguration(existingConfig.id, configData);
       res.json(config);
     } catch (error) {
-      console.error('Error updating TikTok partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to update TikTok partner configuration' });
     }
   });
@@ -3794,7 +4540,7 @@ function registerAdminRoutes(app: Express) {
       await storage.deletePartnerConfiguration(existingConfig.id);
       res.status(204).send();
     } catch (error) {
-      console.error('Error deleting TikTok partner configuration:', error);
+
       res.status(500).json({ error: 'Failed to delete TikTok partner configuration' });
     }
   });
@@ -3827,7 +4573,7 @@ function registerAdminRoutes(app: Express) {
         warning: 'TikTok Business Messaging API requires partner access. Ensure you have been approved as a TikTok Messaging Partner.'
       });
     } catch (error) {
-      console.error('Error validating TikTok credentials:', error);
+
       res.status(500).json({
         valid: false,
         error: 'Failed to validate TikTok credentials'
@@ -3841,7 +4587,7 @@ function registerAdminRoutes(app: Express) {
       const websites = await storage.getAllWebsites();
       res.json(websites);
     } catch (error) {
-      console.error("Error fetching websites:", error);
+
       res.status(500).json({ error: "Failed to fetch websites" });
     }
   });
@@ -3857,7 +4603,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(website);
     } catch (error) {
-      console.error("Error fetching website:", error);
+
       res.status(500).json({ error: "Failed to fetch website" });
     }
   });
@@ -3920,7 +4666,7 @@ function registerAdminRoutes(app: Express) {
 
       res.status(201).json(newWebsite);
     } catch (error) {
-      console.error("Error creating website:", error);
+
       res.status(500).json({ error: "Failed to create website" });
     }
   });
@@ -3985,7 +4731,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json(updatedWebsite);
     } catch (error) {
-      console.error("Error updating website:", error);
+
       res.status(500).json({ error: "Failed to update website" });
     }
   });
@@ -4001,7 +4747,7 @@ function registerAdminRoutes(app: Express) {
 
       res.json({ message: "Website deleted successfully" });
     } catch (error) {
-      console.error("Error deleting website:", error);
+
       res.status(500).json({ error: "Failed to delete website" });
     }
   });
@@ -4012,7 +4758,7 @@ function registerAdminRoutes(app: Express) {
       const publishedWebsite = await storage.publishWebsite(websiteId);
       res.json(publishedWebsite);
     } catch (error) {
-      console.error("Error publishing website:", error);
+
       res.status(500).json({ error: "Failed to publish website" });
     }
   });
@@ -4023,7 +4769,7 @@ function registerAdminRoutes(app: Express) {
       const unpublishedWebsite = await storage.unpublishWebsite(websiteId);
       res.json(unpublishedWebsite);
     } catch (error) {
-      console.error("Error unpublishing website:", error);
+
       res.status(500).json({ error: "Failed to unpublish website" });
     }
   });
@@ -4184,7 +4930,7 @@ function registerAdminRoutes(app: Express) {
         totalEstimatedSize
       });
     } catch (error) {
-      console.error("Error fetching company data preview:", error);
+
       res.status(500).json({ error: "Failed to fetch company data preview" });
     }
   });
@@ -4265,10 +5011,10 @@ function registerAdminRoutes(app: Express) {
               break;
 
             default:
-              console.warn(`Unknown data category: ${category}`);
+
           }
         } catch (categoryError) {
-          console.error(`Error clearing ${category} for company ${companyId}:`, categoryError);
+
           results.push(`Failed to clear ${category}: ${categoryError instanceof Error ? categoryError.message : 'Unknown error'}`);
         }
       }
@@ -4280,7 +5026,7 @@ function registerAdminRoutes(app: Express) {
         totalItemsCleared: clearedItems
       });
     } catch (error) {
-      console.error("Error clearing company data:", error);
+
       res.status(500).json({ error: "Failed to clear company data" });
     }
   });

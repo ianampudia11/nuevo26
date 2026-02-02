@@ -431,7 +431,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 flex-shrink-0"
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 flex-shrink-0"
                               disabled={clearingAllSessions || loadingSessions}
                             >
                               {clearingAllSessions ? (
@@ -458,7 +458,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleClearAllSessions}
-                          className="bg-red-600 hover:bg-red-700"
+                          className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                         >
                           Delete All Sessions
                         </AlertDialogAction>
@@ -477,7 +477,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center gap-2 h-8 px-3 border rounded-md text-xs text-red-600 bg-red-50 w-full cursor-help min-w-0">
+                    <div className="flex items-center gap-2 h-8 px-3 border rounded-md text-xs text-destructive bg-destructive/10 w-full cursor-help min-w-0">
                       <span className="truncate">Error loading sessions</span>
                     </div>
                   </TooltipTrigger>
@@ -570,7 +570,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
             <div className="h-full overflow-y-auto pr-2" style={{ maxHeight: 'calc(100vh - 300px)' }}>
               {error && (
                 <div className="text-center py-4">
-                  <p className="text-xs text-red-600">Error loading variables</p>
+                  <p className="text-xs text-destructive">Error loading variables</p>
                   <p className="text-xs text-muted-foreground">{error}</p>
                 </div>
               )}
@@ -611,7 +611,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                                   </Badge>
                                 )}
                                 {hasVariableValue(variable.value) && (
-                                  <Badge variant="default" className="text-xs px-1 py-0 bg-green-100 text-green-800">
+                                  <Badge variant="default" className="text-xs px-1 py-0 bg-primary/10 text-primary border border-primary/20">
                                     Has Value
                                   </Badge>
                                 )}
@@ -626,7 +626,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                                 {variable.description}
                               </p>
                             )}
-                            <code className="text-xs font-mono text-blue-600 bg-blue-50 px-1 py-0.5 rounded mt-1 block truncate">
+                            <code className="text-xs font-mono text-primary bg-primary/10 px-1 py-0.5 rounded mt-1 block truncate">
                               {`{{${variable.value}}}`}
                             </code>
                           </div>
@@ -642,7 +642,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                                     onClick={() => copyToClipboard(variable.value, variable.value)}
                                   >
                                     {copiedVariable === variable.value ? (
-                                      <CheckCircle className="w-3 h-3 text-green-600" />
+                                      <CheckCircle className="w-3 h-3 text-primary" />
                                     ) : (
                                       <Copy className="w-3 h-3" />
                                     )}
@@ -714,7 +714,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                  className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
                                   disabled={clearingSessionData || selectedSession.variableCount === 0}
                                 >
                                   {clearingSessionData ? (
@@ -735,7 +735,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={handleClearSessionData}
-                                    className="bg-red-600 hover:bg-red-700"
+                                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                                   >
                                     Clear Data
                                   </AlertDialogAction>
@@ -810,7 +810,7 @@ export function VariableBrowser({ flowId, sessionId, onVariableSelect, className
                         onClick={() => copyToClipboard(key, key)}
                       >
                         {copiedVariable === key ? (
-                          <CheckCircle className="w-3 h-3 text-green-600" />
+                          <CheckCircle className="w-3 h-3 text-primary" />
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}

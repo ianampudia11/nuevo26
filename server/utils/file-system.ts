@@ -45,3 +45,35 @@ export async function cleanupTempFiles(maxAgeHours: number = 24): Promise<void> 
     console.error('Error cleaning up temp files:', error);
   }
 }
+
+/**
+ * Clean up old auth background file when a new one is uploaded
+ */
+export async function cleanupOldAuthBackground(oldUrl: string | undefined): Promise<void> {
+  if (!oldUrl) {
+    return;
+  }
+
+  try {
+
+    const urlPath = oldUrl.split('?')[0];
+    const filename = path.basename(urlPath);
+    
+    if (!filename) {
+      return;
+    }
+
+    const filePath = path.join(process.cwd(), 'uploads', 'branding', filename);
+    
+    try {
+      await fs.access(filePath);
+      await fs.unlink(filePath);
+    } catch (error) {
+
+
+    }
+  } catch (error) {
+
+    console.error('Error cleaning up old auth background:', error);
+  }
+}

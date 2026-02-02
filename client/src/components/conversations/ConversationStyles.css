@@ -1,9 +1,14 @@
 /* WhatsApp-like conversation background */
 .conversation-background {
-  background-color: #f5f1eb;
-  background-image: url('https://static.whatsapp.net/rsrc.php/v4/y1/r/a3pd-CgpXeU.png');
-  background-repeat: repeat;
-  background-size: auto;
+  background-color: hsl(var(--muted));
+  background-image: 
+    repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.1) 35px, rgba(255,255,255,.1) 70px);
+}
+
+.dark .conversation-background {
+  background-color: hsl(var(--background));
+  background-image: 
+    repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(0,0,0,.1) 35px, rgba(0,0,0,.1) 70px);
 }
 
 /* Group chat participant name styling */
@@ -54,8 +59,8 @@
 
 .date-separator span {
   position: relative;
-  background: #f0f0f0;
-  color: #667781;
+  background: var(--background);
+  color: var(--muted-foreground);
   padding: 0.375rem 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.75rem;
@@ -64,12 +69,11 @@
 }
 
 /* Message bubble improvements - WhatsApp Style */
+/* Note: Background and text colors are now handled by Tailwind classes in MessageBubble.tsx */
 .chat-bubble-user {
   position: relative;
   word-wrap: break-word;
   max-width: 100%;
-  background-color: #dcf8c6 !important; /* WhatsApp green for sent messages */
-  color: #303030 !important;
   border-radius: 8px !important;
 }
 
@@ -80,20 +84,21 @@
   right: -6px;
   width: 0;
   height: 0;
-  border: 6px solid transparent;
-  border-left-color: #dcf8c6;
+  border-left-color: var(--card);
   border-right: 0;
   border-bottom: 0;
   margin-top: -3px;
   margin-right: -6px;
 }
 
+.dark .chat-bubble-user::after {
+  border-left-color: #005c4b; 
+}
+
 .chat-bubble-contact {
   position: relative;
   word-wrap: break-word;
   max-width: 100%;
-  background-color: #ffffff !important; /* White for received messages */
-  color: #303030 !important;
   border-radius: 8px !important;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
 }
@@ -105,77 +110,31 @@
   left: -6px;
   width: 0;
   height: 0;
-  border: 6px solid transparent;
-  border-right-color: #ffffff;
+  border-right-color: var(--card);
   border-left: 0;
   border-bottom: 0;
   margin-top: -3px;
   margin-left: -6px;
 }
 
-/* Override any existing bubble colors */
-.bg-sky-500 {
-  background-color: #dcf8c6 !important;
-  color: #303030 !important;
+.dark .chat-bubble-contact::after {
+  border-right-color: #242626;
 }
 
-.bg-sky-500.text-white {
-  color: #303030 !important;
-}
-
-.bg-white.chat-bubble-contact {
-  background-color: #ffffff !important;
-  color: #303030 !important;
-}
-
-/* Ensure proper text color in all cases */
-.chat-bubble-user *, 
-.chat-bubble-contact * {
-  color: inherit !important;
-}
-
-.chat-bubble-user .text-white,
-.bg-sky-500 .text-white {
-  color: #303030 !important;
-}
-
-.chat-bubble-user .text-sky-100,
-.bg-sky-500 .text-sky-100 {
-  color: #667781 !important;
-}
-
-/* WhatsApp message time styling */
+/* WhatsApp message time styling - use theme variables */
 .message-time {
-  color: #667781 !important;
   font-size: 11px !important;
   opacity: 0.8;
   font-weight: 400 !important;
   white-space: nowrap;
+  color: var(--muted-foreground) !important;
 }
 
-/* Status icons for sent messages */
+/* Status icons for sent messages - use theme variables */
 .message-status {
-  color: #667781 !important;
   font-size: 12px !important;
   opacity: 0.8;
-}
-
-/* Specific styling for message time in sent messages */
-.chat-bubble-user .message-time {
-  color: #667781 !important;
-}
-
-.chat-bubble-user .message-status {
-  color: #667781 !important;
-}
-
-/* Specific styling for message time in received messages */
-.chat-bubble-contact .message-time {
-  color: #667781 !important;
-}
-
-.chat-bubble-contact .message-status {
-  color: #667781 !important;
+  color: var(--muted-foreground) !important;
 }
 
 /* Message status indicators */
@@ -188,7 +147,7 @@
 }
 
 .message-status.read {
-  color: #0ea5e9;
+  color: #00a884;
 }
 
 .message-status.delivered {
@@ -240,6 +199,32 @@
   background-color: rgba(0,0,0,0.3);
 }
 
+.dark .messages-container {
+  scrollbar-color: hsl(var(--border)) hsl(var(--background));
+}
+
+.dark .messages-container::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+.dark .messages-container::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+}
+
+.dark .messages-container::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--border) / 0.8);
+}
+
+.dark .participant-name {
+  color: #00a884 !important;
+}
+
+.dark .conversation-start-indicator {
+  background-color: rgba(0, 168, 132, 0.15) !important;
+  color: #e9edef !important;
+  border: 1px solid #00a884 !important;
+}
+
 /* Ensure message content doesn't overlap with timestamp */
 .message-content {
   margin-bottom: 0.25rem;
@@ -257,7 +242,3 @@
   align-items: flex-end;
 }
 
-/* Ensure proper text color inheritance */
-.bg-sky-500 .text-sky-100 {
-  color: rgba(255, 255, 255, 0.7) !important;
-}

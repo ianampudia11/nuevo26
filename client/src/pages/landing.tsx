@@ -43,7 +43,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white landing-page">
+    <div className="min-h-screen bg-background landing-page">
       {/* Navigation Header */}
       <nav className="glass-nav sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -57,17 +57,17 @@ export default function LandingPage() {
                   <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-sm">{branding.appName.charAt(0)}</span>
                   </div>
-                  <span className="ml-2 text-xl font-bold text-gray-900">{branding.appName}</span>
+                  <span className="ml-2 text-xl font-bold text-foreground">{branding.appName}</span>
                 </div>
               )}
             </div>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="nav-link text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.features', 'Features')}</a>
-              <a href="#pricing" className="nav-link text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.pricing', 'Pricing')}</a>
-              <a href="#about" className="nav-link text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.about', 'About')}</a>
-              <a href="#contact" className="nav-link text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.contact', 'Contact')}</a>
+              <a href="#features" className="nav-link text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.features', 'Features')}</a>
+              <a href="#pricing" className="nav-link text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.pricing', 'Pricing')}</a>
+              <a href="#about" className="nav-link text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.about', 'About')}</a>
+              <a href="#contact" className="nav-link text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.contact', 'Contact')}</a>
               <Button variant="ghost" asChild>
                 <a href="/auth">{t('landing.nav.sign_in', 'Sign In')}</a>
               </Button>
@@ -92,7 +92,7 @@ export default function LandingPage() {
           {mobileMenuOpen && (
             <div className="md:hidden border-t border-gray-200 py-4 mobile-menu">
               <div className="flex flex-col space-y-4">
-                <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.features', 'Features')}</a>
+                <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.features', 'Features')}</a>
                 <a href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.pricing', 'Pricing')}</a>
                 <a href="#about" className="text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.about', 'About')}</a>
                 <a href="#contact" className="text-gray-600 hover:text-gray-900 transition-colors">{t('landing.nav.contact', 'Contact')}</a>

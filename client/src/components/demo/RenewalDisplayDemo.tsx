@@ -59,7 +59,7 @@ export function RenewalDisplayDemo({
   const renewalInfo = getRenewalDisplayInfo();
 
   return (
-    <div className="p-4 bg-gray-100 rounded-lg">
+    <div className="p-4 bg-muted rounded-lg">
       <h3 className="font-medium mb-2">Renewal Display Demo</h3>
       <div className="text-sm text-gray-600 mb-2">
         <div>Days until expiry: {daysUntilExpiry ?? 'N/A'}</div>

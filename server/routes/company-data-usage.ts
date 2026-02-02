@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import { ensureAuthenticated, ensureSuperAdmin } from '../middleware';
 import { storage } from '../storage';
+import { db } from '../db';
+import { knowledgeBaseDocuments, users, messages, conversations } from '@shared/schema';
+import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import path from 'path';
+import fs from 'fs/promises';
+import fsExtra from 'fs-extra';
 
 const router = Router();
 
@@ -43,17 +49,27 @@ router.get('/:companyId/usage', ensureSuperAdmin, async (req, res) => {
     }
 
 
-    const storagePercentage = plan?.storageLimit 
-      ? Math.round((company.currentStorageUsed || 0) / plan.storageLimit * 100)
-      : 0;
-    
-    const bandwidthPercentage = plan?.bandwidthLimit
-      ? Math.round((company.currentBandwidthUsed || 0) / plan.bandwidthLimit * 100)
-      : 0;
 
-    const filesPercentage = plan?.totalFilesLimit
-      ? Math.round((company.filesCount || 0) / plan.totalFilesLimit * 100)
-      : 0;
+    const currentStorageUsed = company.currentStorageUsed ?? 0;
+    const currentBandwidthUsed = company.currentBandwidthUsed ?? 0;
+    const currentFilesCount = company.filesCount ?? 0;
+    
+    const storageLimit = plan?.storageLimit ?? 0;
+    const bandwidthLimit = plan?.bandwidthLimit ?? 0;
+    const totalFilesLimit = plan?.totalFilesLimit ?? 0;
+    
+
+    const storagePercentage = storageLimit > 0
+      ? Math.min(100, Math.round((currentStorageUsed / storageLimit) * 100))
+      : (currentStorageUsed > 0 ? 100 : 0);
+    
+    const bandwidthPercentage = bandwidthLimit > 0
+      ? Math.min(100, Math.round((currentBandwidthUsed / bandwidthLimit) * 100))
+      : (currentBandwidthUsed > 0 ? 100 : 0);
+
+    const filesPercentage = totalFilesLimit > 0
+      ? Math.min(100, Math.round((currentFilesCount / totalFilesLimit) * 100))
+      : (currentFilesCount > 0 ? 100 : 0);
 
     const usageData = {
       companyId: company.id,
@@ -62,17 +78,20 @@ router.get('/:companyId/usage', ensureSuperAdmin, async (req, res) => {
       
 
       currentUsage: {
-        storage: company.currentStorageUsed || 0, // in MB
-        bandwidth: company.currentBandwidthUsed || 0, // in MB
-        files: company.filesCount || 0
+
+
+
+        storage: currentStorageUsed, // in MB - actual database value
+        bandwidth: currentBandwidthUsed, // in MB - actual database value
+        files: currentFilesCount // actual database value
       },
       
 
       limits: {
-        storage: plan?.storageLimit || 0, // in MB
-        bandwidth: plan?.bandwidthLimit || 0, // in MB
-        fileUpload: plan?.fileUploadLimit || 0, // in MB
-        totalFiles: plan?.totalFilesLimit || 0
+        storage: storageLimit, // in MB
+        bandwidth: bandwidthLimit, // in MB
+        fileUpload: plan?.fileUploadLimit ?? 0, // in MB
+        totalFiles: totalFilesLimit
       },
       
 
@@ -237,6 +256,159 @@ router.post('/:companyId/usage/reset-bandwidth', ensureSuperAdmin, async (req, r
   } catch (error) {
     console.error('Error resetting bandwidth usage:', error);
     res.status(500).json({ error: 'Failed to reset bandwidth usage' });
+  }
+});
+
+/**
+ * Recalculate company usage from actual files (admin only)
+ * POST /api/admin/companies/:companyId/usage/recalculate
+ */
+router.post('/:companyId/usage/recalculate', ensureSuperAdmin, async (req, res) => {
+  try {
+    const companyId = parseInt(req.params.companyId);
+    
+    if (isNaN(companyId)) {
+      return res.status(400).json({ error: 'Invalid company ID' });
+    }
+
+    const company = await storage.getCompany(companyId);
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+
+    let totalStorageBytes = 0;
+    let totalFiles = 0;
+
+
+    const knowledgeBaseDocs = await db.select()
+      .from(knowledgeBaseDocuments)
+      .where(eq(knowledgeBaseDocuments.companyId, companyId));
+
+    for (const doc of knowledgeBaseDocs) {
+      if (doc.fileSize) {
+        totalStorageBytes += doc.fileSize;
+        totalFiles += 1;
+      }
+    }
+
+
+
+
+
+    try {
+      const templatesDir = path.join(process.cwd(), 'uploads', 'templates');
+      if (await fsExtra.pathExists(templatesDir)) {
+        const templateFiles = await fs.readdir(templatesDir);
+        for (const filename of templateFiles) {
+          try {
+            const filePath = path.join(templatesDir, filename);
+            const stats = await fs.stat(filePath);
+            if (stats.isFile()) {
+              totalStorageBytes += stats.size;
+              totalFiles += 1;
+            }
+          } catch (error) {
+
+            console.warn(`Could not access template file ${filename}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error scanning template media directory:', error);
+    }
+
+
+    try {
+      const webchatDir = path.join(process.cwd(), 'uploads', 'webchat');
+      if (await fsExtra.pathExists(webchatDir)) {
+
+        const webchatMessages = await db
+          .select({ mediaUrl: messages.mediaUrl })
+          .from(messages)
+          .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+          .where(
+            and(
+              eq(conversations.companyId, companyId),
+              sql`${messages.mediaUrl} LIKE '/uploads/webchat/%'`
+            )
+          );
+
+        const processedFiles = new Set<string>();
+        for (const msg of webchatMessages) {
+          if (msg.mediaUrl && !processedFiles.has(msg.mediaUrl)) {
+            processedFiles.add(msg.mediaUrl);
+            const filename = path.basename(msg.mediaUrl);
+            try {
+              const filePath = path.join(webchatDir, filename);
+              if (await fsExtra.pathExists(filePath)) {
+                const stats = await fs.stat(filePath);
+                totalStorageBytes += stats.size;
+                totalFiles += 1;
+              }
+            } catch (error) {
+
+              console.warn(`Could not access webchat file ${filename}:`, error);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error scanning webchat uploads:', error);
+    }
+
+
+    try {
+      const companyUsers = await db
+        .select({ avatarUrl: users.avatarUrl })
+        .from(users)
+        .where(eq(users.companyId, companyId));
+
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      for (const user of companyUsers) {
+        if (user.avatarUrl && user.avatarUrl.startsWith('/uploads/')) {
+          const filename = path.basename(user.avatarUrl);
+          try {
+            const filePath = path.join(uploadsDir, filename);
+            if (await fsExtra.pathExists(filePath)) {
+              const stats = await fs.stat(filePath);
+              totalStorageBytes += stats.size;
+              totalFiles += 1;
+            }
+          } catch (error) {
+
+            console.warn(`Could not access avatar file ${filename}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error scanning avatar files:', error);
+    }
+
+
+
+    const totalStorageMB = Math.ceil(totalStorageBytes / (1024 * 1024));
+
+
+    await storage.updateCompany(companyId, {
+      currentStorageUsed: totalStorageMB,
+      filesCount: totalFiles,
+      lastUsageUpdate: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: 'Usage recalculated successfully',
+      recalculated: {
+        storage: totalStorageMB,
+        files: totalFiles,
+        bandwidth: company.currentBandwidthUsed || 0 // Keep existing bandwidth
+      }
+    });
+
+  } catch (error) {
+    console.error('Error recalculating company usage:', error);
+    res.status(500).json({ error: 'Failed to recalculate company usage' });
   }
 });
 

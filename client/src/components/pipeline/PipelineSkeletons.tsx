@@ -17,7 +17,7 @@ export function DealCardSkeleton() {
       <Skeleton className="h-3 w-2/3 mb-3" />
       
       {/* Contact section */}
-      <div className="border-t border-gray-100 pt-2">
+      <div className="border-t border-border pt-2">
         <div className="flex items-center gap-2">
           <Skeleton className="h-6 w-6 rounded-full" />
           <div className="flex-1">
@@ -28,7 +28,7 @@ export function DealCardSkeleton() {
       </div>
       
       {/* Footer */}
-      <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+      <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
         <div className="flex items-center gap-1">
           <Skeleton className="h-3 w-3" />
           <Skeleton className="h-3 w-16" />
@@ -41,7 +41,7 @@ export function DealCardSkeleton() {
 
 export function StageColumnSkeleton() {
   return (
-    <div className="bg-gray-50 rounded-lg p-4 min-h-[600px]">
+    <div className="bg-muted rounded-lg p-4 min-h-[600px]">
       {/* Stage Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -53,7 +53,7 @@ export function StageColumnSkeleton() {
       </div>
       
       {/* Stage Stats */}
-      <div className="mb-4 p-3 bg-white rounded-lg border">
+      <div className="mb-4 p-3 bg-card rounded-lg border">
         <Skeleton className="h-4 w-20 mb-2" />
         <div className="space-y-1">
           <Skeleton className="h-3 w-full" />

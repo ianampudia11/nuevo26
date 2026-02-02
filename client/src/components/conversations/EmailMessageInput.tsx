@@ -281,7 +281,7 @@ export default function EmailMessageInput({
   };
 
   return (
-    <div className="border-t bg-white p-4 space-y-4">
+    <div className="border-t bg-background p-4 space-y-4">
       {replyToMessage && (
         <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
           <div className="text-sm text-blue-800">

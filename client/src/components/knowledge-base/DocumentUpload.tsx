@@ -288,7 +288,7 @@ export function DocumentUpload({
         <CardContent>
           <div className="space-y-4">
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
-              <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <div className="space-y-2">
                 <p className="text-gray-600 mb-2">
                   {t('knowledge_base.upload.select_files', 'Select files to upload')}

@@ -209,7 +209,7 @@ export function RAGConfiguration({
               <Label className="text-base">
                 {t('knowledge_base.config.enabled', 'Enable Knowledge Base')}
               </Label>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {t('knowledge_base.config.enabled_desc', 'Use knowledge base for context-aware responses')}
               </p>
             </div>
@@ -316,7 +316,7 @@ export function RAGConfiguration({
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
+                <div className="flex items-center gap-2 px-3 py-2  border border-gray-200 rounded-md">
                   <CheckCircle className="w-4 h-4 text-green-600" />
                   <span className="text-sm font-medium">OpenAI Embedding 3 Small (Fast)</span>
                   <span className="text-xs text-gray-500 ml-auto">1536 dimensions</span>

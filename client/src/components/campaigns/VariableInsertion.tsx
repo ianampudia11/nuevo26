@@ -255,7 +255,7 @@ export function VariableInsertion({
                             {variable.description}
                           </div>
                         </div>
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs !bg-muted !text-muted-foreground">
                           {`{{${variable.value}}}`}
                         </Badge>
                       </div>

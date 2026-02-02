@@ -16,13 +16,80 @@ const eventEmitter = new EventEmitter();
 
 eventEmitter.setMaxListeners(50);
 
-const WHATSAPP_API_VERSION = 'v22.0';
+const WHATSAPP_API_VERSION = 'v24.0';
 const WHATSAPP_GRAPH_URL = 'https://graph.facebook.com';
 
 const MEDIA_DIR = path.join(process.cwd(), 'public', 'media');
 fsExtra.ensureDirSync(MEDIA_DIR);
 
 const mediaCache = new Map<string, string>();
+
+
+
+const lastReceivedMessageId = new Map<string, string>();
+
+
+let hasLoggedHistoryWebhook = false;
+
+/**
+ * Typing indicator configuration
+ */
+interface TypingConfig {
+  enabled: boolean;
+  wordsPerMinute: number;
+  minDelay: number;
+  maxDelay: number;
+  randomnessFactor: number;
+  recordingMinDelay: number;
+  recordingMaxDelay: number;
+}
+
+const TYPING_CONFIG: TypingConfig = {
+  enabled: true,
+  wordsPerMinute: 50,
+  minDelay: 1000,
+  maxDelay: 5000,
+  randomnessFactor: 0.6,
+  recordingMinDelay: 2000,
+  recordingMaxDelay: 4000,
+};
+
+/**
+ * Message splitting configuration
+ */
+interface MessageSplittingConfig {
+  enabled: boolean;
+  maxLength: number;
+  splitMethod: 'sentences' | 'paragraphs' | 'characters' | 'logical';
+  delayBetweenMessages: number;
+  randomDelayFactor: number;
+  preserveFormatting: boolean;
+  minChunkSize: number;
+  smartBoundaries: boolean;
+  prioritizeSentences: boolean;
+  logicalSplitting: {
+    enabled: boolean;
+    delimiter: string;
+    fallbackToCharacters: boolean;
+  };
+}
+
+const MESSAGE_SPLITTING_CONFIG: MessageSplittingConfig = {
+  enabled: false,
+  maxLength: 300,
+  splitMethod: 'sentences',
+  delayBetweenMessages: 2000,
+  randomDelayFactor: 0.5,
+  preserveFormatting: true,
+  minChunkSize: 20,
+  smartBoundaries: true,
+  prioritizeSentences: true,
+  logicalSplitting: {
+    enabled: true,
+    delimiter: '||',
+    fallbackToCharacters: true,
+  },
+};
 
 /**
  * Normalize phone number to +E.164 format
@@ -32,16 +99,73 @@ const mediaCache = new Map<string, string>();
 function normalizePhoneToE164(phone: string): string {
   if (!phone) return phone;
 
-
   let normalized = phone.replace(/[^\d+]/g, '');
-
 
   if (normalized.startsWith('+')) {
     return normalized;
   }
 
-
   return '+' + normalized;
+}
+
+/**
+ * Split message into chunks based on configuration
+ * @param message The message to split
+ * @returns Array of message chunks
+ */
+function splitMessage(message: string): string[] {
+  if (!MESSAGE_SPLITTING_CONFIG.enabled) {
+    return [message];
+  }
+
+  if (message.length <= MESSAGE_SPLITTING_CONFIG.maxLength) {
+    return [message];
+  }
+
+
+  if (MESSAGE_SPLITTING_CONFIG.logicalSplitting.enabled) {
+    const delimiter = MESSAGE_SPLITTING_CONFIG.logicalSplitting.delimiter;
+    if (delimiter && message.includes(delimiter)) {
+      return message.split(delimiter).map(chunk => chunk.trim()).filter(chunk => chunk.length > 0);
+    }
+  }
+
+
+  const chunks: string[] = [];
+  let remainingText = message.trim();
+
+  while (remainingText.length > 0) {
+    if (remainingText.length <= MESSAGE_SPLITTING_CONFIG.maxLength) {
+      chunks.push(remainingText);
+      break;
+    }
+
+    let splitPoint = MESSAGE_SPLITTING_CONFIG.maxLength;
+
+
+    for (let i = MESSAGE_SPLITTING_CONFIG.maxLength - 1; i >= Math.max(20, MESSAGE_SPLITTING_CONFIG.maxLength * 0.7); i--) {
+      if (remainingText[i] === ' ') {
+        splitPoint = i;
+        break;
+      }
+    }
+
+    const chunk = remainingText.substring(0, splitPoint).trim();
+    chunks.push(chunk);
+    remainingText = remainingText.substring(splitPoint).trim();
+  }
+
+  return chunks;
+}
+
+/**
+ * Calculate delay between split messages
+ * @returns Delay in milliseconds
+ */
+function calculateSplitMessageDelay(): number {
+  const baseDelay = MESSAGE_SPLITTING_CONFIG.delayBetweenMessages;
+  const randomFactor = 1 + (Math.random() - 0.5) * MESSAGE_SPLITTING_CONFIG.randomDelayFactor;
+  return Math.max(baseDelay * randomFactor, 1000);
 }
 
 /**
@@ -70,7 +194,290 @@ function getContentTypeFromMediaType(mediaType: string): string {
   }
 }
 
+/**
+ * Store the last received message ID from a contact for typing indicator purposes
+ * @param phoneNumberId The business phone number ID
+ * @param contactPhone The contact's phone number
+ * @param messageId The WhatsApp message ID (wamid)
+ */
+export function storeLastReceivedMessageId(phoneNumberId: string, contactPhone: string, messageId: string): void {
+  const key = `${phoneNumberId}:${contactPhone}`;
+  lastReceivedMessageId.set(key, messageId);
+}
 
+/**
+ * Get the last received message ID from a contact
+ * @param phoneNumberId The business phone number ID
+ * @param contactPhone The contact's phone number
+ * @returns The last message ID or null
+ */
+function getLastReceivedMessageId(phoneNumberId: string, contactPhone: string): string | null {
+  const key = `${phoneNumberId}:${contactPhone}`;
+  return lastReceivedMessageId.get(key) || null;
+}
+
+/**
+ * Send typing indicator via WhatsApp Cloud API
+ * According to official docs, typing indicators are sent using the "mark as read" endpoint
+ * with a typing_indicator object. It requires the message_id of the received message.
+ * The typing indicator auto-dismisses after 25 seconds or when you respond.
+ * 
+ * @param connectionId The ID of the channel connection
+ * @param companyId The company ID for multi-tenant security
+ * @param to The recipient phone number (with country code)
+ * @returns Promise resolving to success status
+ */
+export async function sendTypingIndicator(
+  connectionId: number,
+  companyId: number,
+  to: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!companyId) {
+      throw new Error('Company ID is required for multi-tenant security');
+    }
+
+    const connection = await storage.getChannelConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection with ID ${connectionId} not found`);
+    }
+
+    if (connection.companyId !== companyId) {
+      throw new Error(`Access denied: Connection does not belong to company ${companyId}`);
+    }
+
+    const connectionData = connection.connectionData as any;
+    const accessToken = connection.accessToken || connectionData?.accessToken;
+    const phoneNumberId = connectionData?.phoneNumberId;
+
+    if (!accessToken) {
+      throw new Error('WhatsApp Business API access token is missing');
+    }
+
+    if (!phoneNumberId) {
+      throw new Error('WhatsApp Business API phone number ID is missing');
+    }
+
+    const normalizedPhone = normalizePhoneToE164(to);
+    
+
+    const messageId = getLastReceivedMessageId(phoneNumberId, normalizedPhone);
+    
+    if (!messageId) {
+
+
+
+      return { success: true }; // Return success to not block the message flow
+    }
+
+
+
+    const response = await axios.post(
+      `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId,
+        typing_indicator: {
+          type: 'text'
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (response.status === 200 && response.data?.success) {
+
+      return { success: true };
+    } else {
+      return {
+        success: false,
+        error: 'Failed to send typing indicator: Unknown error'
+      };
+    }
+  } catch (error: any) {
+    console.error('Error sending typing indicator:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error?.message || error.message
+    };
+  }
+}
+
+/**
+ * Send recording indicator via WhatsApp Cloud API
+ * Note: WhatsApp Cloud API only supports "text" type for typing indicators.
+ * This function uses the same typing indicator but logs it as recording for clarity.
+ * 
+ * @param connectionId The ID of the channel connection
+ * @param companyId The company ID for multi-tenant security
+ * @param to The recipient phone number (with country code)
+ * @returns Promise resolving to success status
+ */
+export async function sendRecordingIndicator(
+  connectionId: number,
+  companyId: number,
+  to: string
+): Promise<{ success: boolean; error?: string }> {
+
+
+
+  return sendTypingIndicator(connectionId, companyId, to);
+}
+
+/**
+ * Stop typing indicator via WhatsApp Cloud API
+ * Note: WhatsApp Cloud API typing indicators auto-dismiss after 25 seconds
+ * or when you send a response. There is no explicit "stop" API.
+ * This function is kept for backward compatibility but is a no-op.
+ * 
+ * @param connectionId The ID of the channel connection
+ * @param companyId The company ID for multi-tenant security
+ * @param to The recipient phone number (with country code)
+ * @returns Promise resolving to success status
+ */
+export async function stopTypingIndicator(
+  connectionId: number,
+  companyId: number,
+  to: string
+): Promise<{ success: boolean; error?: string }> {
+
+
+
+
+  return { success: true };
+}
+
+/**
+ * Calculate typing delay based on message length
+ * @param message The message content to calculate typing time for
+ * @returns Delay in milliseconds
+ */
+function calculateTypingDelay(message: string): number {
+  if (!TYPING_CONFIG.enabled) {
+    return 0;
+  }
+
+  const words = message.split(' ').length;
+  const baseDelay = (words / TYPING_CONFIG.wordsPerMinute) * 60 * 1000;
+
+  const randomFactor = 0.7 + Math.random() * TYPING_CONFIG.randomnessFactor;
+  const calculatedDelay = Math.min(
+    Math.max(baseDelay * randomFactor, TYPING_CONFIG.minDelay),
+    TYPING_CONFIG.maxDelay
+  );
+
+  return calculatedDelay;
+}
+
+/**
+ * Calculate recording delay for voice messages
+ * @returns Delay in milliseconds
+ */
+function calculateRecordingDelay(): number {
+  if (!TYPING_CONFIG.enabled) {
+    return 0;
+  }
+
+  const delay = TYPING_CONFIG.recordingMinDelay + 
+    Math.random() * (TYPING_CONFIG.recordingMaxDelay - TYPING_CONFIG.recordingMinDelay);
+
+  return delay;
+}
+
+/**
+ * Simulate typing indicator with delay based on message length
+ * @param connectionId The ID of the channel connection
+ * @param companyId The company ID for multi-tenant security
+ * @param to The recipient phone number
+ * @param message The message content to calculate typing time for
+ * @returns Promise that resolves when typing simulation is complete
+ */
+export async function simulateTyping(
+  connectionId: number,
+  companyId: number,
+  to: string,
+  message: string
+): Promise<void> {
+  if (!TYPING_CONFIG.enabled) {
+    return;
+  }
+
+  try {
+    const connection = await storage.getChannelConnection(connectionId);
+    if (!connection) {
+      console.warn(`Connection ${connectionId} not found for typing simulation`);
+      return;
+    }
+
+    const connectionData = connection.connectionData as any;
+    const behaviorSettings = connectionData?.behaviorSettings;
+
+    if (behaviorSettings?.typingIndicator === false) {
+
+      return;
+    }
+
+    await sendTypingIndicator(connectionId, companyId, to);
+
+    const delay = calculateTypingDelay(message);
+
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    await stopTypingIndicator(connectionId, companyId, to);
+  } catch (error) {
+    console.error('Error simulating typing:', error);
+  }
+}
+
+/**
+ * Simulate recording indicator with delay
+ * @param connectionId The ID of the channel connection
+ * @param companyId The company ID for multi-tenant security
+ * @param to The recipient phone number
+ * @returns Promise that resolves when recording simulation is complete
+ */
+export async function simulateRecording(
+  connectionId: number,
+  companyId: number,
+  to: string
+): Promise<void> {
+  if (!TYPING_CONFIG.enabled) {
+    return;
+  }
+
+  try {
+    const connection = await storage.getChannelConnection(connectionId);
+    if (!connection) {
+      console.warn(`Connection ${connectionId} not found for recording simulation`);
+      return;
+    }
+
+    const connectionData = connection.connectionData as any;
+    const behaviorSettings = connectionData?.behaviorSettings;
+
+    if (behaviorSettings?.typingIndicator === false) {
+
+      return;
+    }
+
+    await sendRecordingIndicator(connectionId, companyId, to);
+
+    const delay = calculateRecordingDelay();
+
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    await stopTypingIndicator(connectionId, companyId, to);
+  } catch (error) {
+    console.error('Error simulating recording:', error);
+  }
+}
 
 /**
  * Get a WhatsApp Business API connection status by ID
@@ -189,24 +596,22 @@ export async function downloadAndSaveMedia(
  * @param signature The X-Hub-Signature header value
  * @param body The raw request body (Buffer, string, or object)
  * @param appSecret The app secret for the WhatsApp Business application
+ * @param debug Optional flag to enable verbose debugging (default: false)
  * @returns True if signature is valid, false otherwise
  */
-export function verifyWebhookSignature(signature: string, body: Buffer | string | any, appSecret: string): boolean {
+export function verifyWebhookSignature(signature: string, body: Buffer | string | any, appSecret: string, debug: boolean = false): boolean {
   try {
     if (!signature || !appSecret) {
-
       return false;
     }
 
     const signatureParts = signature.split('=');
     if (signatureParts.length !== 2) {
-
       return false;
     }
 
     const algorithm = signatureParts[0];
     const receivedHash = signatureParts[1];
-
 
     let bodyBuffer: Buffer;
     if (Buffer.isBuffer(body)) {
@@ -214,29 +619,21 @@ export function verifyWebhookSignature(signature: string, body: Buffer | string 
     } else if (typeof body === 'string') {
       bodyBuffer = Buffer.from(body, 'utf8');
     } else if (typeof body === 'object') {
-
       bodyBuffer = Buffer.from(JSON.stringify(body), 'utf8');
     } else {
       console.error('Unsupported body type for signature verification:', typeof body);
       return false;
     }
 
-    
     const hmac = crypto.createHmac(algorithm, appSecret);
     hmac.update(bodyBuffer);
     const expectedHash = hmac.digest('hex');
-
-
-    if (expectedHash === receivedHash) {
-
-    }
 
     const isValid = crypto.timingSafeEqual(
       Buffer.from(expectedHash, 'hex'),
       Buffer.from(receivedHash, 'hex')
     );
 
-    
     return isValid;
   } catch (error) {
     console.error('Error verifying webhook signature:', error);
@@ -770,7 +1167,7 @@ export async function sendTemplateMessage(
 
         const existingMessage = await storage.getMessageByExternalId(messageId, companyId);
         if (existingMessage) {
-
+          
           return {
             success: true,
             messageId,
@@ -875,9 +1272,11 @@ export async function sendWhatsAppBusinessMediaMessage(
       throw new Error(`Access denied: Connection does not belong to company ${companyId}`);
     }
 
-    const accessToken = connection.accessToken;
     const connectionData = connection.connectionData as any;
+    const accessToken = connection.accessToken || connectionData?.accessToken;
     const phoneNumberId = connectionData?.phoneNumberId;
+
+
 
     if (!accessToken) {
       throw new Error('WhatsApp Business API access token is missing');
@@ -890,6 +1289,16 @@ export async function sendWhatsAppBusinessMediaMessage(
 
     const normalizedPhone = normalizePhoneToE164(to);
 
+
+    if (isFromBot) {
+      if (mediaType === 'audio') {
+        await simulateRecording(connectionId, companyId, normalizedPhone);
+      } else {
+
+        const simulationMessage = caption || `Sending ${mediaType}...`;
+        await simulateTyping(connectionId, companyId, normalizedPhone, simulationMessage);
+      }
+    }
 
     let mediaId: string;
 
@@ -1089,50 +1498,108 @@ export async function processWebhook(payload: any, companyId?: number): Promise<
       if (!entry.changes || !entry.changes.length) continue;
 
       for (const change of entry.changes) {
-        if (change.field !== 'messages') continue;
+        if (change.field === 'messages') {
+          const value = change.value;
+          if (!value || !value.messages || !value.messages.length) continue;
 
-        const value = change.value;
-        if (!value || !value.messages || !value.messages.length) continue;
-
-        const phoneNumberId = value.metadata?.phone_number_id;
-        if (!phoneNumberId) {
-          
-          continue;
-        }
-
+          const phoneNumberId = value.metadata?.phone_number_id;
+          if (!phoneNumberId) {
+            
+            continue;
+          }
 
 
 
-        const connections = await storage.getChannelConnectionsByType('whatsapp_official');
 
-        const connection = connections.find(conn => {
-          const connData = conn.connectionData as any;
-          return connData?.phoneNumberId === phoneNumberId;
-        });
+          const connections = await storage.getChannelConnectionsByType('whatsapp_official');
 
-        if (!connection) {
-          console.warn(`No WhatsApp Business API connection found for phone number ID: ${phoneNumberId}`);
-          continue;
-        }
+          const connection = connections.find(conn => {
+            const connData = conn.connectionData as any;
+            return connData?.phoneNumberId === phoneNumberId;
+          });
+
+          if (!connection) {
+            console.warn(`No WhatsApp Business API connection found for phone number ID: ${phoneNumberId}`);
+            continue;
+          }
 
 
-        if (companyId && connection.companyId !== companyId) {
-          console.warn(`Company ID mismatch for connection ${connection.id}: expected ${companyId}, got ${connection.companyId}`);
-          continue;
-        }
+          if (companyId && connection.companyId !== companyId) {
+            console.warn(`Company ID mismatch for connection ${connection.id}: expected ${companyId}, got ${connection.companyId}`);
+            continue;
+          }
 
-        if (!connection.companyId) {
-          console.error(`WhatsApp connection ${connection.id} missing companyId - skipping message processing`);
-          continue;
-        }
+          if (!connection.companyId) {
+            console.error(`WhatsApp connection ${connection.id} missing companyId - skipping message processing`);
+            continue;
+          }
 
-        for (const message of value.messages) {
-          await handleIncomingWebhookMessage(message, value.contacts, connection);
+          for (const message of value.messages) {
+            await handleIncomingWebhookMessage(message, value.contacts, connection);
+          }
+        } else if (change.field === 'history') {
+          await handleHistoryWebhook(change.value);
         }
       }
     }
   } catch (error) {
     console.error('Error processing webhook message:', error);
+  }
+}
+
+/**
+ * Handle history sync webhook from Meta WhatsApp Business API
+ * @param historyValue The history webhook payload
+ */
+async function handleHistoryWebhook(historyValue: any): Promise<void> {
+  try {
+    if (!historyValue || !historyValue.history || !Array.isArray(historyValue.history)) {
+
+      return;
+    }
+
+    const phoneNumberId = historyValue.metadata?.phone_number_id;
+    if (!phoneNumberId) {
+      console.warn('[HISTORY SYNC] Missing phone_number_id in history webhook metadata');
+      return;
+    }
+
+    if (!hasLoggedHistoryWebhook) {
+
+      hasLoggedHistoryWebhook = true;
+    }
+
+    const connections = await storage.getChannelConnectionsByType('whatsapp_official');
+    const connection = connections.find(conn => {
+      const connData = conn.connectionData as any;
+      return connData?.phoneNumberId === phoneNumberId;
+    });
+
+    if (!connection) {
+      console.warn(`[HISTORY SYNC] No WhatsApp Business API connection found for phone number ID: ${phoneNumberId}`);
+      return;
+    }
+
+    const connData = connection.connectionData as any;
+    if (!connData?.historySyncEnabled) {
+
+      return;
+    }
+
+
+    const { WhatsAppHistorySyncProcessor } = await import('./whatsapp-history-sync-processor');
+    const processor = new WhatsAppHistorySyncProcessor();
+
+
+    for (const historyItem of historyValue.history) {
+      try {
+        await processor.processHistoryChunk(historyItem, connection);
+      } catch (error) {
+        console.error(`[HISTORY SYNC] Error processing history chunk:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('[HISTORY SYNC] Error handling history webhook:', error);
   }
 }
 
@@ -1157,8 +1624,14 @@ async function handleIncomingWebhookMessage(
     const messageId = message.id;
     const timestamp = message.timestamp * 1000;
 
-
     const normalizedPhone = normalizePhoneToE164(phoneNumber);
+    
+
+    const connectionData = connection.connectionData as any;
+    const phoneNumberId = connectionData?.phoneNumberId;
+    if (phoneNumberId && messageId) {
+      storeLastReceivedMessageId(phoneNumberId, normalizedPhone, messageId);
+    }
 
     const existingMessage = await storage.getMessageByExternalId(messageId, connection.companyId || undefined);
     if (existingMessage) {
@@ -1392,10 +1865,49 @@ async function handleIncomingWebhookMessage(
 
     const updatedConversation = await storage.getConversation(conversation.id);
 
-    if (mediaType && msgMetadata.mediaId && connection.accessToken) {
+    const accessToken = connection.accessToken || (connection.connectionData as any)?.accessToken;
+    if (mediaType && msgMetadata.mediaId && accessToken) {
       try {
+        console.log('🔍 [WHATSAPP OFFICIAL] Downloading media for message:', {
+          messageId,
+          mediaId: msgMetadata.mediaId,
+          mediaType,
+          connectionId: connection.id,
+          hasAccessToken: !!accessToken,
+          isEmbeddedSignup: !!(connection.connectionData as any)?.partnerManaged
+        });
+
+        const downloadedMediaUrl = await downloadAndSaveMedia(
+          msgMetadata.mediaId,
+          accessToken,
+          mediaType
+        );
+
+        if (downloadedMediaUrl) {
+          
+
+
+          await storage.updateMessage(savedMessage.id, {
+            mediaUrl: downloadedMediaUrl
+          });
+
+
+          savedMessage.mediaUrl = downloadedMediaUrl;
+        } else {
+          console.warn('⚠️ [WHATSAPP OFFICIAL] Media download returned null:', {
+            messageId,
+            mediaId: msgMetadata.mediaId,
+            mediaType
+          });
+        }
       } catch (error) {
-        console.error(`Error preparing media download for message ${messageId}:`, error);
+        console.error('❌ [WHATSAPP OFFICIAL] Error downloading media:', {
+          messageId,
+          mediaId: msgMetadata.mediaId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
+
       }
     }
 
@@ -1683,15 +2195,23 @@ async function findOrCreateConversation(connectionId: number, phoneNumber: strin
 }
 
 /**
- * Enhanced send message function that integrates with the inbox system
- * @param connectionId The channel connection ID
+ * Send a message via WhatsApp Business API
+ * @param connectionId The ID of the channel connection
  * @param userId The user ID sending the message
  * @param companyId The company ID for multi-tenant security
  * @param to The recipient phone number
  * @param message The message content
+ * @param isFromBot Whether the message is sent from a bot (default: false)
  * @returns The saved message object
  */
-export async function sendMessage(connectionId: number, userId: number, companyId: number, to: string, message: string) {
+export async function sendMessage(
+  connectionId: number,
+  userId: number,
+  companyId: number,
+  to: string,
+  message: string,
+  isFromBot: boolean = false
+) {
   try {
     if (!companyId) {
       throw new Error('Company ID is required for multi-tenant security');
@@ -1723,6 +2243,14 @@ export async function sendMessage(connectionId: number, userId: number, companyI
     const normalizedPhone = normalizePhoneToE164(to);
 
 
+    const chunks = isFromBot ? splitMessage(message) : [message];
+    const savedMessages: any[] = [];
+
+
+    if (isFromBot && chunks.length > 0) {
+      await simulateTyping(connectionId, companyId, normalizedPhone, chunks[0]);
+    }
+
     const response = await axios.post(
       `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,
       {
@@ -1730,7 +2258,7 @@ export async function sendMessage(connectionId: number, userId: number, companyI
         to: normalizedPhone,
         type: 'text',
         text: {
-          body: message
+          body: chunks[0]
         }
       },
       {
@@ -1744,38 +2272,104 @@ export async function sendMessage(connectionId: number, userId: number, companyI
     if (response.status === 200 && response.data) {
       const messageId = response.data.messages?.[0]?.id;
 
-
       const conversation = await findOrCreateConversation(connectionId, normalizedPhone, companyId);
-
 
       const savedMessage = await storage.createMessage({
         conversationId: conversation.id,
         direction: 'outbound',
         type: 'text',
-        content: message,
-        senderId: userId,
-        senderType: 'user',
-        isFromBot: false,
+        content: chunks[0],
+        senderId: isFromBot ? null : userId,
+        senderType: isFromBot ? null : 'user',
+        isFromBot: isFromBot,
         externalId: messageId || `wa-${Date.now()}`,
         metadata: JSON.stringify({
           whatsapp_message_id: messageId,
           timestamp: new Date().toISOString(),
-          phone_number_id: phoneNumberId
+          phone_number_id: phoneNumberId,
+          chunkIndex: 0,
+          totalChunks: chunks.length
         })
       });
 
+      savedMessages.push(savedMessage);
 
       await storage.updateConversation(conversation.id, {
         lastMessageAt: new Date()
       });
-
 
       eventEmitter.emit('newMessage', {
         message: savedMessage,
         conversation: await storage.getConversation(conversation.id)
       });
 
-      return savedMessage;
+
+      if (chunks.length > 1 && isFromBot) {
+        for (let i = 1; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const delay = calculateSplitMessageDelay();
+
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+
+
+          await simulateTyping(connectionId, companyId, normalizedPhone, chunk);
+
+
+          const chunkResponse = await axios.post(
+            `${WHATSAPP_GRAPH_URL}/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,
+            {
+              messaging_product: 'whatsapp',
+              to: normalizedPhone,
+              type: 'text',
+              text: {
+                body: chunk
+              }
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (chunkResponse.status === 200 && chunkResponse.data) {
+            const chunkMessageId = chunkResponse.data.messages?.[0]?.id;
+
+            const chunkSavedMessage = await storage.createMessage({
+              conversationId: conversation.id,
+              direction: 'outbound',
+              type: 'text',
+              content: chunk,
+              senderId: isFromBot ? null : userId,
+              senderType: isFromBot ? null : 'user',
+              isFromBot: isFromBot,
+              externalId: chunkMessageId || `wa-${Date.now()}-${i}`,
+              metadata: JSON.stringify({
+                whatsapp_message_id: chunkMessageId,
+                timestamp: new Date().toISOString(),
+                phone_number_id: phoneNumberId,
+                chunkIndex: i,
+                totalChunks: chunks.length
+              })
+            });
+
+            savedMessages.push(chunkSavedMessage);
+
+            await storage.updateConversation(conversation.id, {
+              lastMessageAt: new Date()
+            });
+
+            eventEmitter.emit('newMessage', {
+              message: chunkSavedMessage,
+              conversation: await storage.getConversation(conversation.id)
+            });
+          }
+        }
+      }
+
+      return savedMessages[0];
     } else {
       throw new Error('Failed to send message: Unknown error');
     }
@@ -1910,11 +2504,61 @@ export async function sendInteractiveMessage(
 
     if (error.response?.data) {
       console.error('WhatsApp API error response:', error.response.data);
-      throw new Error(`WhatsApp API error: ${error.response.data.error?.message || 'Unknown error'}`);
+      const apiError = error.response.data.error;
+      const errorMessage = apiError?.message || 'Unknown error';
+      const errorDetails = apiError?.error_data?.details || '';
+      
+
+      let userFriendlyMessage = errorMessage;
+      if (errorDetails.includes('flow_id') && errorDetails.includes('invalid')) {
+        userFriendlyMessage = `Invalid Flow ID: The flow ID does not belong to your WhatsApp Business Account or is not in a valid state. Please verify the flow ID in Meta Business Manager and ensure it's published.`;
+      } else if (errorDetails.includes('flow_cta')) {
+        userFriendlyMessage = `Invalid CTA: ${errorDetails}`;
+      } else if (errorDetails.includes('body')) {
+        userFriendlyMessage = `Invalid message body: ${errorDetails}`;
+      } else if (errorDetails) {
+        userFriendlyMessage = `${errorMessage}. ${errorDetails}`;
+      }
+      
+      throw new Error(`WhatsApp API error: ${userFriendlyMessage}`);
     }
 
     throw error;
   }
+}
+
+/**
+ * Get current typing configuration
+ * @returns Current typing configuration
+ */
+export function getTypingConfiguration(): TypingConfig {
+  return { ...TYPING_CONFIG };
+}
+
+/**
+ * Configure typing indicator behavior
+ * @param config Partial typing configuration to update
+ */
+export function configureTypingBehavior(config: Partial<TypingConfig>): void {
+  Object.assign(TYPING_CONFIG, config);
+
+}
+
+/**
+ * Get current message splitting configuration
+ * @returns Current message splitting configuration
+ */
+export function getMessageSplittingConfiguration(): MessageSplittingConfig {
+  return { ...MESSAGE_SPLITTING_CONFIG };
+}
+
+/**
+ * Configure message splitting behavior
+ * @param config Partial message splitting configuration to update
+ */
+export function configureMessageSplitting(config: Partial<MessageSplittingConfig>): void {
+  Object.assign(MESSAGE_SPLITTING_CONFIG, config);
+
 }
 
 export default {
@@ -1934,5 +2578,15 @@ export default {
   verifyWebhookSignature,
   testWebhookConfiguration,
   initializeConnection, // Add the new method
-  getConnectionStatus
+  getConnectionStatus,
+  storeLastReceivedMessageId,
+  sendTypingIndicator,
+  sendRecordingIndicator,
+  stopTypingIndicator,
+  simulateTyping,
+  simulateRecording,
+  getTypingConfiguration,
+  configureTypingBehavior,
+  getMessageSplittingConfiguration,
+  configureMessageSplitting
 };

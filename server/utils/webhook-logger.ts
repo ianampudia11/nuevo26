@@ -7,7 +7,7 @@ import { logger } from './logger';
 
 interface WebhookLogEntry {
   timestamp: Date;
-  provider: 'whatsapp' | 'messenger' | 'instagram' | 'tiktok' | '360dialog';
+  provider: 'whatsapp' | 'messenger' | 'instagram' | 'tiktok';
   eventType: string;
   status: 'received' | 'processing' | 'success' | 'error';
   connectionId?: number;

@@ -631,41 +631,36 @@ class OpenAIProvider implements AIProviderInterface {
   }
 }
 
+/** OpenRouter fallback model when API rejects tools (tool-capable) */
+const OPENROUTER_TOOLS_FALLBACK_MODEL = 'openai/gpt-4o-mini';
+
 class OpenRouterProvider implements AIProviderInterface {
   private client: OpenAI;
 
-
-
+  /** OpenRouter model IDs that support tool/function calling; user's model is always tried first, fallback only on API error */
   private static readonly FUNCTION_CALLING_SUPPORTED_MODELS = new Set([
-
-
+    'openai/gpt-5.2',
+    'openai/gpt-5-mini',
+    'openai/gpt-5-nano',
+    'openai/gpt-5.2-pro',
     'openai/gpt-5',
-
-
     'openai/gpt-4o',
     'openai/gpt-4o-mini',
     'openai/gpt-4o-2024-11-20',
     'openai/gpt-4o-2024-08-06',
     'openai/gpt-4o-2024-05-13',
-
-
     'openai/gpt-4',
     'openai/gpt-4-turbo',
     'openai/gpt-4-turbo-preview',
     'openai/gpt-4-turbo-2024-04-09',
     'openai/gpt-4-1106-preview',
     'openai/gpt-4-vision-preview',
-
-
     'openai/gpt-3.5-turbo',
     'openai/gpt-3.5-turbo-0125',
     'openai/gpt-3.5-turbo-1106',
-
-
-    'openai/gpt-oss-120b',  // 117B MoE model with full tool use support
-    'openai/gpt-oss-20b',   // 21B model with agentic capabilities and function calling
-
-
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'anthropic/claude-sonnet-4.5',
     'anthropic/claude-3-5-sonnet',
     'anthropic/claude-3-opus',
     'anthropic/claude-3-sonnet',
@@ -673,58 +668,42 @@ class OpenRouterProvider implements AIProviderInterface {
     'anthropic/claude-3-5-sonnet-20241022',
     'anthropic/claude-3-5-haiku',
     'anthropic/claude-3-5-sonnet-20240620',
-
-
-    'google/gemini-2.5-pro',           // Gemini 2.5 Pro - supports function calling
-    'google/gemini-2.5-flash',         // Gemini 2.5 Flash - supports function calling
-    'google/gemini-2.5-flash-lite',    // Gemini 2.5 Flash-Lite - supports function calling
-    'google/gemini-2.0-flash',         // Gemini 2.0 Flash - supports function calling
-    'google/gemini-2.0-flash-lite',    // Gemini 2.0 Flash-Lite - supports function calling
-    'google/gemini-2.0-flash-exp',     // Gemini 2.0 Flash Experimental - supports function calling
-    'google/gemini-2.0-flash-thinking-exp', // Gemini 2.0 Flash Thinking Experimental - supports function calling
-
+    'google/gemini-3-flash-preview',
+    'google/gemini-2.5-pro',
+    'google/gemini-2.5-flash',
+    'google/gemini-2.5-flash-lite',
+    'google/gemini-2.0-flash',
+    'google/gemini-2.0-flash-lite',
+    'google/gemini-2.0-flash-exp',
+    'google/gemini-2.0-flash-thinking-exp',
     'google/gemini-pro',
     'google/gemini-1.5-pro',
     'google/gemini-1.5-flash',
     'google/gemini-1.5-pro-latest',
     'google/gemini-1.5-flash-latest',
-
-
-    'thudm/glm-4-32b',              // Optimized for code generation and function calling
-    'thudm/glm-z1-32b',             // Enhanced reasoning with JSON tool calling
-    'thudm/glm-z1-rumination-32b',  // Deep reasoning with search/navigation function calls
-
-
-    '01-ai/yi-large-fc',  // Specialized model with function calling capability
-
-
+    'thudm/glm-4-32b',
+    'thudm/glm-z1-32b',
+    'thudm/glm-z1-rumination-32b',
+    '01-ai/yi-large-fc',
     'mistralai/mistral-large',
     'mistralai/mistral-medium',
     'mistralai/mistral-small',
     'mistralai/mixtral-8x7b-instruct',
     'mistralai/mistral-7b-instruct',
     'mistralai/pixtral-12b',
-    'mistralai/mistral-nemo',  // 12B multilingual model with function calling support
-
-
+    'mistralai/mistral-nemo',
     'cohere/command-r-plus',
     'cohere/command-r',
-
-
-    'cognitivecomputations/dolphin-llama-3-70b',     // Fine-tuned Llama 3 with improved function calling
-    'cognitivecomputations/dolphin3.0-mistral-24b',  // Supports coding, math, agentic, and function calling
-
-
-    'xai/grok-4',                    // Grok 4 - supports function calling
-    'xai/grok-4-0709',               // Grok 4 specific version - confirmed function calling support
-    'xai/grok-3',                    // Grok 3 - supports function calling
-    'xai/grok-3-latest',             // Grok 3 latest - supports function calling
-    'xai/grok-2',                    // Grok 2 - confirmed tool calling support
-    'xai/grok-2-latest',             // Grok 2 latest - supports function calling
-    'xai/grok-2-1212',               // Grok 2 specific version - supports function calling
-    'xai/grok-beta',                 // Grok Beta - experimental model with function calling
-
-
+    'cognitivecomputations/dolphin-llama-3-70b',
+    'cognitivecomputations/dolphin3.0-mistral-24b',
+    'xai/grok-4',
+    'xai/grok-4-0709',
+    'xai/grok-3',
+    'xai/grok-3-latest',
+    'xai/grok-2',
+    'xai/grok-2-latest',
+    'xai/grok-2-1212',
+    'xai/grok-beta',
     'qwen/qwen-2.5-72b-instruct',
     'qwen/qwen-2.5-coder-32b-instruct',
     'qwen/qwq-32b-preview',
@@ -747,11 +726,21 @@ class OpenRouterProvider implements AIProviderInterface {
     });
   }
 
-  /**
-   * Check if a model supports function calling
-   */
   private supportsTools(model: string): boolean {
     return OpenRouterProvider.FUNCTION_CALLING_SUPPORTED_MODELS.has(model);
+  }
+
+  /** True if error likely means model does not support tools */
+  private isToolsNotSupportedError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const lower = message.toLowerCase();
+    return (
+      lower.includes('tool') ||
+      lower.includes('function calling') ||
+      lower.includes('function_call') ||
+      lower.includes('not supported') ||
+      lower.includes('does not support')
+    );
   }
 
   async generateResponse(
@@ -784,65 +773,51 @@ class OpenRouterProvider implements AIProviderInterface {
     audioUrl?: string;
     functionCalls?: any[];
   }> {
-    try {
+    const openAIMessages = messages.map(msg => ({
+      role: msg.role as 'system' | 'user' | 'assistant',
+      content: msg.content
+    }));
 
-      const openAIMessages = messages.map(msg => ({
-        role: msg.role as 'system' | 'user' | 'assistant',
-        content: msg.content
+    if (options.systemPrompt && !messages.find(m => m.role === 'system')) {
+      openAIMessages.unshift({
+        role: 'system',
+        content: options.systemPrompt
+      });
+    }
+
+    const needsTools = options.enableFunctionCalling && options.functionDefinitions && options.functionDefinitions.length > 0;
+    const userModel = options.model || 'openai/gpt-4o-mini';
+
+    const buildTools = (): any[] => {
+      if (!needsTools || !options.functionDefinitions) return [];
+      return options.functionDefinitions.map(func => ({
+        type: 'function',
+        function: {
+          name: func.name,
+          description: func.description,
+          parameters: func.parameters
+        }
       }));
+    };
 
-
-      if (options.systemPrompt && !messages.find(m => m.role === 'system')) {
-        openAIMessages.unshift({
-          role: 'system',
-          content: options.systemPrompt
-        });
-      }
-
-      let modelName = options.model || 'openai/gpt-4o-mini';
-      let modelSupportsTools = this.supportsTools(modelName);
-
-
-      const needsTools = options.enableFunctionCalling && options.functionDefinitions && options.functionDefinitions.length > 0;
-      if (needsTools && !modelSupportsTools) {
-        const fallbackModel = 'openai/gpt-4o-mini'; // Reliable fallback that supports tools
-        console.warn(`OpenRouter: Model ${modelName} does not support function calling. Falling back to ${fallbackModel}.`);
-        modelName = fallbackModel;
-        modelSupportsTools = true;
-      }
-
-
-      let tools: any[] = [];
-      if (needsTools && modelSupportsTools) {
-        tools = options.functionDefinitions!.map(func => ({
-          type: 'function',
-          function: {
-            name: func.name,
-            description: func.description,
-            parameters: func.parameters
-          }
-        }));
-      }
-
+    const runRequest = (modelName: string) => {
       const requestParams: any = {
         model: modelName,
         messages: openAIMessages,
         max_tokens: 4096,
         temperature: 0.7
       };
-
-
+      const tools = buildTools();
       if (tools.length > 0) {
         requestParams.tools = tools;
         requestParams.tool_choice = 'auto';
       }
+      return this.client.chat.completions.create(requestParams);
+    };
 
-      const response = await this.client.chat.completions.create(requestParams);
-
+    const parseResponse = (response: any) => {
       let text = response.choices[0]?.message?.content || "";
-      let functionCalls: Array<{ name: string, arguments: any }> = [];
-
-
+      const functionCalls: Array<{ name: string, arguments: any }> = [];
       if (response.choices[0]?.message?.tool_calls) {
         for (const toolCall of response.choices[0].message.tool_calls) {
           if (toolCall.type === 'function') {
@@ -853,13 +828,25 @@ class OpenRouterProvider implements AIProviderInterface {
           }
         }
       }
-
       return { text, functionCalls: functionCalls.length > 0 ? functionCalls : undefined };
-    } catch (error) {
-      console.error('OpenRouter Provider: Error in generateResponse', error);
-      return {
-        text: ""
-      };
+    };
+
+    try {
+      const response = await runRequest(userModel);
+      return parseResponse(response);
+    } catch (firstError) {
+      if (needsTools && this.isToolsNotSupportedError(firstError)) {
+        console.warn(`OpenRouter: User model ${userModel} rejected tools. Retrying once with ${OPENROUTER_TOOLS_FALLBACK_MODEL}.`, firstError);
+        try {
+          const fallbackResponse = await runRequest(OPENROUTER_TOOLS_FALLBACK_MODEL);
+          return parseResponse(fallbackResponse);
+        } catch (fallbackError) {
+          console.error('OpenRouter Provider: Fallback model also failed', fallbackError);
+          return { text: "" };
+        }
+      }
+      console.error('OpenRouter Provider: Error in generateResponse', firstError);
+      return { text: "" };
     }
   }
 }
@@ -868,7 +855,7 @@ class TranslationService {
   /**
    * Detect if text is in a foreign language (not the target language)
    */
-  private async detectLanguage(text: string, provider: string, apiKey: string): Promise<string> {
+  async detectLanguage(text: string, provider: string, apiKey: string): Promise<string> {
     try {
       if (provider === 'openai') {
         const openai = new OpenAI({ apiKey: apiKey || process.env.OPENAI_API_KEY });
@@ -1315,6 +1302,56 @@ ${config.enableTextToSpeech && capabilities.length > 0 ? capabilities[capabiliti
 
       const provider = await this.getProvider(config.provider, config.apiKey, companyId);
 
+
+      let language = config.language || 'en';
+      if (language === 'auto') {
+
+        if ((contact as any).language && typeof (contact as any).language === 'string') {
+          language = (contact as any).language;
+        } else {
+
+          const messageContent = message.content || '';
+          if (messageContent.trim()) {
+            try {
+
+              let detectionApiKey = config.apiKey;
+              if (!detectionApiKey && companyId) {
+                try {
+                  const credentialSource = await aiCredentialsService.getCredentialForCompany(companyId, config.provider);
+                  if (credentialSource) {
+                    detectionApiKey = credentialSource.apiKey;
+                  }
+                } catch (error) {
+
+                }
+              }
+              if (!detectionApiKey) {
+                detectionApiKey = this.getEnvironmentKey(config.provider) || '';
+              }
+
+              const detectedLang = await this.translationService.detectLanguage(
+                messageContent,
+                config.provider,
+                detectionApiKey
+              );
+              
+
+              if (detectedLang && detectedLang !== 'unknown') {
+                language = detectedLang;
+              } else {
+                language = 'en';
+              }
+            } catch (error) {
+              console.error('Error detecting language:', error);
+              language = 'en';
+            }
+          } else {
+
+            language = 'en';
+          }
+        }
+      }
+
       let functionDefinitions: any[] = [];
       const shouldEnableTaskFunctions = config.enableTaskExecution && config.tasks && config.tasks.length > 0;
       const shouldEnableCalendarFunctions = config.enableGoogleCalendar && config.calendarFunctions && config.calendarFunctions.length > 0;
@@ -1384,7 +1421,6 @@ ${config.enableTextToSpeech && capabilities.length > 0 ? capabilities[capabiliti
 
           if (retrievalResults && retrievalResults.length > 0) {
             const maxChunks = kbConfig.maxRetrievedChunks || 3;
-            const language = config.language || 'en';
             const defaultTemplate = await serverI18n.t(
               'ai_assistant.knowledge_base_context_template',
               language,
@@ -1397,7 +1433,6 @@ ${config.enableTextToSpeech && capabilities.length > 0 ? capabilities[capabiliti
               .slice(0, maxChunks)
               .map(async (result, index) => {
                 const similarity = (result.similarity * 100).toFixed(1);
-                const language = config.language || 'en';
                 const label = await serverI18n.t(
                   'ai_assistant.knowledge_base_document_label',
                   language,
@@ -1418,7 +1453,6 @@ ${config.enableTextToSpeech && capabilities.length > 0 ? capabilities[capabiliti
         }
       }
 
-      const language = config.language || 'en';
       await serverI18n.ensureLanguageLoaded(language);
 
 

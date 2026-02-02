@@ -391,7 +391,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
 
 
   return (
-    <div className="node-documind p-3 rounded-lg bg-white border border-orange-200 shadow-sm min-w-[380px] max-w-[480px] group">
+    <div className="node-documind p-3 rounded-lg bg-card border border-border shadow-sm min-w-[380px] max-w-[480px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -416,14 +416,18 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
         type="target"
         position={Position.Left}
         isConnectable={isConnectable}
-        className="w-3 h-3 bg-orange-400 border-2 border-white"
+        className="w-3 h-3 bg-primary border-2 border-background"
       />
 
       <div className="font-medium flex items-center gap-2 mb-2">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <FileText className="h-4 w-4 text-orange-600" />
+              <img 
+                src="https://cdn-icons-png.flaticon.com/128/136/136522.png" 
+                alt="Documind PDF Chat" 
+                className="h-4 w-4"
+              />
             </TooltipTrigger>
             <TooltipContent side="top">
               <p className="text-xs">{t('flow_builder.documind_node_title', 'Documind PDF Chat Integration')}</p>
@@ -440,7 +444,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                 variant={configurationProgress >= 70 ? "default" : "secondary"}
                 className={cn(
                   "text-[10px] px-1.5 py-0.5",
-                  configurationProgress >= 70 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                  configurationProgress >= 70 ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground"
                 )}
               >
                 {configurationProgress}% configured
@@ -473,14 +477,14 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
         </TooltipProvider>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2 bg-card rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1">
                   <span className="text-lg">📄</span>
-                  <span className="font-medium text-orange-600">
+                  <span className="font-medium text-primary">
                     {DOCUMIND_OPERATIONS.find(op => op.id === selectedOperation)?.name || selectedOperation}
                   </span>
                 </div>
@@ -499,9 +503,9 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1">
                   {connectionStatus === 'success' && selectedFolder ? (
-                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <CheckCircle className="h-3 w-3 text-primary" />
                   ) : (
-                    <AlertCircle className="h-3 w-3 text-yellow-600" />
+                    <AlertCircle className="h-3 w-3 text-muted-foreground" />
                   )}
                   <span className="text-xs text-muted-foreground">
                     {connectionStatus === 'success' && selectedFolder ? 'Ready' : 'Setup Required'}
@@ -531,7 +535,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
         {!isEditing ? (
 
           <div className="space-y-2">
-            <div className="text-xs text-gray-600">
+            <div className="text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span className="font-medium">Operation:</span>
                 <span>{DOCUMIND_OPERATIONS.find(op => op.id === operation)?.name || 'Ask Question'}</span>
@@ -551,10 +555,10 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
             </div>
             <div className="flex items-center gap-2 text-xs">
               <div className={`w-2 h-2 rounded-full ${
-                connectionStatus === 'success' ? 'bg-green-500' :
-                connectionStatus === 'error' ? 'bg-red-500' : 'bg-gray-400'
+                connectionStatus === 'success' ? 'bg-primary' :
+                connectionStatus === 'error' ? 'bg-destructive' : 'bg-muted-foreground'
               }`} />
-              <span className="text-gray-600">
+              <span className="text-muted-foreground">
                 {connectionStatus === 'success' ? 'Connected' :
                  connectionStatus === 'error' ? 'Connection Error' : 'Not Connected'}
               </span>
@@ -592,8 +596,8 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
               />
               {connectionMessage && (
                 <div className={`text-xs flex items-center gap-1 ${
-                  connectionStatus === 'success' ? 'text-green-600' :
-                  connectionStatus === 'error' ? 'text-red-600' : 'text-gray-600'
+                  connectionStatus === 'success' ? 'text-primary' :
+                  connectionStatus === 'error' ? 'text-destructive' : 'text-muted-foreground'
                 }`}>
                   {connectionStatus === 'success' && <CheckCircle className="h-3 w-3" />}
                   {connectionStatus === 'error' && <AlertCircle className="h-3 w-3" />}
@@ -605,7 +609,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => window.open('https://www.documind.chat/chat-with-pdf-api-docs.html', '_blank')}
-                className="h-6 px-2 text-xs text-blue-600 hover:text-blue-800"
+                className="h-6 px-2 text-xs text-primary hover:text-primary/80"
               >
                 <ExternalLink className="h-3 w-3 mr-1" />
                 Get API Key
@@ -654,7 +658,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                                   deleteFolder(selectedFolder);
                                 }
                               }}
-                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
                             >
                               {deletingFolderId === selectedFolder ? (
                                 <RefreshCw className="h-3 w-3 animate-spin" />
@@ -686,7 +690,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                     Create Folder
                   </Button>
                   {folders.length > 0 && (
-                    <p className="text-[10px] text-gray-500 text-center">
+                    <p className="text-[10px] text-muted-foreground text-center">
                       {folders.length} folder{folders.length !== 1 ? 's' : ''} available
                     </p>
                   )}
@@ -726,7 +730,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                       <TooltipProvider>
                         <div className="space-y-1">
                           {files.slice(0, 3).map((file) => (
-                            <div key={file.id} className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 p-1 rounded group">
+                            <div key={file.id} className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-1 rounded group">
                               <FileText className="h-3 w-3" />
                               <span className="truncate flex-1">{file.name}</span>
                               <Tooltip>
@@ -742,7 +746,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                                         deleteFile(file.id, selectedFolder);
                                       }
                                     }}
-                                    className="h-4 w-4 p-0 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="h-4 w-4 p-0 text-destructive hover:text-destructive/80 opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     {deletingFileId === file.id ? (
                                       <RefreshCw className="h-2 w-2 animate-spin" />
@@ -758,7 +762,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                             </div>
                           ))}
                           {files.length > 3 && (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                               +{files.length - 3} more files
                             </div>
                           )}
@@ -793,7 +797,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                 <div className="space-y-2 mt-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-medium">System Prompt</Label>
-                    <span className={`text-[10px] ${systemPrompt.length > 500 ? 'text-red-600' : 'text-muted-foreground'}`}>{systemPrompt.length}/500</span>
+                    <span className={`text-[10px] ${systemPrompt.length > 500 ? 'text-destructive' : 'text-muted-foreground'}`}>{systemPrompt.length}/500</span>
                   </div>
                   <Textarea
                     value={systemPrompt}
@@ -810,8 +814,8 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                 </div>
 
                 {/* Conversation History Configuration */}
-                <div className="border rounded-lg p-3 bg-gradient-to-r from-blue-50 to-indigo-50 mt-3">
-                  <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <div className="border border-border rounded-lg p-3 bg-primary/10 mt-3">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
@@ -825,7 +829,7 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                           id="enable-history"
                           checked={enableHistory}
                           onCheckedChange={setEnableHistory}
-                          className="data-[state=checked]:bg-blue-600"
+                          className="data-[state=checked]:bg-primary"
                         />
                         <Label htmlFor="enable-history" className="text-xs font-medium cursor-pointer">
                           {t('flow_builder.documind_enable_history', 'Include conversation history')}
@@ -834,9 +838,9 @@ export function DocumindNode({ id, data, isConnectable }: DocumindNodeProps) {
                     </div>
 
                     {enableHistory && (
-                      <div className="pl-4 border-l-2 border-blue-200">
+                      <div className="pl-4 border-l-2 border-primary/20">
                         <div className="flex items-center justify-between">
-                          <Label className="text-[10px] font-medium text-gray-700">
+                          <Label className="text-[10px] font-medium text-foreground">
                             {t('flow_builder.documind_history_limit', 'Message Limit')}
                           </Label>
                           <div className="flex items-center gap-1">

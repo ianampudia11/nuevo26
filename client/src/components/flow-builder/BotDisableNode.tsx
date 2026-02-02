@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useReactFlow } from 'reactflow';
 import { useQuery } from '@tanstack/react-query';
-import { Trash2, Copy, Pause, UserCheck, Loader2, Users, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Copy, Pause, Loader2, Users, Eye, EyeOff } from 'lucide-react';
 import { useFlowContext } from '../../pages/flow-builder';
 import { apiRequest } from '@/lib/queryClient';
 import { useTranslation } from '@/hooks/use-translation';
@@ -163,7 +163,7 @@ export function BotDisableNode({ id, data, isConnectable }: BotDisableNodeProps)
   };
 
   return (
-    <div className="node-bot-disable p-3 rounded-lg bg-white border border-orange-200 shadow-sm max-w-[320px] group">
+    <div className="node-bot-disable p-3 rounded-lg bg-card border border-border shadow-sm max-w-[320px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -203,7 +203,11 @@ export function BotDisableNode({ id, data, isConnectable }: BotDisableNodeProps)
       </div>
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <UserCheck className="h-4 w-4 text-orange-600" />
+        <img 
+          src="https://cdn-icons-png.flaticon.com/128/8898/8898827.png" 
+          alt="Agent Handoff" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.bot_disable_node_title', 'Agent Handoff')}</span>
        <button
                 className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -223,10 +227,10 @@ export function BotDisableNode({ id, data, isConnectable }: BotDisableNodeProps)
               </button>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <Pause className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="font-medium text-orange-600">{t('flow_builder.bot_disable_disable_bot', 'Disable Bot')}</span>
+          <span className="font-medium text-primary">{t('flow_builder.bot_disable_disable_bot', 'Disable Bot')}</span>
           <span className="text-muted-foreground">•</span>
           <span className="text-xs text-muted-foreground truncate">
             {getDurationDisplay()}
@@ -234,16 +238,16 @@ export function BotDisableNode({ id, data, isConnectable }: BotDisableNodeProps)
         </div>
 
         <div className="mt-1 flex flex-wrap gap-1">
-          <span className="text-[10px] bg-orange-100 text-orange-800 px-1 py-0.5 rounded">
+          <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded">
             {getTriggerDisplay()}
           </span>
           {assignToAgent && (
-            <span className="text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">
+            <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded">
               {availableAgents.find(a => a.id === assignToAgent)?.name.split(' ')[0] || 'Agent'}
             </span>
           )}
           {notifyAgent && (
-            <span className="text-[10px] bg-green-100 text-green-800 px-1 py-0.5 rounded">
+            <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded">
               Notify Agent
             </span>
           )}
@@ -251,7 +255,7 @@ export function BotDisableNode({ id, data, isConnectable }: BotDisableNodeProps)
       </div>
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border rounded p-2 ">
           <div>
             <Label className="block mb-2 font-medium">Trigger Method</Label>
             <RadioGroup

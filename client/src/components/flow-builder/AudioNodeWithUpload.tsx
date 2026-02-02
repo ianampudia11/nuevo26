@@ -189,7 +189,7 @@ export function AudioNodeWithUpload({ id, data, isConnectable }: AudioNodeProps)
       ) : (
         <div className="space-y-3">
           {mediaUrl ? (
-            <div className="relative bg-secondary/30 rounded overflow-hidden p-3 flex flex-col items-center justify-center">
+            <div className="relative  rounded overflow-hidden p-3 flex flex-col items-center justify-center">
               <FileAudio className="h-8 w-8 text-orange-500 mb-2" />
               {mediaUrl.match(/\.(mp3|wav|ogg|m4a)$/i) && (
                 <audio controls className="w-full max-w-full">
@@ -200,7 +200,7 @@ export function AudioNodeWithUpload({ id, data, isConnectable }: AudioNodeProps)
               <span className="absolute top-1 right-1 text-[10px] px-1 bg-background/80 rounded">{t('flow_builder.audio_upload_audio_label', 'Audio')}</span>
             </div>
           ) : (
-            <div className="bg-secondary/30 p-3 rounded flex flex-col items-center justify-center">
+            <div className=" p-3 rounded flex flex-col items-center justify-center">
               <FileAudio className="h-8 w-8 text-muted-foreground mb-1" />
               <span className="text-xs text-muted-foreground">{t('flow_builder.audio_upload_no_audio_selected', 'No audio selected')}</span>
             </div>

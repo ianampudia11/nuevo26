@@ -1,40 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
-import helmet from 'helmet';
+
 
 /**
- * Security middleware for production
+ * Security middleware
+ * UPDATED: Restrictions disabled to prevent issues with CRM functionality and integrations (Meta/WhatsApp)
  */
 export function setupSecurityMiddleware(app: any) {
 
-  const disableCSP = true; 
 
+  /*
   app.use(helmet({
-    contentSecurityPolicy: disableCSP ? false : {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https:",
-          "data:"
-        ],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        connectSrc: ["'self'", "https:", "wss:", "ws:"],
-        fontSrc: [
-          "'self'",
-          "https:",
-          "data:"
-        ],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'", "https:", "data:"],
-        frameSrc: ["'self'", "https:"],
-        childSrc: ["'self'", "https:"],
-        workerSrc: ["'self'", "blob:"],
-        manifestSrc: ["'self'"],
-      },
-    },
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false, 
+    crossOriginOpenerPolicy: false,
     xFrameOptions: false, 
     hsts: {
       maxAge: 31536000,
@@ -42,10 +20,7 @@ export function setupSecurityMiddleware(app: any) {
       preload: true
     }
   }));
-
-
-
-
+  */
 
   const isWebChatWidgetEndpoint = (path: string): boolean => {
     return (
@@ -74,67 +49,24 @@ export function setupSecurityMiddleware(app: any) {
     res.removeHeader('X-Powered-By');
 
 
-    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('Cross-Origin-Opener-Policy');
+    res.removeHeader('Cross-Origin-Embedder-Policy');
+    res.removeHeader('Cross-Origin-Resource-Policy');
 
 
-    const embedCookie = (req as any).cookies?.['powerchat_embed_context'];
-    const secFetchDest = req.headers['sec-fetch-dest'];
-    const isIframeRequest = secFetchDest === 'iframe';
-    
-    const isEmbedded = 
-      req.query.embed === 'true' || 
-      (req as any).isEmbedded === true || 
-      embedCookie === 'true' ||
-      isIframeRequest;
+    res.setHeader('Content-Security-Policy', "frame-ancestors *");
 
     if (isWebChatWidgetEndpoint(req.path)) {
-
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-      if (req.path.startsWith('/api/webchat/embed/')) {
-        res.setHeader('Content-Security-Policy', 'frame-ancestors *');
-      }
-    } else {
-
-
-      if (isEmbedded) {
-
-
-
-        res.setHeader('Content-Security-Policy', 'frame-ancestors *');
-      } else {
-
-
-        const isHtmlResponse = !req.path.startsWith('/api/') && 
-                              !req.path.startsWith('/public/') &&
-                              (req.path === '/' || !req.path.includes('.'));
-        
-        if (isHtmlResponse) {
-
-
-          if (secFetchDest === 'document' || secFetchDest === 'empty') {
-
-            res.setHeader('X-Frame-Options', 'DENY');
-          } else {
-
-
-            res.setHeader('Content-Security-Policy', 'frame-ancestors *');
-          }
-        } else {
-
-          res.setHeader('X-Frame-Options', 'DENY');
-        }
-      }
     }
 
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
 
-    if (!disableCSP) {
-      res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(self), camera=(self)');
-    }
+
 
 
     if (req.path.includes('/api/')) {
@@ -175,6 +107,7 @@ export function setupSecurityMiddleware(app: any) {
   });
 
 
+  /* WAF DISABLED: To prevent blocking CRM data (HTML content, etc.)
   app.use((req: Request, res: Response, next: NextFunction) => {
 
     const suspiciousPatterns = [
@@ -214,10 +147,12 @@ export function setupSecurityMiddleware(app: any) {
 
     next();
   });
+  */
 
 
   app.use('/api/', (req: Request, res: Response, next: NextFunction) => {
 
+    /* User-Agent check DISABLED
     if (process.env.NODE_ENV === 'production') {
       
     }
@@ -226,6 +161,7 @@ export function setupSecurityMiddleware(app: any) {
     if (!req.headers['user-agent']) {
       return res.status(400).json({ error: 'Missing required headers' });
     }
+    */
     
     next();
   });
@@ -239,41 +175,18 @@ export function setupSecurityReporting(app: any) {
     const { reason, timestamp, userAgent, url } = req.body;
     
 
-    console.warn('🚨 Client Security Event:', {
+    console.warn('Client Security Event (Logged only):', {
       reason,
       timestamp,
       userAgent,
-      url,
-      ip: req.ip,
-      headers: req.headers
+      url
     });
-    
-
 
     res.status(200).json({ status: 'reported' });
   });
 
 
   app.get('/security-violation', (req: Request, res: Response) => {
-    res.status(403).send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Security Violation</title>
-        <style>
-          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-          .error { color: #d32f2f; font-size: 24px; margin-bottom: 20px; }
-          .message { color: #666; font-size: 16px; }
-        </style>
-      </head>
-      <body>
-        <div class="error">🚨 Security Violation Detected</div>
-        <div class="message">
-          Your session has been terminated due to suspicious activity.<br>
-          If you believe this is an error, please contact support.
-        </div>
-      </body>
-      </html>
-    `);
+    res.status(200).send('Security violation reporting');
   });
 }

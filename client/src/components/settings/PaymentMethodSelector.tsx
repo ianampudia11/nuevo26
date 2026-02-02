@@ -26,6 +26,10 @@ export function PaymentMethodSelector({
     if (methodId === 'moyasar') {
       return currency === 'SAR';
     }
+    if (methodId === 'paystack') {
+      const supported = ['NGN', 'GHS', 'ZAR', 'USD'];
+      return supported.includes(currency.toUpperCase());
+    }
     if (methodId === 'stripe') {
       const supportedCurrencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'NZD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'BGN', 'HRK', 'RUB', 'TRY', 'BRL', 'MXN', 'ARS', 'CLP', 'COP', 'PEN', 'INR', 'SGD', 'HKD', 'KRW', 'TWD', 'THB', 'MYR', 'PHP', 'IDR', 'VND', 'AED', 'SAR', 'ILS', 'ZAR', 'NGN', 'EGP', 'KES'];
       return supportedCurrencies.includes(currency.toUpperCase());
@@ -47,6 +51,9 @@ export function PaymentMethodSelector({
     }
     if (methodId === 'moyasar' && currency !== 'SAR') {
       return `Moyasar only supports SAR. Current currency: ${currency}`;
+    }
+    if (methodId === 'paystack' && !isMethodAvailable('paystack')) {
+      return `Paystack supports NGN, GHS, ZAR, USD. Current currency: ${currency}`;
     }
     if (methodId === 'stripe' && !isMethodAvailable('stripe')) {
       return `Currency ${currency} is not supported by Stripe`;
@@ -114,6 +121,11 @@ export function PaymentMethodSelector({
                       <i className="ri-smartphone-line text-2xl text-green-500"></i>
                     </div>
                   )}
+                  {method.id === 'paystack' && (
+                    <div className="w-10 h-10 flex items-center justify-center">
+                      <i className="ri-bank-card-line text-2xl text-emerald-600"></i>
+                    </div>
+                  )}
                   {method.id === 'bank-transfer' && (
                     <div className="w-10 h-10 flex items-center justify-center">
                       <i className="ri-bank-line text-2xl text-green-600"></i>
@@ -130,9 +142,9 @@ export function PaymentMethodSelector({
                         )}
                       </div>
                     </div>
-                    <div className="h-4 w-4 rounded-full border border-primary flex items-center justify-center">
+                    <div className="h-4 w-4 rounded-full border-2 border-gray-700 flex items-center justify-center">
                       {selectedMethod === method.id && (
-                        <div className="h-2 w-2 rounded-full bg-primary btn-brand-primary "></div>
+                        <div className="h-2 w-2 rounded-full bg-gray-700"></div>
                       )}
                     </div>
                   </Label>

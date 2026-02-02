@@ -7,6 +7,7 @@ import {
   contacts
 } from '@shared/schema';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { format, isAfter, isBefore, parseISO } from 'date-fns';
 import path from 'path';
 import { getDb } from '../db';
 import {
@@ -16,31 +17,15 @@ import {
 } from '../types/campaign';
 import { CampaignEventEmitter } from '../utils/websocket';
 import { CampaignService } from './campaignService';
+import { logger } from '../utils/logger';
 import whatsappService from './channels/whatsapp';
 import whatsappOfficialService from './channels/whatsapp-official';
 import axios from 'axios';
 import FormData from 'form-data';
 import { storage } from '../storage';
 
-/**
- * Normalize phone number to +E.164 format
- * @param phone The phone number to normalize
- * @returns Normalized phone number in +E.164 format
- */
-function normalizePhoneToE164(phone: string): string {
-  if (!phone) return phone;
 
-
-  let normalized = phone.replace(/[^\d+]/g, '');
-
-
-  if (normalized.startsWith('+')) {
-    return normalized;
-  }
-
-
-  return '+' + normalized;
-}
+import { normalizePhoneToE164 } from '../../shared/utils/phone';
 
 interface QueueItem {
   id: number;
@@ -104,6 +89,46 @@ export class CampaignQueueService {
   private connectionPools: Map<number, ConnectionProcessingPool>;
   private maxConcurrentConnections: number;
   private activeProcessingPromises: Map<number, Promise<void>>;
+
+  /**
+   * Build WhatsApp Official API template components (body parameters)
+   * Handles variable mapping by position (1..N) to logical variable names
+   * 
+   * @param templateData Template data containing variables and optional mapping
+   * @param allVariables All available variables (name, phone, email, company, etc.)
+   * @returns Array of component objects for WhatsApp API
+   */
+  private buildWhatsappTemplateComponents(
+    templateData: any,
+    allVariables: Record<string, any>
+  ): any[] {
+    const components: any[] = [];
+    const templateVariables = (templateData.variables as string[]) || [];
+
+    if (templateVariables.length > 0) {
+      const variableMapping = (templateData.whatsappTemplateVariableMapping as Record<string, string>) || {};
+      const allVarsMap = allVariables as Record<string, any>;
+      
+      const bodyParameters = templateVariables.map((varName: string, index: number) => {
+
+
+        const mappedVarName = variableMapping[String(index + 1)] || varName;
+        const value = allVarsMap[mappedVarName] || '';
+
+        return {
+          type: 'text',
+          text: String(value) // Ensure string type
+        };
+      });
+
+      components.push({
+        type: 'body',
+        parameters: bodyParameters
+      });
+    }
+
+    return components;
+  }
 
   constructor() {
     this.campaignService = new CampaignService();
@@ -189,7 +214,7 @@ export class CampaignQueueService {
 
 
     if (this.activeProcessingPromises.size > 0) {
-
+      
       try {
         await Promise.all(Array.from(this.activeProcessingPromises.values()));
       } catch (error) {
@@ -199,7 +224,7 @@ export class CampaignQueueService {
 
     this.connectionPools.clear();
     this.activeProcessingPromises.clear();
-
+    
   }
 
   private async processQueue(): Promise<void> {
@@ -722,6 +747,26 @@ export class CampaignQueueService {
   private async processQueueItem(queueItem: QueueItem): Promise<CampaignProcessingResult> {
     try {
 
+      const [claimed] = await getDb().update(campaignQueue)
+        .set({ 
+          status: 'processing',
+          startedAt: new Date()
+        })
+        .where(and(
+          eq(campaignQueue.id, queueItem.id),
+          eq(campaignQueue.status, 'pending') // Only update if still pending
+        ))
+        .returning();
+
+      if (!claimed) {
+
+        return {
+          success: false,
+          error: 'Item already being processed',
+          timestamp: new Date()
+        };
+      }
+
       const [campaign] = await getDb().select()
         .from(campaigns)
         .where(eq(campaigns.id, queueItem.campaign_id));
@@ -817,28 +862,8 @@ export class CampaignQueueService {
         }
 
 
-        const components: any[] = [];
 
-
-        const templateVariables = (templateData.variables as string[]) || [];
-
-
-        if (templateVariables.length > 0) {
-          const allVarsMap = allVariables as Record<string, any>;
-          const bodyParameters = templateVariables.map((varName: string) => {
-            const value = allVarsMap[varName] || '';
-
-            return {
-              type: 'text',
-              text: value
-            };
-          });
-
-          components.push({
-            type: 'body',
-            parameters: bodyParameters
-          });
-        }
+        const components = this.buildWhatsappTemplateComponents(templateData, allVariables);
 
 
 
@@ -1205,30 +1230,13 @@ export class CampaignQueueService {
         }
 
 
-        if (templateVariables.length > 0) {
-          const allVarsMap = allVariables as Record<string, any>;
-          const bodyParameters = templateVariables.map((varName: string) => {
-            const value = allVarsMap[varName] || '';
 
-            return { type: 'text', text: String(value) };
-          });
-
-          components.push({
-            type: 'body',
-            parameters: bodyParameters
-          });
-        }
+        const bodyComponents = this.buildWhatsappTemplateComponents(templateData, allVariables);
+        components.push(...bodyComponents);
 
 
 
-        console.log('[Campaign Queue] Sending template message:', {
-          templateName: templateData.whatsappTemplateName,
-          language: templateData.whatsappTemplateLanguage || 'en',
-          recipientPhone: recipientData.phone,
-          componentsCount: components.length,
-          hasMediaComponent: components.some(c => c.type === 'header'),
-          components: JSON.stringify(components, null, 2)
-        });
+      
 
         try {
           const result = await whatsappOfficialService.sendTemplateMessage(
@@ -1705,7 +1713,7 @@ export class CampaignQueueService {
   private async recordAnalyticsSnapshots(): Promise<void> {
 
     if (!this.isGlobalProcessing || !CampaignQueueService.globalProcessingEnabled) {
-
+      
       return;
     }
 
@@ -1731,46 +1739,115 @@ export class CampaignQueueService {
   public async checkCampaignCompletion(): Promise<void> {
 
     if (!this.isGlobalProcessing || !CampaignQueueService.globalProcessingEnabled) {
-
+      
       return;
     }
 
     try {
+
+
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       
-      const potentiallyCompletedCampaigns = await getDb().select()
+
+      const potentiallyCompletedCampaigns = await getDb().select({
+        id: campaigns.id,
+        companyId: campaigns.companyId,
+        campaignType: campaigns.campaignType,
+        name: campaigns.name,
+        dripSettings: campaigns.dripSettings,
+        timezone: campaigns.timezone,
+        startedAt: campaigns.startedAt
+      })
         .from(campaigns)
-        .where(eq(campaigns.status, 'running'));
+        .where(
+          and(
+            eq(campaigns.status, 'running'),
+
+            sql`EXISTS (
+              SELECT 1 FROM campaign_queue 
+              WHERE campaign_queue.campaign_id = campaigns.id 
+              AND campaign_queue.updated_at > ${fiveMinutesAgo}
+            )`
+          )
+        )
+        .limit(100); // Limit to prevent loading too many campaigns at once
+
+      if (potentiallyCompletedCampaigns.length === 0) {
+        return;
+      }
+
+
+      const campaignsByCompany = new Map<number, typeof potentiallyCompletedCampaigns>();
       for (const campaign of potentiallyCompletedCampaigns) {
-        try {
-          
-          const queueStats = await getDb().select({
-            total: sql`COUNT(*)`,
-            pending: sql`COUNT(*) FILTER (WHERE status = 'pending')`,
-            processing: sql`COUNT(*) FILTER (WHERE status = 'processing')`,
-            completed: sql`COUNT(*) FILTER (WHERE status = 'completed')`,
-            failed: sql`COUNT(*) FILTER (WHERE status = 'failed')`,
-            cancelled: sql`COUNT(*) FILTER (WHERE status = 'cancelled')`
-          })
-          .from(campaignQueue)
-          .where(eq(campaignQueue.campaignId, campaign.id));
-
-          const stats = queueStats[0];
-          if (!stats) {
-            continue; // Skip if no stats found
+        if (campaign.companyId) {
+          if (!campaignsByCompany.has(campaign.companyId)) {
+            campaignsByCompany.set(campaign.companyId, []);
           }
-
-          const totalItems = parseInt(String(stats.total));
-          const pendingItems = parseInt(String(stats.pending));
-          const processingItems = parseInt(String(stats.processing));
-          const completedItems = parseInt(String(stats.completed));
-          const failedItems = parseInt(String(stats.failed));
+          campaignsByCompany.get(campaign.companyId)!.push(campaign);
+        }
+      }
 
 
-          
-          const activePendingItems = pendingItems + processingItems;
+      const companyIds = Array.from(campaignsByCompany.keys());
+      const concurrencyLimit = 5;
+      
+      for (let i = 0; i < companyIds.length; i += concurrencyLimit) {
+        const companyBatch = companyIds.slice(i, i + concurrencyLimit);
+        await Promise.allSettled(
+          companyBatch.map(companyId => 
+            this.checkCompanyCampaignsCompletion(campaignsByCompany.get(companyId)!)
+          )
+        );
+      }
+    } catch (error) {
+      logger.error('Campaign Queue', 'Failed to check campaign completion', error);
+    }
+  }
 
-          if (totalItems > 0 && activePendingItems === 0) {
-            
+  /**
+   * Check completion for campaigns belonging to a specific company
+   */
+  private async checkCompanyCampaignsCompletion(companyCampaigns: Array<{ 
+    id: number; 
+    companyId: number | null; 
+    campaignType: string | null; 
+    name: string | null;
+    dripSettings: any;
+    timezone: string | null;
+    startedAt: Date | null;
+  }>): Promise<void> {
+    for (const campaign of companyCampaigns) {
+      try {
+        const queueStats = await getDb().select({
+          total: sql`COUNT(*)`,
+          pending: sql`COUNT(*) FILTER (WHERE status = 'pending')`,
+          processing: sql`COUNT(*) FILTER (WHERE status = 'processing')`,
+          completed: sql`COUNT(*) FILTER (WHERE status = 'completed')`,
+          failed: sql`COUNT(*) FILTER (WHERE status = 'failed')`,
+          cancelled: sql`COUNT(*) FILTER (WHERE status = 'cancelled')`
+        })
+        .from(campaignQueue)
+        .where(eq(campaignQueue.campaignId, campaign.id));
+
+        const stats = queueStats[0];
+        if (!stats) {
+          continue; // Skip if no stats found
+        }
+
+        const totalItems = parseInt(String(stats.total));
+        const pendingItems = parseInt(String(stats.pending));
+        const processingItems = parseInt(String(stats.processing));
+        const completedItems = parseInt(String(stats.completed));
+        const failedItems = parseInt(String(stats.failed));
+
+        const activePendingItems = pendingItems + processingItems;
+
+        if (totalItems > 0 && activePendingItems === 0) {
+
+          if (campaign.campaignType === 'recurring_daily') {
+            await this.handleRecurringCampaignCompletion(campaign);
+          } else {
+
             await getDb().update(campaigns)
               .set({
                 status: 'completed',
@@ -1778,15 +1855,12 @@ export class CampaignQueueService {
               })
               .where(eq(campaigns.id, campaign.id));
 
-            
             await this.campaignService.recordAnalyticsSnapshot(campaign.id);
 
-
-            
             CampaignEventEmitter.emitCampaignCompleted(
               campaign.id,
-              campaign.companyId,
-              campaign.name,
+              campaign.companyId || 0,
+              campaign.name || '',
               {
                 totalRecipients: totalItems,
                 successfulSends: completedItems,
@@ -1794,18 +1868,94 @@ export class CampaignQueueService {
               }
             );
           }
-        } catch (error) {
-          console.error(`Failed to check completion for campaign ${campaign.id}:`, error);
         }
+      } catch (error) {
+        logger.error('Campaign Queue', `Failed to check completion for campaign ${campaign.id}`, error);
       }
-    } catch (error) {
-      console.error('Failed to check campaign completion:', error);
     }
   }
 
-  
-  
-  
+  /**
+   * Handle completion of a recurring daily campaign occurrence
+   */
+  private async handleRecurringCampaignCompletion(campaign: any) {
+    try {
+      if (!campaign.dripSettings) {
+
+        await getDb().update(campaigns)
+          .set({
+            status: 'completed',
+            completedAt: new Date()
+          })
+          .where(eq(campaigns.id, campaign.id));
+        return;
+      }
+
+      const settings = campaign.dripSettings;
+      const currentDate = new Date();
+
+
+      if (settings.endDate) {
+        const endDate = parseISO(settings.endDate);
+        if (isAfter(currentDate, endDate)) {
+
+          await getDb().update(campaigns)
+            .set({
+              status: 'completed',
+              completedAt: new Date()
+            })
+            .where(eq(campaigns.id, campaign.id));
+          return;
+        }
+      }
+
+
+
+
+      const timezone = settings.timezone || campaign.timezone || 'UTC';
+      const bufferMinutes = 2;
+      
+
+      let referenceTime: Date;
+      if (campaign.startedAt) {
+        referenceTime = new Date(new Date(campaign.startedAt).getTime() + bufferMinutes * 60 * 1000);
+      } else {
+
+        referenceTime = new Date(currentDate.getTime() + bufferMinutes * 60 * 1000);
+      }
+      
+      const nextSendTime = this.getNextRecurringSendTime(settings, referenceTime, campaign.timezone);
+
+      if (nextSendTime) {
+
+        await getDb().update(campaigns)
+          .set({
+            status: 'scheduled',
+            scheduledAt: nextSendTime,
+            updatedAt: new Date()
+          })
+          .where(eq(campaigns.id, campaign.id));
+      } else {
+
+        await getDb().update(campaigns)
+          .set({
+            status: 'completed',
+            completedAt: new Date()
+          })
+          .where(eq(campaigns.id, campaign.id));
+      }
+    } catch (error) {
+      logger.error('Campaign Queue', `Error handling recurring campaign completion for campaign ${campaign.id}`, error);
+    }
+  }
+
+  /**
+   * Get the next valid send time for a recurring daily campaign
+   * Delegates to CampaignService to ensure consistent timezone handling
+   */
+  private getNextRecurringSendTime(recurringSettings: any, currentDateTime: Date, timezone: string = 'UTC'): Date | null {
+    return this.campaignService.calculateNextRecurringSendTime(recurringSettings, currentDateTime, timezone);
+  }
 
   public async getQueueStats(companyId: number): Promise<CampaignStats> {
     try {
@@ -2038,7 +2188,7 @@ export class CampaignQueueService {
   private async processConcurrentQueue(): Promise<void> {
 
     if (!this.isGlobalProcessing || !CampaignQueueService.globalProcessingEnabled) {
-
+      
       return;
     }
 

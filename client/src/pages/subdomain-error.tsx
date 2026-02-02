@@ -80,7 +80,7 @@ export default function SubdomainErrorPage({
             <div className="flex justify-center mb-4">
               {errorContent.icon}
             </div>
-            <CardTitle className="text-xl font-semibold text-gray-900">
+            <CardTitle className="text-xl font-semibold text-foreground">
               {errorContent.title}
             </CardTitle>
             <CardDescription className="text-gray-600">

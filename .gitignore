@@ -4,15 +4,7 @@ dist
 uploads
 public
 whatsapp-sessions
-vite.config.ts.*
 *.tar.gz
 *.zip
 *.md
-backups/
-/.idea/AugmentWebviewStateStore.xml
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/powerchatplus.iml
-/.idea/inspectionProfiles/Project_Default.xml
-/.idea/vcs.xml
-/.idea/workspace.xml
+backups

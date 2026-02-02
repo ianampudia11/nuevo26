@@ -1592,6 +1592,414 @@
         "value": "Acciones"
     },
     {
+        "key": "admin.companies.title",
+        "value": "Empresas"
+    },
+    {
+        "key": "admin.companies.delete_selected",
+        "value": "Eliminar seleccionadas ({{count}})"
+    },
+    {
+        "key": "admin.companies.refresh",
+        "value": "Actualizar"
+    },
+    {
+        "key": "admin.companies.manage_title",
+        "value": "Gestionar Empresas"
+    },
+    {
+        "key": "admin.companies.search_placeholder",
+        "value": "Buscar empresas..."
+    },
+    {
+        "key": "admin.companies.no_search_results",
+        "value": "No se encontraron empresas que coincidan con su búsqueda"
+    },
+    {
+        "key": "admin.companies.table.company",
+        "value": "Empresa"
+    },
+    {
+        "key": "admin.companies.table.users",
+        "value": "Usuarios"
+    },
+    {
+        "key": "admin.companies.manage_button",
+        "value": "Gestionar"
+    },
+    {
+        "key": "admin.companies.login_as",
+        "value": "Iniciar sesión como"
+    },
+    {
+        "key": "admin.companies.clear_data",
+        "value": "Limpiar datos"
+    },
+    {
+        "key": "admin.companies.delete",
+        "value": "Eliminar"
+    },
+    {
+        "key": "admin.companies.loading_plan_details",
+        "value": "Cargando detalles del plan..."
+    },
+    {
+        "key": "admin.companies.no_description",
+        "value": "No hay descripción disponible"
+    },
+    {
+        "key": "admin.companies.plan_price",
+        "value": "Precio:"
+    },
+    {
+        "key": "admin.companies.plan_max_users",
+        "value": "Usuarios máximos:"
+    },
+    {
+        "key": "admin.companies.plan_max_contacts",
+        "value": "Contactos máximos:"
+    },
+    {
+        "key": "admin.companies.plan_max_channels",
+        "value": "Canales máximos:"
+    },
+    {
+        "key": "admin.companies.impersonate_title",
+        "value": "Suplantar Empresa"
+    },
+    {
+        "key": "admin.companies.impersonate_description",
+        "value": "Está a punto de iniciar sesión como usuario administrador para {{name}}. Esto le permitirá acceder al panel de la empresa y realizar acciones como administrador de la empresa."
+    },
+    {
+        "key": "admin.companies.impersonating",
+        "value": "Suplantando..."
+    },
+    {
+        "key": "admin.companies.login_as_admin",
+        "value": "Iniciar sesión como Administrador de Empresa"
+    },
+    {
+        "key": "admin.companies.bulk_delete_title",
+        "value": "Eliminar Múltiples Empresas"
+    },
+    {
+        "key": "admin.companies.bulk_delete_description",
+        "value": "Está a punto de eliminar {{count}} empresas y todos sus datos asociados. Esta acción no se puede deshacer. ¿Está seguro de que desea continuar?"
+    },
+    {
+        "key": "admin.companies.bulk_delete_action",
+        "value": "Eliminar {{count}} Empresas"
+    },
+    {
+        "key": "admin.companies.bulk_delete_success",
+        "value": "Se eliminaron exitosamente {{successCount}} empresas{{failures}}"
+    },
+    {
+        "key": "admin.companies.bulk_delete_no_deleted",
+        "value": "No se eliminaron empresas. Por favor, revise los registros del servidor para obtener más detalles."
+    },
+    {
+        "key": "admin.companies.bulk_delete_error",
+        "value": "Error al eliminar empresas"
+    },
+    {
+        "key": "admin.companies.bulk_delete_failed",
+        "value": "Error al eliminar empresas: {{error}}"
+    },
+    {
+        "key": "admin.companies.detail.title",
+        "value": "Empresa: {{name}}"
+    },
+    {
+        "key": "admin.companies.detail.impersonate_button",
+        "value": "Suplantar"
+    },
+    {
+        "key": "admin.companies.detail.tabs.details",
+        "value": "Detalles de la Empresa"
+    },
+    {
+        "key": "admin.companies.detail.tabs.users",
+        "value": "Usuarios"
+    },
+    {
+        "key": "admin.companies.detail.tabs.data_usage",
+        "value": "Datos y Uso"
+    },
+    {
+        "key": "admin.companies.detail.card.title",
+        "value": "Información de la Empresa"
+    },
+    {
+        "key": "admin.companies.detail.card.description",
+        "value": "Gestionar detalles y configuración de la empresa"
+    },
+    {
+        "key": "admin.companies.detail.uploading",
+        "value": "Subiendo..."
+    },
+    {
+        "key": "admin.companies.detail.change_logo",
+        "value": "Cambiar Logo"
+    },
+    {
+        "key": "admin.companies.detail.form.company_name",
+        "value": "Nombre de la Empresa"
+    },
+    {
+        "key": "admin.companies.detail.form.slug",
+        "value": "Slug"
+    },
+    {
+        "key": "admin.companies.detail.form.slug_description",
+        "value": "Usado para URL e identificación"
+    },
+    {
+        "key": "admin.companies.detail.form.logo_url",
+        "value": "URL del Logo"
+    },
+    {
+        "key": "admin.companies.detail.form.primary_color",
+        "value": "Color Principal"
+    },
+    {
+        "key": "admin.companies.detail.form.color_placeholder",
+        "value": "#333235"
+    },
+    {
+        "key": "admin.companies.detail.form.plan",
+        "value": "Plan"
+    },
+    {
+        "key": "admin.companies.detail.form.select_plan_placeholder",
+        "value": "Seleccionar un plan"
+    },
+    {
+        "key": "admin.companies.detail.form.loading_plans",
+        "value": "Cargando planes..."
+    },
+    {
+        "key": "admin.companies.detail.form.no_plans_available",
+        "value": "No hay planes disponibles"
+    },
+    {
+        "key": "admin.companies.detail.form.plan_description",
+        "value": "Seleccionar un plan de suscripción para esta empresa"
+    },
+    {
+        "key": "admin.companies.detail.form.max_users",
+        "value": "Usuarios Máximos"
+    },
+    {
+        "key": "admin.companies.detail.form.active_status",
+        "value": "Estado Activo"
+    },
+    {
+        "key": "admin.companies.detail.form.active_status_description",
+        "value": "Cuando está inactivo, los usuarios no pueden acceder a la plataforma"
+    },
+    {
+        "key": "admin.companies.detail.deactivating",
+        "value": "Desactivando..."
+    },
+    {
+        "key": "admin.companies.detail.deactivate_company",
+        "value": "Desactivar Empresa"
+    },
+    {
+        "key": "admin.companies.detail.confirm.deactivate",
+        "value": "¿Está seguro de que desea desactivar esta empresa? Esto impedirá que todos los usuarios accedan a la plataforma."
+    },
+    {
+        "key": "admin.companies.detail.users.title",
+        "value": "Usuarios de la Empresa"
+    },
+    {
+        "key": "admin.companies.detail.users.description",
+        "value": "Gestionar usuarios de esta empresa"
+    },
+    {
+        "key": "admin.companies.detail.users.no_users",
+        "value": "No se encontraron usuarios para esta empresa."
+    },
+    {
+        "key": "admin.companies.detail.users.table.user",
+        "value": "Usuario"
+    },
+    {
+        "key": "admin.companies.detail.users.table.email",
+        "value": "Correo Electrónico"
+    },
+    {
+        "key": "admin.companies.detail.users.table.role",
+        "value": "Rol"
+    },
+    {
+        "key": "admin.companies.detail.users.table.actions",
+        "value": "Acciones"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.title",
+        "value": "Editar Usuario"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.description",
+        "value": "Actualizar información y permisos del usuario."
+    },
+    {
+        "key": "admin.companies.detail.edit_user.full_name",
+        "value": "Nombre Completo"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.email",
+        "value": "Correo Electrónico"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role",
+        "value": "Rol"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.select_role_placeholder",
+        "value": "Seleccionar rol"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role_user",
+        "value": "Usuario"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role_admin",
+        "value": "Administrador"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role_superadmin",
+        "value": "Super Administrador"
+    },
+    {
+        "key": "admin.companies.detail.validation.company_name_required",
+        "value": "El nombre de la empresa es obligatorio"
+    },
+    {
+        "key": "admin.companies.detail.validation.slug_required",
+        "value": "El slug es obligatorio"
+    },
+    {
+        "key": "admin.companies.detail.validation.slug_invalid",
+        "value": "El slug solo puede contener letras minúsculas, números y guiones"
+    },
+    {
+        "key": "admin.companies.detail.validation.color_invalid",
+        "value": "Debe ser un color hexadecimal válido"
+    },
+    {
+        "key": "admin.companies.detail.validation.plan_required",
+        "value": "El plan es obligatorio"
+    },
+    {
+        "key": "admin.companies.detail.validation.max_users_required",
+        "value": "Debe tener al menos 1 usuario"
+    },
+    {
+        "key": "admin.companies.detail.error.fetch_company",
+        "value": "Error al obtener la empresa"
+    },
+    {
+        "key": "admin.companies.detail.error.fetch_users",
+        "value": "Error al obtener los usuarios de la empresa"
+    },
+    {
+        "key": "admin.companies.detail.error.update_failed",
+        "value": "Error al actualizar la empresa"
+    },
+    {
+        "key": "admin.companies.detail.error.deactivate_failed",
+        "value": "Error al desactivar la empresa"
+    },
+    {
+        "key": "admin.companies.detail.error.upload_logo_failed",
+        "value": "Error al subir el logo"
+    },
+    {
+        "key": "admin.companies.detail.error.update_user_failed",
+        "value": "Error al actualizar el usuario"
+    },
+    {
+        "key": "admin.companies.detail.toast.update_success_title",
+        "value": "Empresa actualizada"
+    },
+    {
+        "key": "admin.companies.detail.toast.update_success_description",
+        "value": "La empresa se ha actualizado correctamente"
+    },
+    {
+        "key": "admin.companies.detail.toast.update_failed_title",
+        "value": "Error en la actualización"
+    },
+    {
+        "key": "admin.companies.detail.toast.deactivate_success_title",
+        "value": "Empresa desactivada"
+    },
+    {
+        "key": "admin.companies.detail.toast.deactivate_success_description",
+        "value": "La empresa se ha desactivado correctamente"
+    },
+    {
+        "key": "admin.companies.detail.toast.deactivate_failed_title",
+        "value": "Error en la desactivación"
+    },
+    {
+        "key": "admin.companies.detail.toast.logo_updated_title",
+        "value": "Logo Actualizado"
+    },
+    {
+        "key": "admin.companies.detail.toast.logo_updated_description",
+        "value": "El logo de la empresa se ha actualizado correctamente."
+    },
+    {
+        "key": "admin.companies.detail.toast.error_title",
+        "value": "Error"
+    },
+    {
+        "key": "admin.companies.detail.toast.upload_logo_error",
+        "value": "Error al subir el logo: {{error}}"
+    },
+    {
+        "key": "admin.companies.detail.toast.user_updated_title",
+        "value": "Usuario Actualizado"
+    },
+    {
+        "key": "admin.companies.detail.toast.user_updated_description",
+        "value": "El usuario se ha actualizado correctamente."
+    },
+    {
+        "key": "admin.companies.detail.toast.update_user_failed_title",
+        "value": "Error en la Actualización"
+    },
+    {
+        "key": "admin.companies.detail.toast.invalid_file_type_title",
+        "value": "Tipo de archivo no válido"
+    },
+    {
+        "key": "admin.companies.detail.toast.invalid_file_type_description",
+        "value": "Por favor, seleccione un archivo de imagen válido (JPEG, PNG, GIF o WebP)."
+    },
+    {
+        "key": "admin.companies.detail.toast.file_too_large_title",
+        "value": "Archivo demasiado grande"
+    },
+    {
+        "key": "admin.companies.detail.toast.file_too_large_description",
+        "value": "Por favor, seleccione una imagen más pequeña que 5MB."
+    },
+    {
+        "key": "common.saving",
+        "value": "Guardando..."
+    },
+    {
+        "key": "common.save_changes",
+        "value": "Guardar Cambios"
+    },
+    {
         "key": "common.active",
         "value": "Activo"
     },
@@ -1729,7 +2137,7 @@
     },
     {
         "key": "registration.page_subtitle",
-        "value": "Crea la cuenta de tu empresa y empieza a gestionar conversaciones"
+        "value": "Crea la cuenta de tu empresa y gestiona todos tus canales en un solo lugar!"
     },
     {
         "key": "registration.company_slug",
@@ -1890,6 +2298,46 @@
     {
         "key": "registration.error.register_failed",
         "value": "Error al registrar la empresa"
+    },
+    {
+        "key": "registration.referral_detected",
+        "value": "¡Excelente! Te estás registrando a través de una referencia del afiliado {{code}}."
+    },
+    {
+        "key": "registration.referral_benefit",
+        "value": "Puedes ser elegible para beneficios especiales o descuentos."
+    },
+    {
+        "key": "registration.already_have_account",
+        "value": "¿Ya tienes una cuenta?"
+    },
+    {
+        "key": "registration.sign_in",
+        "value": "Iniciar sesión"
+    },
+    {
+        "key": "registration.affiliate.cta_title",
+        "value": "¿Interesado en Ganar Comisiones?"
+    },
+    {
+        "key": "registration.affiliate.cta_description",
+        "value": "Únete a nuestro programa de afiliados y gana hasta un 30% de comisión refiriendo empresas a {{appName}}"
+    },
+    {
+        "key": "registration.affiliate.button_text",
+        "value": "Conviértete en Socio y Gana Comisiones"
+    },
+    {
+        "key": "registration.plan.trial_days",
+        "value": "Prueba de {{days}} días"
+    },
+    {
+        "key": "registration.plan.free_plan",
+        "value": "Plan gratuito"
+    },
+    {
+        "key": "registration.plan.monthly_suffix",
+        "value": "/mes"
     },
     {
         "key": "flow_builder.error.no_file",
@@ -2456,6 +2904,14 @@
         "value": "Contacto Desconocido"
     },
     {
+        "key": "common.na",
+        "value": "N/A"
+    },
+    {
+        "key": "common.unknown_error",
+        "value": "Ocurrió un error desconocido"
+    },
+    {
         "key": "common.cancel",
         "value": "Cancelar"
     },
@@ -2594,6 +3050,1394 @@
     {
         "key": "pipeline.delete_stage",
         "value": "Eliminar Etapa"
+    },
+    {
+        "key": "pipeline.search_placeholder",
+        "value": "Buscar oportunidades, contactos, etiquetas... (Ctrl+F)"
+    },
+    {
+        "key": "pipeline.search_title",
+        "value": "Buscar por título de oportunidad, nombre de contacto, teléfono, etiquetas, descripción... (Ctrl+F)"
+    },
+    {
+        "key": "pipeline.filters",
+        "value": "Filtros"
+    },
+    {
+        "key": "pipeline.clear_all",
+        "value": "Limpiar Todo"
+    },
+    {
+        "key": "pipeline.clear",
+        "value": "Limpiar"
+    },
+    {
+        "key": "pipeline.loading_pipelines",
+        "value": "Cargando pipelines..."
+    },
+    {
+        "key": "pipeline.select_pipeline",
+        "value": "Seleccionar pipeline"
+    },
+    {
+        "key": "pipeline.default",
+        "value": "Predeterminado"
+    },
+    {
+        "key": "pipeline.manage",
+        "value": "Gestionar"
+    },
+    {
+        "key": "pipeline.my_deals",
+        "value": "Mis Oportunidades"
+    },
+    {
+        "key": "pipeline.high_priority",
+        "value": "Alta Prioridad"
+    },
+    {
+        "key": "pipeline.overdue",
+        "value": "Vencidas"
+    },
+    {
+        "key": "pipeline.unassigned",
+        "value": "Sin Asignar"
+    },
+    {
+        "key": "pipeline.pipeline_label",
+        "value": "Pipeline: {{names}}"
+    },
+    {
+        "key": "pipeline.stage_label",
+        "value": "Etapa: {{names}}"
+    },
+    {
+        "key": "pipeline.stage_label_more",
+        "value": "Etapa: {{names}} +{{count}} más"
+    },
+    {
+        "key": "pipeline.stage_selected",
+        "value": "Etapa: {{count}} seleccionadas"
+    },
+    {
+        "key": "pipeline.priority_label",
+        "value": "Prioridad: {{priorities}}"
+    },
+    {
+        "key": "pipeline.value_label",
+        "value": "Valor: {{range}}"
+    },
+    {
+        "key": "pipeline.status_label",
+        "value": "Estado: {{status}}"
+    },
+    {
+        "key": "pipeline.due_label",
+        "value": "Vencimiento: {{range}}"
+    },
+    {
+        "key": "pipeline.created_label",
+        "value": "Creado: {{range}}"
+    },
+    {
+        "key": "pipeline.assigned_label",
+        "value": "Asignado: {{count}} usuario(s)"
+    },
+    {
+        "key": "pipeline.tags_label",
+        "value": "Etiquetas: {{tags}}"
+    },
+    {
+        "key": "pipeline.add_new_deal",
+        "value": "Agregar Nueva Oportunidad"
+    },
+    {
+        "key": "pipeline.adding_deal_to",
+        "value": "Agregando oportunidad a"
+    },
+    {
+        "key": "pipeline.create_new_deal",
+        "value": "Crear una nueva oportunidad en tu pipeline"
+    },
+    {
+        "key": "pipeline.loading_form_data",
+        "value": "Cargando datos del formulario..."
+    },
+    {
+        "key": "pipeline.deal_title",
+        "value": "Título de la Oportunidad"
+    },
+    {
+        "key": "pipeline.enter_deal_title",
+        "value": "Ingresar título de oportunidad"
+    },
+    {
+        "key": "pipeline.deal_value",
+        "value": "Valor de la Oportunidad"
+    },
+    {
+        "key": "pipeline.stage",
+        "value": "Etapa"
+    },
+    {
+        "key": "pipeline.select_stage",
+        "value": "Seleccionar etapa"
+    },
+    {
+        "key": "pipeline.contact",
+        "value": "Contacto"
+    },
+    {
+        "key": "pipeline.select_contact",
+        "value": "Seleccionar contacto"
+    },
+    {
+        "key": "pipeline.none",
+        "value": "Ninguno"
+    },
+    {
+        "key": "pipeline.no_contacts_available",
+        "value": "No hay contactos disponibles"
+    },
+    {
+        "key": "pipeline.add_new_contact",
+        "value": "Agregar nuevo contacto"
+    },
+    {
+        "key": "pipeline.priority",
+        "value": "Prioridad"
+    },
+    {
+        "key": "pipeline.select_priority",
+        "value": "Seleccionar prioridad"
+    },
+    {
+        "key": "pipeline.low",
+        "value": "Baja"
+    },
+    {
+        "key": "pipeline.medium",
+        "value": "Media"
+    },
+    {
+        "key": "pipeline.high",
+        "value": "Alta"
+    },
+    {
+        "key": "pipeline.due_date",
+        "value": "Fecha de Vencimiento"
+    },
+    {
+        "key": "pipeline.pick_date",
+        "value": "Seleccionar fecha"
+    },
+    {
+        "key": "pipeline.assigned_to",
+        "value": "Asignado A"
+    },
+    {
+        "key": "pipeline.assign_to",
+        "value": "Asignar a"
+    },
+    {
+        "key": "pipeline.tags",
+        "value": "Etiquetas"
+    },
+    {
+        "key": "pipeline.add_tags",
+        "value": "Agregar etiquetas"
+    },
+    {
+        "key": "pipeline.press_enter_to_add_tag",
+        "value": "Presiona Enter o haz clic en Agregar para agregar una etiqueta"
+    },
+    {
+        "key": "pipeline.description",
+        "value": "Descripción"
+    },
+    {
+        "key": "pipeline.enter_deal_description",
+        "value": "Ingresar descripción de oportunidad"
+    },
+    {
+        "key": "pipeline.cancel",
+        "value": "Cancelar"
+    },
+    {
+        "key": "pipeline.creating",
+        "value": "Creando..."
+    },
+    {
+        "key": "pipeline.create_deal",
+        "value": "Crear Oportunidad"
+    },
+    {
+        "key": "pipeline.deal_created",
+        "value": "La oportunidad ha sido creada"
+    },
+    {
+        "key": "pipeline.deal_create_failed",
+        "value": "Error al crear oportunidad: {{error}}"
+    },
+    {
+        "key": "pipeline.add_new_contact_title",
+        "value": "Agregar Nuevo Contacto"
+    },
+    {
+        "key": "pipeline.create_new_contact_desc",
+        "value": "Crear un nuevo contacto con la información a continuación."
+    },
+    {
+        "key": "pipeline.upload_contact_photo",
+        "value": "Subir foto de contacto"
+    },
+    {
+        "key": "pipeline.optional_jpg_png",
+        "value": "Opcional - JPG, PNG hasta 5MB"
+    },
+    {
+        "key": "pipeline.choose_photo",
+        "value": "Elegir Foto"
+    },
+    {
+        "key": "pipeline.name_required",
+        "value": "Nombre *"
+    },
+    {
+        "key": "pipeline.enter_contact_name",
+        "value": "Ingresar nombre de contacto"
+    },
+    {
+        "key": "pipeline.email",
+        "value": "Correo Electrónico"
+    },
+    {
+        "key": "pipeline.enter_email_address",
+        "value": "Ingresar dirección de correo electrónico"
+    },
+    {
+        "key": "pipeline.phone",
+        "value": "Teléfono"
+    },
+    {
+        "key": "pipeline.valid_phone_number",
+        "value": "Número de teléfono válido"
+    },
+    {
+        "key": "pipeline.company",
+        "value": "Empresa"
+    },
+    {
+        "key": "pipeline.enter_company_name",
+        "value": "Ingresar nombre de empresa"
+    },
+    {
+        "key": "pipeline.channel",
+        "value": "Canal"
+    },
+    {
+        "key": "pipeline.select_channel",
+        "value": "Seleccionar canal"
+    },
+    {
+        "key": "pipeline.channel_identifier",
+        "value": "Identificador de Canal"
+    },
+    {
+        "key": "pipeline.phone_number_or_id",
+        "value": "Número de teléfono o ID"
+    },
+    {
+        "key": "pipeline.whatsapp_official",
+        "value": "WhatsApp Oficial"
+    },
+    {
+        "key": "pipeline.whatsapp_unofficial",
+        "value": "WhatsApp No Oficial"
+    },
+    {
+        "key": "pipeline.facebook_messenger",
+        "value": "Facebook Messenger"
+    },
+    {
+        "key": "pipeline.instagram",
+        "value": "Instagram"
+    },
+    {
+        "key": "pipeline.type_tags_separated",
+        "value": "Escribir etiquetas separadas por comas..."
+    },
+    {
+        "key": "pipeline.notes",
+        "value": "Notas"
+    },
+    {
+        "key": "pipeline.additional_notes_contact",
+        "value": "Notas adicionales sobre este contacto..."
+    },
+    {
+        "key": "pipeline.contact_created",
+        "value": "Contacto creado"
+    },
+    {
+        "key": "pipeline.contact_created_success",
+        "value": "El contacto ha sido creado exitosamente."
+    },
+    {
+        "key": "pipeline.create_contact",
+        "value": "Crear Contacto"
+    },
+    {
+        "key": "pipeline.creation_failed",
+        "value": "Error en la creación"
+    },
+    {
+        "key": "pipeline.contact_name_required",
+        "value": "El nombre del contacto es requerido"
+    },
+    {
+        "key": "pipeline.file_too_large",
+        "value": "Archivo demasiado grande"
+    },
+    {
+        "key": "pipeline.avatar_must_be_less_than_5mb",
+        "value": "El avatar debe ser menor a 5MB"
+    },
+    {
+        "key": "pipeline.invalid_file_type",
+        "value": "Tipo de archivo inválido"
+    },
+    {
+        "key": "pipeline.please_select_image_file",
+        "value": "Por favor selecciona un archivo de imagen (JPG, PNG)"
+    },
+    {
+        "key": "pipeline.manage_pipelines",
+        "value": "Gestionar Pipelines"
+    },
+    {
+        "key": "pipeline.create_edit_organize",
+        "value": "Crear, editar y organizar tus pipelines"
+    },
+    {
+        "key": "pipeline.create_new",
+        "value": "Crear Nuevo"
+    },
+    {
+        "key": "pipeline.no_pipelines_yet",
+        "value": "Aún no hay pipelines. Crea tu primer pipeline para comenzar."
+    },
+    {
+        "key": "pipeline.set_as_default",
+        "value": "Establecer como predeterminado"
+    },
+    {
+        "key": "pipeline.pipeline_deleted_success",
+        "value": "Pipeline eliminado exitosamente"
+    },
+    {
+        "key": "pipeline.pipeline_delete_failed",
+        "value": "Error al eliminar pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.default_pipeline_updated",
+        "value": "Pipeline predeterminado actualizado"
+    },
+    {
+        "key": "pipeline.default_pipeline_update_failed",
+        "value": "Error al establecer pipeline predeterminado: {{error}}"
+    },
+    {
+        "key": "pipeline.reorder_failed",
+        "value": "Error al reordenar pipelines: {{error}}"
+    },
+    {
+        "key": "pipeline.cannot_delete_default",
+        "value": "No se puede eliminar el pipeline predeterminado. Por favor establece otro pipeline como predeterminado primero."
+    },
+    {
+        "key": "pipeline.delete_pipeline",
+        "value": "Eliminar Pipeline"
+    },
+    {
+        "key": "pipeline.delete_pipeline_confirmation",
+        "value": "¿Estás seguro de que deseas eliminar \"{{name}}\"? Esta acción no se puede deshacer."
+    },
+    {
+        "key": "pipeline.pipeline_has_deals",
+        "value": "Este pipeline tiene {{count}} oportunidad(es). Debes seleccionar una etapa de destino de otro pipeline para moverlas."
+    },
+    {
+        "key": "pipeline.move_deals_to_stage",
+        "value": "Mover oportunidades a etapa *"
+    },
+    {
+        "key": "pipeline.no_other_pipelines_available",
+        "value": "No hay otros pipelines disponibles. No se puede eliminar pipeline con oportunidades."
+    },
+    {
+        "key": "pipeline.select_stage_from_another_pipeline",
+        "value": "Seleccionar una etapa de otro pipeline"
+    },
+    {
+        "key": "pipeline.pipeline_stage_name",
+        "value": "{{pipelineName}} - {{stageName}}"
+    },
+    {
+        "key": "pipeline.please_select_target_stage",
+        "value": "Por favor selecciona una etapa de destino para mover las oportunidades antes de eliminar este pipeline."
+    },
+    {
+        "key": "pipeline.cannot_delete_with_deals",
+        "value": "No se puede eliminar pipeline con oportunidades. No hay otros pipelines disponibles para mover las oportunidades."
+    },
+    {
+        "key": "pipeline.deleting",
+        "value": "Eliminando..."
+    },
+    {
+        "key": "pipeline.delete",
+        "value": "Eliminar"
+    },
+    {
+        "key": "pipeline.close",
+        "value": "Cerrar"
+    },
+    {
+        "key": "pipeline.selected",
+        "value": "seleccionadas"
+    },
+    {
+        "key": "pipeline.move",
+        "value": "Mover"
+    },
+    {
+        "key": "pipeline.assign",
+        "value": "Asignar"
+    },
+    {
+        "key": "pipeline.move_to_pipeline",
+        "value": "Mover a Pipeline"
+    },
+    {
+        "key": "pipeline.delete_selected",
+        "value": "Eliminar Seleccionadas"
+    },
+    {
+        "key": "pipeline.move_deals",
+        "value": "Mover {{count}} Oportunidades"
+    },
+    {
+        "key": "pipeline.select_stage_to_move",
+        "value": "Selecciona la etapa a la que mover las oportunidades seleccionadas."
+    },
+    {
+        "key": "pipeline.target_stage",
+        "value": "Etapa de Destino"
+    },
+    {
+        "key": "pipeline.moving",
+        "value": "Moviendo..."
+    },
+    {
+        "key": "pipeline.move_deals_action",
+        "value": "Mover Oportunidades"
+    },
+    {
+        "key": "pipeline.delete_deals",
+        "value": "Eliminar {{count}} Oportunidades"
+    },
+    {
+        "key": "pipeline.delete_deals_confirmation",
+        "value": "¿Estás seguro de que deseas eliminar estas oportunidades? Esta acción no se puede deshacer."
+    },
+    {
+        "key": "pipeline.delete_deals_action",
+        "value": "Eliminar Oportunidades"
+    },
+    {
+        "key": "pipeline.assign_deals",
+        "value": "Asignar {{count}} Oportunidades"
+    },
+    {
+        "key": "pipeline.select_user_to_assign",
+        "value": "Selecciona un usuario para asignar las oportunidades seleccionadas."
+    },
+    {
+        "key": "pipeline.assignee",
+        "value": "Asignado A"
+    },
+    {
+        "key": "pipeline.select_user",
+        "value": "Seleccionar un usuario"
+    },
+    {
+        "key": "pipeline.assigning",
+        "value": "Asignando..."
+    },
+    {
+        "key": "pipeline.assign_deals_action",
+        "value": "Asignar Oportunidades"
+    },
+    {
+        "key": "pipeline.move_deals_to_another_pipeline",
+        "value": "Mover {{count}} Oportunidades a Otro Pipeline"
+    },
+    {
+        "key": "pipeline.select_target_pipeline_stage",
+        "value": "Selecciona el pipeline y etapa de destino para las oportunidades seleccionadas."
+    },
+    {
+        "key": "pipeline.target_pipeline",
+        "value": "Pipeline de Destino"
+    },
+    {
+        "key": "pipeline.select_pipeline_first",
+        "value": "Seleccionar pipeline primero"
+    },
+    {
+        "key": "pipeline.deals_moved_success",
+        "value": "{{count}} oportunidades movidas exitosamente"
+    },
+    {
+        "key": "pipeline.deals_move_failed",
+        "value": "Error al mover oportunidades: {{error}}"
+    },
+    {
+        "key": "pipeline.deals_deleted_success",
+        "value": "{{count}} oportunidades eliminadas exitosamente"
+    },
+    {
+        "key": "pipeline.deals_deleted_partial",
+        "value": "{{deletedCount}} oportunidades eliminadas exitosamente, {{failedCount}} fallaron (ya eliminadas o no encontradas)"
+    },
+    {
+        "key": "pipeline.deals_delete_failed",
+        "value": "Error al eliminar oportunidades: {{error}}"
+    },
+    {
+        "key": "pipeline.deals_assigned_success",
+        "value": "{{count}} oportunidades asignadas exitosamente"
+    },
+    {
+        "key": "pipeline.deals_assign_failed",
+        "value": "Error al asignar oportunidades: {{error}}"
+    },
+    {
+        "key": "pipeline.partial_success",
+        "value": "Completado Parcialmente"
+    },
+    {
+        "key": "pipeline.deals_moved_to_new_pipeline",
+        "value": "{{movedCount}} oportunidades movidas a nuevo pipeline exitosamente"
+    },
+    {
+        "key": "pipeline.deals_moved_partial",
+        "value": "{{movedCount}} oportunidades movidas exitosamente, {{failedCount}} fallaron"
+    },
+    {
+        "key": "pipeline.quick_edit",
+        "value": "Edición Rápida"
+    },
+    {
+        "key": "pipeline.view_details",
+        "value": "Ver Detalles"
+    },
+    {
+        "key": "pipeline.more_actions",
+        "value": "Más Acciones"
+    },
+    {
+        "key": "pipeline.view_contact",
+        "value": "Ver Contacto"
+    },
+    {
+        "key": "pipeline.open_chat",
+        "value": "Abrir Chat"
+    },
+    {
+        "key": "pipeline.move_to_pipeline_action",
+        "value": "Mover a Pipeline"
+    },
+    {
+        "key": "pipeline.delete_deal",
+        "value": "Eliminar Oportunidad"
+    },
+    {
+        "key": "pipeline.are_you_sure",
+        "value": "¿Estás seguro?"
+    },
+    {
+        "key": "pipeline.remove_deal_confirmation",
+        "value": "Esto eliminará la oportunidad \"{{title}}\" de tu pipeline. Esta acción no se puede deshacer."
+    },
+    {
+        "key": "pipeline.priority_priority",
+        "value": "prioridad {{priority}}"
+    },
+    {
+        "key": "pipeline.assigned_to_user",
+        "value": "Asignado a: {{name}}"
+    },
+    {
+        "key": "pipeline.due",
+        "value": "Vencimiento: {{date}}"
+    },
+    {
+        "key": "pipeline.last_activity",
+        "value": "Última actividad: {{date}}"
+    },
+    {
+        "key": "pipeline.open_conversation",
+        "value": "Abrir conversación con {{name}}"
+    },
+    {
+        "key": "pipeline.redirecting_to_inbox",
+        "value": "Redirigiendo al buzón"
+    },
+    {
+        "key": "pipeline.opening_conversation",
+        "value": "Abriendo conversación con {{name}}"
+    },
+    {
+        "key": "pipeline.revert_scheduled",
+        "value": "Revertir {{time}}"
+    },
+    {
+        "key": "pipeline.reverts",
+        "value": "{{count}} reversiones"
+    },
+    {
+        "key": "pipeline.scheduled_stage_reverts",
+        "value": "{{count}} reversiones de etapa programadas"
+    },
+    {
+        "key": "pipeline.scheduled_to_revert",
+        "value": "Programado para revertir a la etapa \"{{stageName}}\""
+    },
+    {
+        "key": "pipeline.if_no_activity",
+        "value": " (si no hay actividad)"
+    },
+    {
+        "key": "pipeline.welcome_to_pipeline",
+        "value": "¡Bienvenido a tu Pipeline!"
+    },
+    {
+        "key": "pipeline.get_started_message",
+        "value": "Comienza creando tu primera etapa del pipeline, luego agrega oportunidades para rastrear tus oportunidades de ventas."
+    },
+    {
+        "key": "pipeline.create_first_stage_button",
+        "value": "Crear Primera Etapa"
+    },
+    {
+        "key": "pipeline.add_deal_button",
+        "value": "Agregar Oportunidad"
+    },
+    {
+        "key": "pipeline.no_deals_found",
+        "value": "No se encontraron oportunidades"
+    },
+    {
+        "key": "pipeline.try_adjusting_filters",
+        "value": "Intenta ajustar tus criterios de búsqueda o filtros para encontrar lo que buscas."
+    },
+    {
+        "key": "pipeline.clear_filters",
+        "value": "Limpiar Filtros"
+    },
+    {
+        "key": "pipeline.no_deals_yet",
+        "value": "Aún no hay oportunidades"
+    },
+    {
+        "key": "pipeline.start_building_message",
+        "value": "Comienza a construir tu pipeline agregando tu primera oportunidad."
+    },
+    {
+        "key": "pipeline.add_first_deal",
+        "value": "Agregar Tu Primera Oportunidad"
+    },
+    {
+        "key": "pipeline.no_deals_in_stage",
+        "value": "No hay oportunidades en {{stageName}}"
+    },
+    {
+        "key": "pipeline.export_deals",
+        "value": "Exportar Oportunidades"
+    },
+    {
+        "key": "pipeline.import_deals",
+        "value": "Importar Oportunidades"
+    },
+    {
+        "key": "pipeline.import_export_deals",
+        "value": "Importar / Exportar Oportunidades"
+    },
+    {
+        "key": "pipeline.download_deals_data",
+        "value": "Descarga los datos de tus oportunidades en formato CSV, Excel o JSON"
+    },
+    {
+        "key": "pipeline.upload_file_to_import",
+        "value": "Sube un archivo CSV, Excel o JSON para importar oportunidades"
+    },
+    {
+        "key": "pipeline.choose_import_export",
+        "value": "Elige si deseas importar o exportar datos de oportunidades"
+    },
+    {
+        "key": "pipeline.exporting_from_stage",
+        "value": "Exportando oportunidades solo de la etapa filtrada actual."
+    },
+    {
+        "key": "pipeline.exporting_all_deals",
+        "value": "Exportando todas las oportunidades de tu pipeline."
+    },
+    {
+        "key": "pipeline.export_as_csv",
+        "value": "Exportar como CSV"
+    },
+    {
+        "key": "pipeline.export_as_excel",
+        "value": "Exportar como Excel"
+    },
+    {
+        "key": "pipeline.export_as_json",
+        "value": "Exportar como JSON"
+    },
+    {
+        "key": "pipeline.export_success",
+        "value": "Oportunidades exportadas exitosamente"
+    },
+    {
+        "key": "pipeline.export_failed",
+        "value": "Error al exportar oportunidades: {{error}}"
+    },
+    {
+        "key": "pipeline.download_template",
+        "value": "Descargar Plantilla"
+    },
+    {
+        "key": "pipeline.csv_template",
+        "value": "Plantilla CSV"
+    },
+    {
+        "key": "pipeline.json_template",
+        "value": "Plantilla JSON"
+    },
+    {
+        "key": "pipeline.upload_file_description",
+        "value": "Sube un archivo CSV, Excel o JSON con datos de oportunidades. Asegúrate de que tu archivo incluya los campos requeridos."
+    },
+    {
+        "key": "pipeline.click_to_upload",
+        "value": "Haz clic para subir o arrastra y suelta tu archivo aquí"
+    },
+    {
+        "key": "pipeline.supports_file_formats",
+        "value": "Soporta archivos CSV, Excel y JSON (máx. 10MB)"
+    },
+    {
+        "key": "pipeline.processing_file",
+        "value": "Procesando archivo..."
+    },
+    {
+        "key": "pipeline.imported",
+        "value": "Importadas"
+    },
+    {
+        "key": "pipeline.failed",
+        "value": "Fallidas"
+    },
+    {
+        "key": "pipeline.import_errors",
+        "value": "Errores de Importación:"
+    },
+    {
+        "key": "pipeline.row",
+        "value": "Fila {{row}}:"
+    },
+    {
+        "key": "pipeline.more_errors",
+        "value": "+{{count}} errores más"
+    },
+    {
+        "key": "pipeline.import_success",
+        "value": "{{count}} oportunidades importadas exitosamente"
+    },
+    {
+        "key": "pipeline.import_partial",
+        "value": "{{count}} oportunidades fallaron al importar"
+    },
+    {
+        "key": "pipeline.import_failed",
+        "value": "Error al importar oportunidades: {{error}}"
+    },
+    {
+        "key": "pipeline.invalid_file_type",
+        "value": "Por favor sube un archivo CSV, Excel o JSON"
+    },
+    {
+        "key": "pipeline.back",
+        "value": "Atrás"
+    },
+    {
+        "key": "pipeline.done",
+        "value": "Hecho"
+    },
+    {
+        "key": "pipeline.create_new_pipeline",
+        "value": "Crear Nuevo Pipeline"
+    },
+    {
+        "key": "pipeline.choose_creation_method",
+        "value": "Elige cómo deseas crear tu pipeline"
+    },
+    {
+        "key": "pipeline.configure_pipeline_details",
+        "value": "Configura los detalles de tu pipeline"
+    },
+    {
+        "key": "pipeline.from_template",
+        "value": "Desde Plantilla"
+    },
+    {
+        "key": "pipeline.start_with_template",
+        "value": "Comienza con una plantilla preconfigurada"
+    },
+    {
+        "key": "pipeline.from_scratch",
+        "value": "Desde Cero"
+    },
+    {
+        "key": "pipeline.create_custom_pipeline",
+        "value": "Crear un pipeline personalizado"
+    },
+    {
+        "key": "pipeline.pipeline_name",
+        "value": "Nombre del Pipeline *"
+    },
+    {
+        "key": "pipeline.pipeline_name_placeholder",
+        "value": "ej., Pipeline de Ventas"
+    },
+    {
+        "key": "pipeline.pipeline_description",
+        "value": "Descripción"
+    },
+    {
+        "key": "pipeline.describe_pipeline",
+        "value": "Describe para qué es este pipeline..."
+    },
+    {
+        "key": "pipeline.icon",
+        "value": "Icono"
+    },
+    {
+        "key": "pipeline.icon_placeholder",
+        "value": "ej., TrendingUp, Users"
+    },
+    {
+        "key": "pipeline.color",
+        "value": "Color"
+    },
+    {
+        "key": "pipeline.template_preview",
+        "value": "Vista Previa de Plantilla"
+    },
+    {
+        "key": "pipeline.pipeline_created_success",
+        "value": "Pipeline creado exitosamente"
+    },
+    {
+        "key": "pipeline.pipeline_create_failed",
+        "value": "Error al crear pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.pipeline_name_required",
+        "value": "El nombre del pipeline es requerido"
+    },
+    {
+        "key": "pipeline.creating_pipeline",
+        "value": "Creando..."
+    },
+    {
+        "key": "pipeline.create_pipeline",
+        "value": "Crear Pipeline"
+    },
+    {
+        "key": "pipeline.edit_pipeline",
+        "value": "Editar Pipeline"
+    },
+    {
+        "key": "pipeline.update_pipeline_details",
+        "value": "Actualizar detalles y configuración del pipeline"
+    },
+    {
+        "key": "pipeline.pipeline_statistics",
+        "value": "Estadísticas del Pipeline"
+    },
+    {
+        "key": "pipeline.stages_count",
+        "value": "{{count}} etapas"
+    },
+    {
+        "key": "pipeline.deals_count",
+        "value": "{{count}} oportunidades"
+    },
+    {
+        "key": "pipeline.this_is_default",
+        "value": "Este es el pipeline predeterminado"
+    },
+    {
+        "key": "pipeline.duplicate_pipeline",
+        "value": "Duplicar Pipeline"
+    },
+    {
+        "key": "pipeline.enter_name_for_duplicate",
+        "value": "Ingresa un nombre para el pipeline duplicado"
+    },
+    {
+        "key": "pipeline.pipeline_name_copy",
+        "value": "ej., Pipeline de Ventas Copia"
+    },
+    {
+        "key": "pipeline.pipeline_updated_success",
+        "value": "Pipeline actualizado exitosamente"
+    },
+    {
+        "key": "pipeline.pipeline_update_failed",
+        "value": "Error al actualizar pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.pipeline_duplicated_success",
+        "value": "Pipeline duplicado exitosamente"
+    },
+    {
+        "key": "pipeline.pipeline_duplicate_failed",
+        "value": "Error al duplicar pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.updating",
+        "value": "Actualizando..."
+    },
+    {
+        "key": "pipeline.update_pipeline",
+        "value": "Actualizar Pipeline"
+    },
+    {
+        "key": "pipeline.duplicating",
+        "value": "Duplicando..."
+    },
+    {
+        "key": "pipeline.duplicate",
+        "value": "Duplicar"
+    },
+    {
+        "key": "pipeline.filter_deals",
+        "value": "Filtrar Oportunidades"
+    },
+    {
+        "key": "pipeline.pipeline_stage",
+        "value": "Pipeline y Etapa"
+    },
+    {
+        "key": "pipeline.deal_properties",
+        "value": "Propiedades de Oportunidad"
+    },
+    {
+        "key": "pipeline.dates",
+        "value": "Fechas"
+    },
+    {
+        "key": "pipeline.assignment_tags",
+        "value": "Asignación y Etiquetas"
+    },
+    {
+        "key": "pipeline.custom_fields",
+        "value": "Campos Personalizados"
+    },
+    {
+        "key": "pipeline.all_pipelines",
+        "value": "Todos los pipelines"
+    },
+    {
+        "key": "pipeline.all_stages",
+        "value": "Todas las etapas"
+    },
+    {
+        "key": "pipeline.all_priorities",
+        "value": "Todas las prioridades"
+    },
+    {
+        "key": "pipeline.status",
+        "value": "Estado"
+    },
+    {
+        "key": "pipeline.all_statuses",
+        "value": "Todos los estados"
+    },
+    {
+        "key": "pipeline.active",
+        "value": "Activo"
+    },
+    {
+        "key": "pipeline.won",
+        "value": "Ganado"
+    },
+    {
+        "key": "pipeline.lost",
+        "value": "Perdido"
+    },
+    {
+        "key": "pipeline.due_date_filter",
+        "value": "Fecha de Vencimiento"
+    },
+    {
+        "key": "pipeline.created_date",
+        "value": "Fecha de Creación"
+    },
+    {
+        "key": "pipeline.assigned_users",
+        "value": "Usuarios Asignados"
+    },
+    {
+        "key": "pipeline.all_users",
+        "value": "Todos los usuarios"
+    },
+    {
+        "key": "pipeline.include_unassigned_deals",
+        "value": "Incluir oportunidades sin asignar"
+    },
+    {
+        "key": "pipeline.all_tags",
+        "value": "Todas las etiquetas"
+    },
+    {
+        "key": "pipeline.clear_all_filters",
+        "value": "Limpiar Todos los Filtros"
+    },
+    {
+        "key": "pipeline.apply_filters",
+        "value": "Aplicar Filtros"
+    },
+    {
+        "key": "pipeline.operator",
+        "value": "Operador"
+    },
+    {
+        "key": "pipeline.equals",
+        "value": "Igual a"
+    },
+    {
+        "key": "pipeline.contains",
+        "value": "Contiene"
+    },
+    {
+        "key": "pipeline.greater_than",
+        "value": "Mayor que"
+    },
+    {
+        "key": "pipeline.less_than",
+        "value": "Menor que"
+    },
+    {
+        "key": "pipeline.enter_value",
+        "value": "Ingresar valor..."
+    },
+    {
+        "key": "pipeline.no_filter_applied",
+        "value": "No se aplicó ningún filtro"
+    },
+    {
+        "key": "pipeline.move_deal_to_another_pipeline",
+        "value": "Mover Oportunidad a Otro Pipeline"
+    },
+    {
+        "key": "pipeline.select_target_pipeline_stage_deal",
+        "value": "Selecciona el pipeline y etapa de destino para esta oportunidad."
+    },
+    {
+        "key": "pipeline.current_pipeline",
+        "value": "Pipeline Actual"
+    },
+    {
+        "key": "pipeline.deal_moved_success",
+        "value": "Oportunidad movida a nuevo pipeline exitosamente"
+    },
+    {
+        "key": "pipeline.deal_move_failed",
+        "value": "Error al mover oportunidad: {{error}}"
+    },
+    {
+        "key": "pipeline.move_deal",
+        "value": "Mover Oportunidad"
+    },
+    {
+        "key": "pipeline.edit_deal",
+        "value": "Editar Oportunidad"
+    },
+    {
+        "key": "pipeline.deal_in",
+        "value": "Oportunidad en"
+    },
+    {
+        "key": "pipeline.update_deal_information",
+        "value": "Actualizar la información de la oportunidad"
+    },
+    {
+        "key": "pipeline.pipeline_stage_label",
+        "value": "Etapa del Pipeline"
+    },
+    {
+        "key": "pipeline.deal_value_dollar",
+        "value": "Valor de la Oportunidad ($)"
+    },
+    {
+        "key": "pipeline.select_assignee",
+        "value": "Seleccionar asignado"
+    },
+    {
+        "key": "pipeline.enter_deal_description_placeholder",
+        "value": "Ingresar descripción de oportunidad..."
+    },
+    {
+        "key": "pipeline.add_tag_placeholder",
+        "value": "Agregar una etiqueta..."
+    },
+    {
+        "key": "pipeline.deal_updated",
+        "value": "La oportunidad ha sido actualizada"
+    },
+    {
+        "key": "pipeline.deal_update_failed_edit",
+        "value": "Error al actualizar oportunidad: {{error}}"
+    },
+    {
+        "key": "pipeline.updating_deal",
+        "value": "Actualizando..."
+    },
+    {
+        "key": "pipeline.update_deal",
+        "value": "Actualizar Oportunidad"
+    },
+    {
+        "key": "pipeline.contact_information",
+        "value": "Información de Contacto"
+    },
+    {
+        "key": "pipeline.deal_information",
+        "value": "Información de Oportunidad"
+    },
+    {
+        "key": "pipeline.pipeline_stage_info",
+        "value": "Etapa del Pipeline"
+    },
+    {
+        "key": "pipeline.last_activity_info",
+        "value": "Última Actividad"
+    },
+    {
+        "key": "pipeline.recent_activities",
+        "value": "Actividades Recientes"
+    },
+    {
+        "key": "pipeline.automated",
+        "value": "Automatizado"
+    },
+    {
+        "key": "pipeline.via_rule",
+        "value": "vía regla \"{{ruleName}}\""
+    },
+    {
+        "key": "pipeline.pipeline_movement_history",
+        "value": "Historial de Movimientos del Pipeline"
+    },
+    {
+        "key": "pipeline.scheduled_stage_reverts_title",
+        "value": "Reversiones de Etapa Programadas"
+    },
+    {
+        "key": "pipeline.scheduled_to_revert_to",
+        "value": "Programado para revertir a \"{{stageName}}\""
+    },
+    {
+        "key": "pipeline.only_if_no_activity",
+        "value": "Solo si no hay actividad"
+    },
+    {
+        "key": "pipeline.cancel_scheduled_revert",
+        "value": "¿Estás seguro de que deseas cancelar esta reversión programada?"
+    },
+    {
+        "key": "pipeline.revert_cancelled_success",
+        "value": "Reversión programada cancelada exitosamente"
+    },
+    {
+        "key": "pipeline.revert_cancel_failed",
+        "value": "Error al cancelar reversión programada"
+    },
+    {
+        "key": "pipeline.created",
+        "value": "Creado"
+    },
+    {
+        "key": "pipeline.last_updated",
+        "value": "Última Actualización"
+    },
+    {
+        "key": "pipeline.contact_details",
+        "value": "Detalles del Contacto"
+    },
+    {
+        "key": "pipeline.view_deals",
+        "value": "Ver Oportunidades"
+    },
+    {
+        "key": "pipeline.identifier",
+        "value": "Identificador"
+    },
+    {
+        "key": "pipeline.not_provided",
+        "value": "No proporcionado"
+    },
+    {
+        "key": "pipeline.identifier_type",
+        "value": "Tipo de Identificador"
+    },
+    {
+        "key": "pipeline.not_specified",
+        "value": "No especificado"
+    },
+    {
+        "key": "pipeline.first_contacted",
+        "value": "Primer Contacto"
+    },
+    {
+        "key": "pipeline.unknown",
+        "value": "Desconocido"
+    },
+    {
+        "key": "pipeline.last_activity_contact",
+        "value": "Última Actividad"
+    },
+    {
+        "key": "pipeline.no_recent_activity",
+        "value": "Sin actividad reciente"
+    },
+    {
+        "key": "pipeline.recent_conversations",
+        "value": "Conversaciones Recientes ({{count}})"
+    },
+    {
+        "key": "pipeline.last_message",
+        "value": "Último mensaje: {{time}}"
+    },
+    {
+        "key": "pipeline.associated_deals",
+        "value": "Oportunidades Asociadas ({{count}})"
+    },
+    {
+        "key": "pipeline.min",
+        "value": "Mín"
+    },
+    {
+        "key": "pipeline.max",
+        "value": "Máx"
+    },
+    {
+        "key": "pipeline.no_limit",
+        "value": "Sin límite"
+    },
+    {
+        "key": "pipeline.min_greater_than_max",
+        "value": "El valor mínimo no puede ser mayor que el máximo"
+    },
+    {
+        "key": "pipeline.select_options",
+        "value": "Seleccionar opciones..."
+    },
+    {
+        "key": "pipeline.search",
+        "value": "Buscar..."
+    },
+    {
+        "key": "pipeline.select_all",
+        "value": "Seleccionar Todo"
+    },
+    {
+        "key": "pipeline.deselect_all",
+        "value": "Deseleccionar Todo"
+    },
+    {
+        "key": "pipeline.no_options_found",
+        "value": "No se encontraron opciones"
+    },
+    {
+        "key": "pipeline.select_date_range",
+        "value": "Seleccionar rango de fechas..."
+    },
+    {
+        "key": "pipeline.quick_presets",
+        "value": "Ajustes Rápidos"
+    },
+    {
+        "key": "pipeline.overdue_preset",
+        "value": "Vencidas"
+    },
+    {
+        "key": "pipeline.due_today",
+        "value": "Vence Hoy"
+    },
+    {
+        "key": "pipeline.due_this_week",
+        "value": "Vence Esta Semana"
+    },
+    {
+        "key": "pipeline.due_this_month",
+        "value": "Vence Este Mes"
+    },
+    {
+        "key": "pipeline.due_today_preset",
+        "value": "Vence Hoy"
+    },
+    {
+        "key": "pipeline.due_this_week_preset",
+        "value": "Vence Esta Semana"
+    },
+    {
+        "key": "pipeline.due_this_month_preset",
+        "value": "Vence Este Mes"
+    },
+    {
+        "key": "pipeline.pipelines",
+        "value": "Pipelines"
+    },
+    {
+        "key": "pipeline.stages",
+        "value": "Etapas"
+    },
+    {
+        "key": "pipeline.validation.title_min",
+        "value": "El título debe tener al menos 2 caracteres"
+    },
+    {
+        "key": "pipeline.validation.stage_required",
+        "value": "Por favor seleccione una etapa del pipeline"
+    },
+    {
+        "key": "pipeline.validation.contact_required",
+        "value": "Por favor seleccione un contacto"
+    },
+    {
+        "key": "pipeline.value_range_summary",
+        "value": "Rango de valor"
+    },
+    {
+        "key": "pipeline.set_date_range",
+        "value": "Establecer rango de fechas a {{label}}"
     },
     {
         "key": "calendar.event_created",
@@ -2938,6 +4782,10 @@
     {
         "key": "campaigns.filter.draft",
         "value": "Borrador"
+    },
+    {
+        "key": "campaigns.filter.scheduled",
+        "value": "Programado"
     },
     {
         "key": "campaigns.filter.running",
@@ -5024,6 +6872,38 @@
         "value": "Error al crear segmento"
     },
     {
+        "key": "segments.add_to_existing.title",
+        "value": "Agregar a Segmento Existente"
+    },
+    {
+        "key": "segments.add_to_existing.button",
+        "value": "Agregar al Segmento"
+    },
+    {
+        "key": "segments.add_to_existing.select_label",
+        "value": "Seleccionar Segmento"
+    },
+    {
+        "key": "segments.add_to_existing.select_placeholder",
+        "value": "Elige un segmento..."
+    },
+    {
+        "key": "segments.add_to_existing.selected_count",
+        "value": "{{count}} contacto(s) seleccionado(s)"
+    },
+    {
+        "key": "segments.add_to_existing.no_segments",
+        "value": "No hay segmentos manuales disponibles. Crea un segmento primero."
+    },
+    {
+        "key": "segments.add_to_existing.success",
+        "value": "Se agregaron {{count}} contacto(s) al segmento \"{{name}}\""
+    },
+    {
+        "key": "segments.add_to_existing.error",
+        "value": "Error al agregar contactos al segmento"
+    },
+    {
         "key": "segments.edit.title",
         "value": "Editar Segmento de Contactos"
     },
@@ -5234,6 +7114,38 @@
     {
         "key": "segments.edit.restore_contact_tooltip",
         "value": "Restaurar contacto"
+    },
+    {
+        "key": "segments.add_to_existing.title",
+        "value": "Agregar Contactos a Segmento Existente"
+    },
+    {
+        "key": "segments.add_to_existing.select_label",
+        "value": "Seleccionar Segmento"
+    },
+    {
+        "key": "segments.add_to_existing.select_placeholder",
+        "value": "Elegir un segmento..."
+    },
+    {
+        "key": "segments.add_to_existing.no_segments",
+        "value": "No hay segmentos manuales disponibles. Crea uno primero."
+    },
+    {
+        "key": "segments.add_to_existing.selected_count",
+        "value": "{{count}} contactos serán agregados"
+    },
+    {
+        "key": "segments.add_to_existing.success",
+        "value": "Se agregaron {{count}} contactos exitosamente al segmento \"{{name}}\""
+    },
+    {
+        "key": "segments.add_to_existing.error",
+        "value": "Error al agregar contactos al segmento"
+    },
+    {
+        "key": "segments.add_to_existing.button",
+        "value": "Agregar a Segmento"
     },
     {
         "key": "templates.create.title",
@@ -6908,6 +8820,22 @@
         "value": "Introduce un mensaje de muestra para ver cómo se dividirá y programará..."
     },
     {
+        "key": "settings.whatsapp.enable_history_sync",
+        "value": "Sincronizar historial de mensajes existente"
+    },
+    {
+        "key": "settings.whatsapp.history_sync_tooltip",
+        "value": "Importar hasta 6 meses de historial de chat desde tu aplicación de WhatsApp Business. La sincronización puede tardar de 4 a 6 horas dependiendo del volumen de mensajes."
+    },
+    {
+        "key": "settings.whatsapp.history_sync_in_progress",
+        "value": "Sincronizando Fase {phase}/3: {progress}% completado"
+    },
+    {
+        "key": "settings.whatsapp.history_sync_phase_complete",
+        "value": "Fase {phase} de sincronización de historial completada"
+    },
+    {
         "key": "common.success",
         "value": "Éxito"
     },
@@ -7110,130 +9038,6 @@
     {
         "key": "subdomain.admin_contact_help",
         "value": "Si eres administrador de la empresa, por favor contacta a soporte para reactivar tu cuenta."
-    },
-    {
-        "key": "whatsapp_360dialog.validation_error",
-        "value": "Error de Validación"
-    },
-    {
-        "key": "whatsapp_360dialog.api_key_required",
-        "value": "Se requieren la Clave API y el Número de Teléfono para la validación."
-    },
-    {
-        "key": "whatsapp_360dialog.credentials_valid",
-        "value": "Credenciales Válidas"
-    },
-    {
-        "key": "whatsapp_360dialog.validation_success",
-        "value": "Clave API de 360Dialog validada correctamente para el número de teléfono: {{phoneNumber}}"
-    },
-    {
-        "key": "whatsapp_360dialog.invalid_credentials",
-        "value": "Credenciales inválidas"
-    },
-    {
-        "key": "whatsapp_360dialog.validation_failed",
-        "value": "Fallo en la Validación"
-    },
-    {
-        "key": "whatsapp_360dialog.validation_failed_desc",
-        "value": "Fallo al validar las credenciales de 360Dialog."
-    },
-    {
-        "key": "whatsapp_360dialog.success",
-        "value": "Éxito"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_created",
-        "value": "¡Conexión de WhatsApp 360Dialog creada exitosamente!"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_failed",
-        "value": "Fallo al crear conexión"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_error",
-        "value": "Error de Conexión"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_error_desc",
-        "value": "Fallo al conectarse a WhatsApp 360Dialog"
-    },
-    {
-        "key": "whatsapp_360dialog.connect_title",
-        "value": "Conectar WhatsApp 360Dialog"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_name",
-        "value": "Nombre de la Conexión"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_name_placeholder",
-        "value": "Mi WhatsApp 360Dialog"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_name_help",
-        "value": "Un nombre amigable para esta conexión"
-    },
-    {
-        "key": "whatsapp_360dialog.api_key",
-        "value": "Clave API"
-    },
-    {
-        "key": "whatsapp_360dialog.api_key_placeholder",
-        "value": "Tu clave API de 360Dialog..."
-    },
-    {
-        "key": "whatsapp_360dialog.api_key_help",
-        "value": "Tu clave API de 360Dialog desde el panel del Hub"
-    },
-    {
-        "key": "whatsapp_360dialog.phone_number",
-        "value": "Número de Teléfono de WhatsApp"
-    },
-    {
-        "key": "whatsapp_360dialog.phone_number_placeholder",
-        "value": "+1234567890"
-    },
-    {
-        "key": "whatsapp_360dialog.phone_number_help",
-        "value": "Tu número de teléfono de WhatsApp Business registrado con 360Dialog"
-    },
-    {
-        "key": "whatsapp_360dialog.setup_title",
-        "value": "Configuración de WhatsApp 360Dialog"
-    },
-    {
-        "key": "whatsapp_360dialog.setup_steps",
-        "value": "1. Crea una cuenta de 360Dialog y obtén la aprobación de WhatsApp Business\n2. Genera una clave API en el Hub de 360Dialog\n3. Configura la URL del webhook en tu configuración de 360Dialog\n4. Prueba la conexión para asegurarte de que todo funciona"
-    },
-    {
-        "key": "whatsapp_360dialog.validating",
-        "value": "Validando..."
-    },
-    {
-        "key": "whatsapp_360dialog.test",
-        "value": "Probar"
-    },
-    {
-        "key": "whatsapp_360dialog.webhook_url",
-        "value": "URL de Webhook"
-    },
-    {
-        "key": "whatsapp_360dialog.webhook_url_placeholder",
-        "value": "https://tudominio.com/api/webhooks/360dialog-whatsapp"
-    },
-    {
-        "key": "whatsapp_360dialog.webhook_url_help",
-        "value": "URL donde 360Dialog enviará notificaciones de webhook"
-    },
-    {
-        "key": "whatsapp_360dialog.connecting",
-        "value": "Conectando..."
-    },
-    {
-        "key": "whatsapp_360dialog.connect",
-        "value": "Conectar"
     },
     {
         "key": "admin.languages.create_failed",
@@ -7775,7 +9579,6 @@
         "key": "flow_builder.typebot_node.mappings_label",
         "value": "mapeos"
     },
-    
     {
         "key": "flow_builder.typebot_node.api_connected",
         "value": "API Conectada"
@@ -8013,6 +9816,10 @@
         "value": "Chat PDF IA"
     },
     {
+        "key": "flow_builder.node_types.call_agent",
+        "value": "Agente de Llamadas"
+    },
+    {
         "key": "flow_builder.sections.triggers",
         "value": "Disparadores"
     },
@@ -8128,7 +9935,6 @@
         "key": "flow_builder.singleton_errors.flowise_exists",
         "value": "Solo se permite un nodo Flowise por flujo"
     },
-
     {
         "key": "campaigns.dashboard_description",
         "value": "Gestiona y supervisa tus campañas de mensajería masiva"
@@ -10338,14 +12144,6 @@
         "value": "WhatsApp (Oficial)"
     },
     {
-        "key": "flow_builder.trigger_channel_whatsapp_twilio",
-        "value": "WhatsApp (Twilio)"
-    },
-    {
-        "key": "flow_builder.trigger_channel_whatsapp_360dialog",
-        "value": "WhatsApp (360Dialog)"
-    },
-    {
         "key": "flow_builder.trigger_channel_messenger",
         "value": "Facebook Messenger"
     },
@@ -11770,6 +13568,178 @@
         "value": "Semana del"
     },
     {
+        "key": "calendar.bot_available_slots_for",
+        "value": "Franjas horarias disponibles para {{date}}:"
+    },
+    {
+        "key": "calendar.bot_no_available_slots",
+        "value": "No se encontraron franjas horarias disponibles para {{date}}."
+    },
+    {
+        "key": "calendar.bot_slot_no_longer_available",
+        "value": "Lo siento, pero la franja horaria {{time}} ya no está disponible (puede haber sido reservada por otro usuario o entra en conflicto con una cita existente). Aquí están las franjas horarias disponibles actuales para {{date}}:"
+    },
+    {
+        "key": "calendar.bot_select_time_from_options",
+        "value": "Por favor, seleccione una hora de las opciones anteriores."
+    },
+    {
+        "key": "calendar.bot_slots_duration_note",
+        "value": "Las franjas mostradas tienen en cuenta la duración de su cita de {{duration}} minutos{{bufferNote}}."
+    },
+    {
+        "key": "calendar.bot_buffer_note",
+        "value": " y {{buffer}} minutos de tiempo de espera"
+    },
+    {
+        "key": "calendar.bot_buffer_warning",
+        "value": "Nota: Cada cita requiere un tiempo de espera de {{buffer}} minutos antes y después."
+    },
+    {
+        "key": "calendar.bot_appointment_scheduled",
+        "value": "¡Perfecto! He programado su cita y la franja horaria ha sido reservada."
+    },
+    {
+        "key": "calendar.bot_appointment_details",
+        "value": "{{summary}}\n{{date}}\nDuración: {{duration}} minutos\nUbicación: {{location}}"
+    },
+    {
+        "key": "calendar.bot_event_link",
+        "value": "Enlace del evento: {{link}}"
+    },
+    {
+        "key": "calendar.bot_calendar_invitation",
+        "value": "Recibirá una invitación de calendario en breve."
+    },
+    {
+        "key": "calendar.bot_date_required",
+        "value": "Se requiere la fecha al reservar. Por favor, proporcione la fecha junto con la hora (por ejemplo, \"2025-11-28 16:00\" o use el formato ISO \"2025-11-28T16:00:00\")."
+    },
+    {
+        "key": "calendar.bot_invalid_time_format",
+        "value": "Formato de hora no válido: \"{{time}}\". Por favor, proporcione la hora en formato \"HH:MM\" (24 horas) o \"HH:MM AM/PM\" (12 horas)."
+    },
+    {
+        "key": "calendar.bot_failed_parse_time",
+        "value": "No se pudo analizar la hora \"{{time}}\". Por favor, proporcione la hora en formato \"HH:MM\" (24 horas) o \"HH:MM AM/PM\" (12 horas) junto con la fecha."
+    },
+    {
+        "key": "calendar.bot_start_end_required",
+        "value": "Se requieren las horas de inicio y fin para la reserva. Por favor, proporcione la fecha y hora en formato ISO (YYYY-MM-DDTHH:MM:SS) o especifique tanto la fecha como la hora por separado."
+    },
+    {
+        "key": "calendar.bot_invalid_datetime_format",
+        "value": "Formato de fecha/hora no válido. Por favor, use el formato ISO (YYYY-MM-DDTHH:MM:SS) o proporcione la fecha y hora por separado. Recibido: inicio={{start}}, fin={{end}}"
+    },
+    {
+        "key": "calendar.bot_start_before_end",
+        "value": "La hora de inicio debe ser anterior a la hora de fin."
+    },
+    {
+        "key": "calendar.bot_appointment_cancelled",
+        "value": "¡Listo! He cancelado su cita."
+    },
+    {
+        "key": "calendar.bot_appointment_cancelled_with_link",
+        "value": "Tu cita ha sido cancelada exitosamente. Enlace del evento: {{eventLink}}"
+    },
+    {
+        "key": "calendar.bot_appointment_cancelled_via_link",
+        "value": "Su cita ha sido cancelada exitosamente usando el enlace del evento proporcionado. Recibirá una notificación de cancelación en breve."
+    },
+    {
+        "key": "calendar.bot_provide_event_link",
+        "value": "Para cancelar tu cita, por favor proporciona el enlace del evento que recibiste cuando la reservaste."
+    },
+    {
+        "key": "calendar.bot_cancellation_failed",
+        "value": "Encontré un error al cancelar tu cita: {{error}}"
+    },
+    {
+        "key": "calendar.bot_recent_appointments",
+        "value": "Aquí están tus citas recientes:\n{{appointments}}"
+    },
+    {
+        "key": "calendar.bot_appointment_details_with_link",
+        "value": "• {{summary}} el {{date}} a las {{time}}\n  Enlace del evento: {{eventLink}}"
+    },
+    {
+        "key": "calendar.bot_appointment_not_found",
+        "value": "No pude encontrar una cita en {{date}} {{time}}. ¿Podría proporcionar más detalles o verificar su calendario?"
+    },
+    {
+        "key": "calendar.bot_need_event_id_or_datetime",
+        "value": "Necesito el ID del evento para cancelar la cita. Por favor, proporcione el ID del evento o especifique la fecha y hora exactas de la cita que desea cancelar."
+    },
+    {
+        "key": "calendar.bot_need_event_id_or_datetime_short",
+        "value": "Necesito el ID del evento o la fecha/hora de la cita para cancelarla. Por favor, proporcione esta información."
+    },
+    {
+        "key": "calendar.bot_upcoming_appointments",
+        "value": "Sus próximas citas:"
+    },
+    {
+        "key": "calendar.bot_no_appointments_default",
+        "value": "No se encontraron citas en los últimos/próximos 30 días."
+    },
+    {
+        "key": "calendar.bot_no_appointments_period",
+        "value": "No se encontraron citas para el período especificado."
+    },
+    {
+        "key": "calendar.bot_attendees",
+        "value": "Asistentes: {{attendees}}"
+    },
+    {
+        "key": "calendar.bot_error_checking_availability",
+        "value": "Error al verificar disponibilidad"
+    },
+    {
+        "key": "calendar.bot_error_booking_appointment",
+        "value": "Error al reservar cita"
+    },
+    {
+        "key": "calendar.bot_error_cancelling_appointment",
+        "value": "Error al cancelar cita"
+    },
+    {
+        "key": "calendar.bot_error_listing_appointments",
+        "value": "Error al listar citas"
+    },
+    {
+        "key": "calendar.bot_error_updating_appointment",
+        "value": "Error al actualizar cita"
+    },
+    {
+        "key": "calendar.bot_slot_not_available_fallback",
+        "value": "Lo siento, pero esa franja horaria no está disponible. ¿Le gustaría que verifique las franjas horarias disponibles para ese día, o prefiere una hora diferente?"
+    },
+    {
+        "key": "calendar.bot_generic_calendar_error",
+        "value": "Encontré un problema con el calendario. Por favor, inténtelo de nuevo."
+    },
+    {
+        "key": "calendar.bot_slot_not_available_short",
+        "value": "Esa franja horaria no está disponible en nuestro calendario. Puede intentar con otra hora."
+    },
+    {
+        "key": "calendar.bot_appointment_updated",
+        "value": "¡Excelente! He actualizado su cita."
+    },
+    {
+        "key": "calendar.bot_appointment_updated_details",
+        "value": "{{summary}}\nNueva hora: {{date}}"
+    },
+    {
+        "key": "calendar.bot_need_event_id_to_update",
+        "value": "Necesito el ID del evento para actualizar la cita. Por favor, proporcione el ID del evento o especifique la fecha y hora exactas de la cita que desea actualizar."
+    },
+    {
+        "key": "calendar.bot_need_event_id_or_datetime_to_update",
+        "value": "Necesito el ID del evento o la fecha/hora de la cita para actualizarla. Por favor, proporcione esta información."
+    },
+    {
         "key": "campaigns.unknown_error",
         "value": "Ocurrió un error desconocido"
     },
@@ -12454,8 +14424,8 @@
         "value": "Nombre del Archivo:"
     },
     {
-        "key": "flow_builder.message_received",
-        "value": "Mensaje Recibido"
+        "key": "flow_builder.trigger_node",
+        "value": "Nodo de Disparador"
     },
     {
         "key": "flow_builder.when",
@@ -12924,14 +14894,6 @@
     {
         "key": "admin.settings.platform.description",
         "value": "Configura integraciones de API de socios y credenciales de Proveedor Técnico a nivel de plataforma"
-    },
-    {
-        "key": "admin.settings.platform.360dialog.title",
-        "value": "API de Socio 360Dialog"
-    },
-    {
-        "key": "admin.settings.platform.360dialog.description",
-        "value": "Configura las credenciales de Socio 360Dialog para la incorporación de empresas"
     },
     {
         "key": "admin.settings.platform.meta.title",
@@ -13612,5 +15574,1477 @@
     {
         "key": "flow_builder.ai_default_system_prompt",
         "value": "Eres un asistente útil. Responde las preguntas de los usuarios de manera concisa y precisa. Solo realiza acciones específicas cuando el usuario las solicite explícitamente."
+    },
+    {
+        "key": "call_screen.active_call",
+        "value": "Llamada Activa"
+    },
+    {
+        "key": "call_screen.queued",
+        "value": "En cola..."
+    },
+    {
+        "key": "call_screen.initiated",
+        "value": "Iniciando..."
+    },
+    {
+        "key": "call_screen.ringing",
+        "value": "Llamando..."
+    },
+    {
+        "key": "call_screen.in_progress",
+        "value": "En Progreso"
+    },
+    {
+        "key": "call_screen.connected",
+        "value": "Conectado"
+    },
+    {
+        "key": "call_screen.call_ended",
+        "value": "Llamada Finalizada"
+    },
+    {
+        "key": "call_screen.call_failed",
+        "value": "Llamada Fallida"
+    },
+    {
+        "key": "call_screen.line_busy",
+        "value": "Línea Ocupada"
+    },
+    {
+        "key": "call_screen.no_answer",
+        "value": "Sin Respuesta"
+    },
+    {
+        "key": "call_screen.mute",
+        "value": "Silenciar"
+    },
+    {
+        "key": "call_screen.unmute",
+        "value": "Activar Sonido"
+    },
+    {
+        "key": "call_screen.speaker",
+        "value": "Altavoz"
+    },
+    {
+        "key": "call_screen.hang_up",
+        "value": "Colgar"
+    },
+    {
+        "key": "call_screen.duration",
+        "value": "Duración"
+    },
+    {
+        "key": "call_screen.ending_call",
+        "value": "Finalizando llamada..."
+    },
+    {
+        "key": "call_screen.calling",
+        "value": "Llamando..."
+    },
+    {
+        "key": "call_screen.error.authentication",
+        "value": "No se puede conectar al servicio de llamadas - verifique sus credenciales"
+    },
+    {
+        "key": "call_screen.error.network",
+        "value": "Conexión de red perdida - verifique su conexión a internet"
+    },
+    {
+        "key": "call_screen.error.rate_limit",
+        "value": "Demasiadas llamadas - intente nuevamente en unos minutos"
+    },
+    {
+        "key": "call_screen.error.ai_unavailable",
+        "value": "Agente IA no disponible - la llamada continuará sin asistencia de IA"
+    },
+    {
+        "key": "call_screen.error.invalid_phone",
+        "value": "Formato de número de teléfono inválido - verifique e intente nuevamente"
+    },
+    {
+        "key": "call_screen.error.insufficient_balance",
+        "value": "Saldo insuficiente en la cuenta - recargue su cuenta"
+    },
+    {
+        "key": "call_screen.error.service_unavailable",
+        "value": "Servicio de llamadas temporalmente no disponible - intente más tarde"
+    },
+    {
+        "key": "call_screen.error.connection_failed",
+        "value": "No se pudo establecer la conexión - intente nuevamente"
+    },
+    {
+        "key": "call_screen.error.timeout",
+        "value": "Tiempo de conexión agotado - intente nuevamente"
+    },
+    {
+        "key": "call_screen.error.unknown",
+        "value": "Ocurrió un error inesperado - intente nuevamente"
+    },
+    {
+        "key": "call_screen.retry_call",
+        "value": "Reintentar Llamada"
+    },
+    {
+        "key": "call_screen.switch_to_direct",
+        "value": "Cambiar a Llamada Directa"
+    },
+    {
+        "key": "call_screen.view_details",
+        "value": "Ver Detalles"
+    },
+    {
+        "key": "call_screen.contact_support",
+        "value": "Contactar Soporte"
+    },
+    {
+        "key": "call_screen.error_details",
+        "value": "Detalles del Error"
+    },
+    {
+        "key": "call_screen.error_code",
+        "value": "Código de Error"
+    },
+    {
+        "key": "call_screen.error_timestamp",
+        "value": "Marca de Tiempo"
+    },
+    {
+        "key": "call_screen.retry_success",
+        "value": "Llamada reintentada exitosamente"
+    },
+    {
+        "key": "call_screen.fallback_success",
+        "value": "Cambiado a llamada directa exitosamente"
+    },
+    {
+        "key": "call_screen.retry_failed",
+        "value": "Reintento fallido - intente más tarde"
+    },
+    {
+        "key": "call_screen.fallback_failed",
+        "value": "No se pudo cambiar a llamada directa"
+    },
+    {
+        "key": "call_screen.retrying",
+        "value": "Reintentando"
+    },
+    {
+        "key": "call_screen.close",
+        "value": "Cerrar"
+    },
+    {
+        "key": "affiliate.application.page_title",
+        "value": "Conviértete en Socio - {{appName}}"
+    },
+    {
+        "key": "affiliate.application.form.title",
+        "value": "Solicitud de Socio"
+    },
+    {
+        "key": "affiliate.application.form.description",
+        "value": "Complete el formulario a continuación para solicitar nuestro programa de afiliados. Revisaremos su solicitud y le responderemos en 2-3 días hábiles."
+    },
+    {
+        "key": "affiliate.application.sections.personal_info",
+        "value": "Información Personal"
+    },
+    {
+        "key": "affiliate.application.sections.business_info",
+        "value": "Información Comercial"
+    },
+    {
+        "key": "affiliate.application.sections.marketing_info",
+        "value": "Información de Marketing"
+    },
+    {
+        "key": "affiliate.application.fields.first_name",
+        "value": "Nombre"
+    },
+    {
+        "key": "affiliate.application.fields.last_name",
+        "value": "Apellido"
+    },
+    {
+        "key": "affiliate.application.fields.email",
+        "value": "Dirección de Correo Electrónico"
+    },
+    {
+        "key": "affiliate.application.fields.phone",
+        "value": "Número de Teléfono"
+    },
+    {
+        "key": "affiliate.application.fields.company",
+        "value": "Empresa/Organización"
+    },
+    {
+        "key": "affiliate.application.fields.website",
+        "value": "Sitio Web"
+    },
+    {
+        "key": "affiliate.application.fields.country",
+        "value": "País"
+    },
+    {
+        "key": "affiliate.application.fields.marketing_channels",
+        "value": "Canales de Marketing"
+    },
+    {
+        "key": "affiliate.application.fields.expected_referrals",
+        "value": "Referencias Mensuales Esperadas"
+    },
+    {
+        "key": "affiliate.application.fields.experience",
+        "value": "Experiencia en Marketing"
+    },
+    {
+        "key": "affiliate.application.fields.motivation",
+        "value": "¿Por qué quieres convertirte en socio?"
+    },
+    {
+        "key": "affiliate.application.fields.agree_to_terms",
+        "value": "Acepto los términos y condiciones"
+    },
+    {
+        "key": "affiliate.application.placeholders.first_name",
+        "value": "Juan"
+    },
+    {
+        "key": "affiliate.application.placeholders.last_name",
+        "value": "Pérez"
+    },
+    {
+        "key": "affiliate.application.placeholders.email",
+        "value": "juan@ejemplo.com"
+    },
+    {
+        "key": "affiliate.application.placeholders.phone",
+        "value": "+1 (555) 123-4567"
+    },
+    {
+        "key": "affiliate.application.placeholders.company",
+        "value": "Nombre de su Empresa"
+    },
+    {
+        "key": "affiliate.application.placeholders.website",
+        "value": "https://sitioweb.com"
+    },
+    {
+        "key": "affiliate.application.placeholders.country",
+        "value": "Seleccione su país"
+    },
+    {
+        "key": "affiliate.application.placeholders.expected_referrals",
+        "value": "Seleccione referencias mensuales esperadas"
+    },
+    {
+        "key": "affiliate.application.placeholders.experience",
+        "value": "Describa su experiencia en marketing, tamaño de audiencia y logros relevantes..."
+    },
+    {
+        "key": "affiliate.application.placeholders.motivation",
+        "value": "Cuéntenos por qué está interesado en asociarse con {{appName}}..."
+    },
+    {
+        "key": "affiliate.application.descriptions.marketing_channels",
+        "value": "Seleccione todos los canales de marketing que planea usar (seleccione al menos uno)"
+    },
+    {
+        "key": "affiliate.application.descriptions.experience",
+        "value": "Cuéntenos sobre su experiencia en marketing y cómo planea promover {{appName}} (mínimo 50 caracteres)"
+    },
+    {
+        "key": "affiliate.application.descriptions.motivation",
+        "value": "Comparta su motivación para unirse a nuestro programa de afiliados (mínimo 50 caracteres)"
+    },
+    {
+        "key": "affiliate.application.descriptions.terms",
+        "value": "Al marcar esta casilla, acepta los términos y condiciones de nuestro programa de afiliados, política de privacidad y pautas de marketing."
+    },
+    {
+        "key": "affiliate.application.marketing_channels.social_media",
+        "value": "Redes Sociales (Facebook, Instagram, Twitter)"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.content_marketing",
+        "value": "Marketing de Contenido (Blog, YouTube, Podcast)"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.email_marketing",
+        "value": "Marketing por Correo Electrónico"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.paid_advertising",
+        "value": "Publicidad Pagada (Google Ads, Facebook Ads)"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.seo",
+        "value": "SEO y Búsqueda Orgánica"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.influencer",
+        "value": "Marketing de Influencers"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.networking",
+        "value": "Networking y Eventos"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.referrals",
+        "value": "Boca a Boca y Referencias"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.other",
+        "value": "Otro"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.1_5",
+        "value": "1-5 referencias por mes"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.6_15",
+        "value": "6-15 referencias por mes"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.16_30",
+        "value": "16-30 referencias por mes"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.31_50",
+        "value": "31-50 referencias por mes"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.50_plus",
+        "value": "50+ referencias por mes"
+    },
+    {
+        "key": "affiliate.application.validation.first_name_min",
+        "value": "El nombre debe tener al menos 2 caracteres"
+    },
+    {
+        "key": "affiliate.application.validation.last_name_min",
+        "value": "El apellido debe tener al menos 2 caracteres"
+    },
+    {
+        "key": "affiliate.application.validation.email_invalid",
+        "value": "Por favor ingrese una dirección de correo electrónico válida"
+    },
+    {
+        "key": "affiliate.application.validation.website_invalid",
+        "value": "Por favor ingrese una URL de sitio web válida"
+    },
+    {
+        "key": "affiliate.application.validation.country_required",
+        "value": "Por favor seleccione su país"
+    },
+    {
+        "key": "affiliate.application.validation.marketing_channels_required",
+        "value": "Por favor seleccione al menos un canal de marketing"
+    },
+    {
+        "key": "affiliate.application.validation.expected_referrals_required",
+        "value": "Por favor seleccione referencias mensuales esperadas"
+    },
+    {
+        "key": "affiliate.application.validation.experience_min",
+        "value": "Por favor proporcione al menos 50 caracteres describiendo su experiencia"
+    },
+    {
+        "key": "affiliate.application.validation.motivation_min",
+        "value": "Por favor proporcione al menos 50 caracteres describiendo su motivación"
+    },
+    {
+        "key": "affiliate.application.validation.terms_required",
+        "value": "Debe aceptar los términos y condiciones"
+    },
+    {
+        "key": "affiliate.application.toast.submitted_title",
+        "value": "¡Solicitud Enviada!"
+    },
+    {
+        "key": "affiliate.application.toast.submitted_description",
+        "value": "Gracias por su interés. Revisaremos su solicitud y le responderemos pronto."
+    },
+    {
+        "key": "affiliate.application.toast.failed_title",
+        "value": "Error al Enviar"
+    },
+    {
+        "key": "affiliate.application.toast.failed_description",
+        "value": "Hubo un error al enviar su solicitud. Por favor intente nuevamente."
+    },
+    {
+        "key": "affiliate.application.submitted.title",
+        "value": "¡Solicitud Enviada!"
+    },
+    {
+        "key": "affiliate.application.submitted.message",
+        "value": "Gracias por su interés en convertirse en socio de {{appName}}. Hemos recibido su solicitud y la revisaremos en 2-3 días hábiles."
+    },
+    {
+        "key": "affiliate.application.submitted.follow_up",
+        "value": "Recibirá una confirmación por correo electrónico en breve, y nos pondremos en contacto una vez que se haya revisado su solicitud."
+    },
+    {
+        "key": "affiliate.application.submitted.continue_button",
+        "value": "Continuar al Registro"
+    },
+    {
+        "key": "affiliate.application.buttons.back",
+        "value": "Volver al Registro"
+    },
+    {
+        "key": "affiliate.application.buttons.submitting",
+        "value": "Enviando..."
+    },
+    {
+        "key": "affiliate.application.buttons.submit",
+        "value": "Enviar Solicitud"
+    },
+    {
+        "key": "affiliate.application.toast.submit_failed_error",
+        "value": "Error al enviar la solicitud"
+    },
+    {
+        "key": "affiliate.application.countries.united_states",
+        "value": "Estados Unidos"
+    },
+    {
+        "key": "affiliate.application.countries.canada",
+        "value": "Canadá"
+    },
+    {
+        "key": "affiliate.application.countries.united_kingdom",
+        "value": "Reino Unido"
+    },
+    {
+        "key": "affiliate.application.countries.australia",
+        "value": "Australia"
+    },
+    {
+        "key": "affiliate.application.countries.germany",
+        "value": "Alemania"
+    },
+    {
+        "key": "affiliate.application.countries.france",
+        "value": "Francia"
+    },
+    {
+        "key": "affiliate.application.countries.spain",
+        "value": "España"
+    },
+    {
+        "key": "affiliate.application.countries.italy",
+        "value": "Italia"
+    },
+    {
+        "key": "affiliate.application.countries.netherlands",
+        "value": "Países Bajos"
+    },
+    {
+        "key": "affiliate.application.countries.sweden",
+        "value": "Suecia"
+    },
+    {
+        "key": "affiliate.application.countries.norway",
+        "value": "Noruega"
+    },
+    {
+        "key": "affiliate.application.countries.denmark",
+        "value": "Dinamarca"
+    },
+    {
+        "key": "affiliate.application.countries.finland",
+        "value": "Finlandia"
+    },
+    {
+        "key": "affiliate.application.countries.switzerland",
+        "value": "Suiza"
+    },
+    {
+        "key": "affiliate.application.countries.austria",
+        "value": "Austria"
+    },
+    {
+        "key": "affiliate.application.countries.belgium",
+        "value": "Bélgica"
+    },
+    {
+        "key": "affiliate.application.countries.portugal",
+        "value": "Portugal"
+    },
+    {
+        "key": "affiliate.application.countries.ireland",
+        "value": "Irlanda"
+    },
+    {
+        "key": "affiliate.application.countries.new_zealand",
+        "value": "Nueva Zelanda"
+    },
+    {
+        "key": "affiliate.application.countries.japan",
+        "value": "Japón"
+    },
+    {
+        "key": "affiliate.application.countries.south_korea",
+        "value": "Corea del Sur"
+    },
+    {
+        "key": "affiliate.application.countries.singapore",
+        "value": "Singapur"
+    },
+    {
+        "key": "affiliate.application.countries.hong_kong",
+        "value": "Hong Kong"
+    },
+    {
+        "key": "affiliate.application.countries.india",
+        "value": "India"
+    },
+    {
+        "key": "affiliate.application.countries.brazil",
+        "value": "Brasil"
+    },
+    {
+        "key": "affiliate.application.countries.mexico",
+        "value": "México"
+    },
+    {
+        "key": "affiliate.application.countries.argentina",
+        "value": "Argentina"
+    },
+    {
+        "key": "affiliate.application.countries.chile",
+        "value": "Chile"
+    },
+    {
+        "key": "affiliate.application.countries.colombia",
+        "value": "Colombia"
+    },
+    {
+        "key": "affiliate.application.countries.south_africa",
+        "value": "Sudáfrica"
+    },
+    {
+        "key": "affiliate.application.countries.other",
+        "value": "Otro"
+    },
+    {
+        "key": "admin.affiliate.create.success_description",
+        "value": "El nuevo afiliado ha sido agregado al sistema."
+    },
+    {
+        "key": "admin.affiliate.update.success_description",
+        "value": "La información del afiliado ha sido actualizada."
+    },
+    {
+        "key": "admin.affiliate.delete.success_description",
+        "value": "El afiliado ha sido eliminado del sistema."
+    },
+    {
+        "key": "admin.affiliate.delete.confirm_message",
+        "value": "¿Está seguro de que desea eliminar el afiliado \"{{name}}\"? Esta acción no se puede deshacer y eliminará todos los datos asociados."
+    },
+    {
+        "key": "admin.affiliate.delete.bulk_confirm_message",
+        "value": "¿Está seguro de que desea eliminar {{count}} afiliado{{plural}} seleccionado{{plural}}? Esta acción no se puede deshacer y eliminará todos los datos asociados."
+    },
+    {
+        "key": "admin.affiliate.approve.success_description",
+        "value": "El afiliado ha sido activado y ahora puede comenzar a ganar comisiones."
+    },
+    {
+        "key": "admin.affiliate.suspend.success_description",
+        "value": "El afiliado ha sido suspendido y no puede ganar nuevas comisiones."
+    },
+    {
+        "key": "admin.affiliate.refresh",
+        "value": "Actualizar"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_7_days",
+        "value": "Últimos 7 días"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_30_days",
+        "value": "Últimos 30 días"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_90_days",
+        "value": "Últimos 90 días"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_year",
+        "value": "Último año"
+    },
+    {
+        "key": "admin.affiliate.charts.performance_trends_description",
+        "value": "Rastrear ingresos, conversiones e inscripciones a lo largo del tiempo"
+    },
+    {
+        "key": "admin.affiliate.charts.loading",
+        "value": "Cargando datos del gráfico..."
+    },
+    {
+        "key": "admin.affiliate.charts.series.revenue",
+        "value": "Ingresos"
+    },
+    {
+        "key": "admin.affiliate.charts.series.conversions",
+        "value": "Conversiones"
+    },
+    {
+        "key": "admin.affiliate.charts.series.sign_ups",
+        "value": "Inscripciones"
+    },
+    {
+        "key": "admin.affiliate.export.description",
+        "value": "Descargar datos de rendimiento de afiliados e informes"
+    },
+    {
+        "key": "admin.affiliate.export.csv",
+        "value": "Exportar CSV"
+    },
+    {
+        "key": "admin.affiliate.export.pdf",
+        "value": "Exportar Informe PDF"
+    },
+    {
+        "key": "admin.affiliate.export.chart_data",
+        "value": "Exportar Datos del Gráfico"
+    },
+    {
+        "key": "admin.affiliate.applications.description",
+        "value": "Revisar y gestionar solicitudes de socios afiliados"
+    },
+    {
+        "key": "admin.affiliate.applications.count",
+        "value": "{{count}} solicitud{{plural}} encontrada{{plural}}"
+    },
+    {
+        "key": "admin.affiliate.applications.table.applicant",
+        "value": "Solicitante"
+    },
+    {
+        "key": "admin.affiliate.applications.table.email",
+        "value": "Correo Electrónico"
+    },
+    {
+        "key": "admin.affiliate.applications.table.status",
+        "value": "Estado"
+    },
+    {
+        "key": "admin.affiliate.applications.table.marketing_channels",
+        "value": "Canales de Marketing"
+    },
+    {
+        "key": "admin.affiliate.applications.table.expected_referrals",
+        "value": "Referencias Esperadas"
+    },
+    {
+        "key": "admin.affiliate.applications.table.submitted",
+        "value": "Enviado"
+    },
+    {
+        "key": "admin.affiliate.applications.table.actions",
+        "value": "Acciones"
+    },
+    {
+        "key": "admin.affiliate.applications.status.pending",
+        "value": "Pendiente"
+    },
+    {
+        "key": "admin.affiliate.applications.status.approved",
+        "value": "Aprobado"
+    },
+    {
+        "key": "admin.affiliate.applications.status.rejected",
+        "value": "Rechazado"
+    },
+    {
+        "key": "admin.affiliate.applications.status.under_review",
+        "value": "En Revisión"
+    },
+    {
+        "key": "admin.affiliate.applications.more_channels",
+        "value": " +{{count}} más"
+    },
+    {
+        "key": "admin.affiliate.applications.actions.view_details",
+        "value": "Ver Detalles"
+    },
+    {
+        "key": "admin.affiliate.applications.actions.approve",
+        "value": "Aprobar"
+    },
+    {
+        "key": "admin.affiliate.applications.actions.reject",
+        "value": "Rechazar"
+    },
+    {
+        "key": "admin.affiliate.applications.approve.success_title",
+        "value": "Éxito"
+    },
+    {
+        "key": "admin.affiliate.applications.approve.success_description",
+        "value": "Solicitud aprobada exitosamente"
+    },
+    {
+        "key": "admin.affiliate.applications.reject.success_title",
+        "value": "Éxito"
+    },
+    {
+        "key": "admin.affiliate.applications.reject.success_description",
+        "value": "Solicitud rechazada exitosamente"
+    },
+    {
+        "key": "admin.affiliate.applications.reject.prompt",
+        "value": "Por favor proporcione una razón para el rechazo:"
+    },
+    {
+        "key": "admin.affiliate.applications.details.title",
+        "value": "Detalles de la Solicitud"
+    },
+    {
+        "key": "admin.affiliate.applications.details.description",
+        "value": "Información completa para esta solicitud de afiliado"
+    },
+    {
+        "key": "admin.affiliate.applications.details.personal_info",
+        "value": "Información Personal"
+    },
+    {
+        "key": "admin.affiliate.applications.details.full_name",
+        "value": "Nombre Completo"
+    },
+    {
+        "key": "admin.affiliate.applications.details.email",
+        "value": "Correo Electrónico"
+    },
+    {
+        "key": "admin.affiliate.applications.details.phone",
+        "value": "Teléfono"
+    },
+    {
+        "key": "admin.affiliate.applications.details.country",
+        "value": "País"
+    },
+    {
+        "key": "admin.affiliate.applications.details.business_info",
+        "value": "Información Comercial"
+    },
+    {
+        "key": "admin.affiliate.applications.details.company",
+        "value": "Empresa"
+    },
+    {
+        "key": "admin.affiliate.applications.details.website",
+        "value": "Sitio Web"
+    },
+    {
+        "key": "admin.affiliate.applications.details.status",
+        "value": "Estado"
+    },
+    {
+        "key": "admin.affiliate.applications.details.submitted",
+        "value": "Enviado"
+    },
+    {
+        "key": "admin.affiliate.applications.details.marketing_info",
+        "value": "Información de Marketing"
+    },
+    {
+        "key": "admin.affiliate.applications.details.marketing_channels",
+        "value": "Canales de Marketing"
+    },
+    {
+        "key": "admin.affiliate.applications.details.expected_referrals",
+        "value": "Referencias Mensuales Esperadas"
+    },
+    {
+        "key": "admin.affiliate.applications.details.experience_motivation",
+        "value": "Experiencia y Motivación"
+    },
+    {
+        "key": "admin.affiliate.applications.details.experience",
+        "value": "Experiencia"
+    },
+    {
+        "key": "admin.affiliate.applications.details.motivation",
+        "value": "Motivación"
+    },
+    {
+        "key": "admin.affiliate.applications.details.agreement",
+        "value": "Acuerdo"
+    },
+    {
+        "key": "admin.affiliate.applications.details.agreed_to_terms",
+        "value": "Aceptado Términos y Condiciones"
+    },
+    {
+        "key": "admin.affiliate.applications.details.rejection_reason",
+        "value": "Razón del Rechazo"
+    },
+    {
+        "key": "admin.affiliate.affiliates.description",
+        "value": "Gestionar socios afiliados y sus estructuras de comisión"
+    },
+    {
+        "key": "admin.affiliate.affiliates.more_filters",
+        "value": "Más Filtros"
+    },
+    {
+        "key": "admin.affiliate.affiliates.selected_count",
+        "value": "{{count}} afiliado{{plural}} seleccionado{{plural}}"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.approve",
+        "value": "Aprobar Seleccionados"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.send_email",
+        "value": "Enviar Correo Electrónico"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.export",
+        "value": "Exportar Seleccionados"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.delete",
+        "value": "Eliminar Seleccionados"
+    },
+    {
+        "key": "admin.affiliate.affiliates.converted_count",
+        "value": "{{count}} convertido{{plural}}"
+    },
+    {
+        "key": "admin.affiliate.affiliates.pending_earnings",
+        "value": "{{amount}} pendiente"
+    },
+    {
+        "key": "admin.affiliate.referrals.description",
+        "value": "Rastrear y gestionar todas las referencias y conversiones de afiliados"
+    },
+    {
+        "key": "admin.affiliate.referrals.empty",
+        "value": "No se encontraron referencias"
+    },
+    {
+        "key": "admin.affiliate.payouts.description",
+        "value": "Gestionar pagos de comisiones de afiliados y procesamiento de pagos"
+    },
+    {
+        "key": "admin.affiliate.payouts.not_specified",
+        "value": "No especificado"
+    },
+    {
+        "key": "admin.affiliate.payouts.to",
+        "value": "a"
+    },
+    {
+        "key": "admin.affiliate.payouts.empty",
+        "value": "No se encontraron pagos"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.name",
+        "value": "Ingrese el nombre completo"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.email",
+        "value": "Ingrese la dirección de correo electrónico"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.phone",
+        "value": "Ingrese el número de teléfono"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.business_name",
+        "value": "Ingrese el nombre de la empresa"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.notes",
+        "value": "Notas adicionales sobre este afiliado"
+    },
+    {
+        "key": "admin.affiliate.view.name",
+        "value": "Nombre"
+    },
+    {
+        "key": "admin.affiliate.view.email",
+        "value": "Correo Electrónico"
+    },
+    {
+        "key": "admin.affiliate.view.phone",
+        "value": "Teléfono"
+    },
+    {
+        "key": "admin.affiliate.view.website",
+        "value": "Sitio Web"
+    },
+    {
+        "key": "admin.affiliate.view.business",
+        "value": "Empresa"
+    },
+    {
+        "key": "admin.affiliate.view.total_referrals",
+        "value": "Referencias Totales"
+    },
+    {
+        "key": "admin.affiliate.view.successful",
+        "value": "Exitosas"
+    },
+    {
+        "key": "admin.affiliate.view.total_earnings",
+        "value": "Ganancias Totales"
+    },
+    {
+        "key": "admin.affiliate.view.pending",
+        "value": "Pendiente"
+    },
+    {
+        "key": "admin.affiliate.view.paid",
+        "value": "Pagado"
+    },
+    {
+        "key": "admin.affiliate.view.commission_rate",
+        "value": "Tasa de Comisión"
+    },
+    {
+        "key": "admin.affiliate.view.commission_type",
+        "value": "Tipo de Comisión"
+    },
+    {
+        "key": "admin.affiliate.view.status",
+        "value": "Estado"
+    },
+    {
+        "key": "admin.affiliate.view.joined",
+        "value": "Se Unió"
+    },
+    {
+        "key": "admin.affiliate.view.referral_url_description",
+        "value": "Comparta esta URL con clientes potenciales. Cuando se registren usando este enlace, el afiliado recibirá comisión por conversiones exitosas."
+    },
+    {
+        "key": "admin.affiliate.copied_title",
+        "value": "¡Copiado!"
+    },
+    {
+        "key": "admin.affiliate.copied_description",
+        "value": "URL de referencia copiada al portapapeles"
+    },
+    {
+        "key": "admin.affiliate.copy_url_tooltip",
+        "value": "Copiar URL de referencia"
+    },
+    {
+        "key": "admin.affiliate.open_url_tooltip",
+        "value": "Abrir URL de referencia"
+    },
+    {
+        "key": "admin.affiliate.actions.view_details",
+        "value": "Ver Detalles"
+    },
+    {
+        "key": "admin.affiliate.actions.edit",
+        "value": "Editar Afiliado"
+    },
+    {
+        "key": "admin.affiliate.actions.send_email",
+        "value": "Enviar Correo Electrónico"
+    },
+    {
+        "key": "admin.affiliate.actions.export_data",
+        "value": "Exportar Datos"
+    },
+    {
+        "key": "admin.affiliate.actions.approve",
+        "value": "Aprobar"
+    },
+    {
+        "key": "admin.affiliate.actions.suspend",
+        "value": "Suspender"
+    },
+    {
+        "key": "admin.affiliate.actions.reactivate",
+        "value": "Reactivar"
+    },
+    {
+        "key": "admin.affiliate.actions.delete",
+        "value": "Eliminar Afiliado"
+    },
+    {
+        "key": "admin.affiliate.metrics.points_suffix",
+        "value": " pts"
+    },
+    {
+        "key": "admin.affiliate.metrics.no_data",
+        "value": "-"
+    },
+    {
+        "key": "admin.affiliate.title",
+        "value": "Gestión de Afiliados"
+    },
+    {
+        "key": "admin.affiliate.description",
+        "value": "Gestionar socios afiliados, rastrear referencias y procesar pagos"
+    },
+    {
+        "key": "admin.affiliate.export.title",
+        "value": "Exportar Datos"
+    },
+    {
+        "key": "admin.affiliate.export.button",
+        "value": "Exportar Datos"
+    },
+    {
+        "key": "admin.affiliate.export.short",
+        "value": "Exportar"
+    },
+    {
+        "key": "admin.affiliate.create.success",
+        "value": "Afiliado creado exitosamente"
+    },
+    {
+        "key": "admin.affiliate.update.success",
+        "value": "Afiliado actualizado exitosamente"
+    },
+    {
+        "key": "admin.affiliate.delete.success",
+        "value": "Afiliado eliminado exitosamente"
+    },
+    {
+        "key": "admin.affiliate.approve.success",
+        "value": "Afiliado aprobado exitosamente"
+    },
+    {
+        "key": "admin.affiliate.suspend.success",
+        "value": "Afiliado suspendido exitosamente"
+    },
+    {
+        "key": "admin.affiliate.create.button",
+        "value": "Agregar Afiliado"
+    },
+    {
+        "key": "admin.affiliate.create.short",
+        "value": "Agregar"
+    },
+    {
+        "key": "admin.affiliate.create.title",
+        "value": "Agregar Nuevo Afiliado"
+    },
+    {
+        "key": "admin.affiliate.create.description",
+        "value": "Crear una nueva cuenta de socio afiliado"
+    },
+    {
+        "key": "admin.affiliate.create.submit",
+        "value": "Crear Afiliado"
+    },
+    {
+        "key": "admin.affiliate.edit.title",
+        "value": "Editar Afiliado"
+    },
+    {
+        "key": "admin.affiliate.edit.description",
+        "value": "Actualizar información del socio afiliado"
+    },
+    {
+        "key": "admin.affiliate.edit.submit",
+        "value": "Actualizar Afiliado"
+    },
+    {
+        "key": "admin.affiliate.dashboard.title",
+        "value": "Panel de Control"
+    },
+    {
+        "key": "admin.affiliate.dashboard.short",
+        "value": "Panel"
+    },
+    {
+        "key": "admin.affiliate.applications.title",
+        "value": "Solicitudes"
+    },
+    {
+        "key": "admin.affiliate.applications.short",
+        "value": "Solicitudes"
+    },
+    {
+        "key": "admin.affiliate.applications.empty.title",
+        "value": "Aún No Hay Solicitudes"
+    },
+    {
+        "key": "admin.affiliate.applications.empty.description",
+        "value": "Las solicitudes de afiliados aparecerán aquí cuando las personas soliciten convertirse en socios."
+    },
+    {
+        "key": "admin.affiliate.applications.preview_form",
+        "value": "Vista Previa del Formulario de Solicitud"
+    },
+    {
+        "key": "admin.affiliate.affiliates.title",
+        "value": "Afiliados"
+    },
+    {
+        "key": "admin.affiliate.affiliates.short",
+        "value": "Afiliados"
+    },
+    {
+        "key": "admin.affiliate.affiliates.search_placeholder",
+        "value": "Buscar afiliados..."
+    },
+    {
+        "key": "admin.affiliate.affiliates.filter.all_statuses",
+        "value": "Todos los Estados"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.code",
+        "value": "Código"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.name",
+        "value": "Nombre"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.email",
+        "value": "Correo Electrónico"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.status",
+        "value": "Estado"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.referrals",
+        "value": "Referencias"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.earnings",
+        "value": "Ganancias"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.commission",
+        "value": "Comisión"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.referral_url",
+        "value": "URL de Referencia"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.joined",
+        "value": "Se Unió"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.actions",
+        "value": "Acciones"
+    },
+    {
+        "key": "admin.affiliate.status.active",
+        "value": "Activo"
+    },
+    {
+        "key": "admin.affiliate.status.pending",
+        "value": "Pendiente"
+    },
+    {
+        "key": "admin.affiliate.status.suspended",
+        "value": "Suspendido"
+    },
+    {
+        "key": "admin.affiliate.status.rejected",
+        "value": "Rechazado"
+    },
+    {
+        "key": "admin.affiliate.analytics.title",
+        "value": "Analítica de Rendimiento"
+    },
+    {
+        "key": "admin.affiliate.charts.performance_trends",
+        "value": "Tendencias de Rendimiento"
+    },
+    {
+        "key": "admin.affiliate.charts.status_distribution",
+        "value": "Estado de Afiliados"
+    },
+    {
+        "key": "admin.affiliate.charts.top_performers",
+        "value": "Mejores Desempeños"
+    },
+    {
+        "key": "admin.affiliate.charts.conversion_funnel",
+        "value": "Embudo de Conversión"
+    },
+    {
+        "key": "admin.affiliate.metrics.total_affiliates",
+        "value": "Afiliados Totales"
+    },
+    {
+        "key": "admin.affiliate.metrics.active",
+        "value": "Activo"
+    },
+    {
+        "key": "admin.affiliate.metrics.total_referrals",
+        "value": "Referidos Totales"
+    },
+    {
+        "key": "admin.affiliate.metrics.conversion_rate",
+        "value": "Tasa de Conversión"
+    },
+    {
+        "key": "admin.affiliate.metrics.total_commission",
+        "value": "Comisión Total"
+    },
+    {
+        "key": "admin.affiliate.metrics.from_conversions",
+        "value": "De {{count}} conversiones"
+    },
+    {
+        "key": "admin.affiliate.metrics.conversions",
+        "value": "conversiones"
+    },
+    {
+        "key": "admin.affiliate.metrics.avg_commission",
+        "value": "Comisión Promedio"
+    },
+    {
+        "key": "admin.affiliate.metrics.per_affiliate",
+        "value": "por afiliado"
+    },
+    {
+        "key": "admin.affiliate.metrics.pending_payouts",
+        "value": "Pagos Pendientes"
+    },
+    {
+        "key": "admin.affiliate.metrics.pending_requests",
+        "value": "solicitudes pendientes"
+    },
+    {
+        "key": "admin.affiliate.pagination.showing",
+        "value": "Mostrando"
+    },
+    {
+        "key": "admin.affiliate.pagination.to",
+        "value": "a"
+    },
+    {
+        "key": "admin.affiliate.pagination.of",
+        "value": "de"
+    },
+    {
+        "key": "admin.affiliate.pagination.records",
+        "value": "registros"
+    },
+    {
+        "key": "admin.affiliate.pagination.previous",
+        "value": "Anterior"
+    },
+    {
+        "key": "admin.affiliate.pagination.page",
+        "value": "Página"
+    },
+    {
+        "key": "admin.affiliate.pagination.next",
+        "value": "Siguiente"
+    },
+    {
+        "key": "admin.affiliate.referrals.title",
+        "value": "Referencias"
+    },
+    {
+        "key": "admin.affiliate.referrals.short",
+        "value": "Referencias"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.code",
+        "value": "Código de Referencia"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.affiliate",
+        "value": "Afiliado"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.referred_email",
+        "value": "Correo Referido"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.status",
+        "value": "Estado"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.value",
+        "value": "Valor"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.commission",
+        "value": "Comisión"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.date",
+        "value": "Fecha"
+    },
+    {
+        "key": "admin.affiliate.referrals.status.converted",
+        "value": "Convertido"
+    },
+    {
+        "key": "admin.affiliate.referrals.status.pending",
+        "value": "Pendiente"
+    },
+    {
+        "key": "admin.affiliate.referrals.status.expired",
+        "value": "Expirado"
+    },
+    {
+        "key": "admin.affiliate.payouts.title",
+        "value": "Pagos"
+    },
+    {
+        "key": "admin.affiliate.payouts.short",
+        "value": "Pagos"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.affiliate",
+        "value": "Afiliado"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.amount",
+        "value": "Monto"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.status",
+        "value": "Estado"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.method",
+        "value": "Método"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.period",
+        "value": "Período"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.processed",
+        "value": "Procesado"
+    },
+    {
+        "key": "admin.affiliate.payouts.status.completed",
+        "value": "Completado"
+    },
+    {
+        "key": "admin.affiliate.payouts.status.processing",
+        "value": "Procesando"
+    },
+    {
+        "key": "admin.affiliate.payouts.status.failed",
+        "value": "Fallido"
+    },
+    {
+        "key": "admin.affiliate.view.title",
+        "value": "Detalles del Afiliado"
+    },
+    {
+        "key": "admin.affiliate.view.basic_info",
+        "value": "Información Básica"
+    },
+    {
+        "key": "admin.affiliate.view.performance",
+        "value": "Rendimiento"
+    },
+    {
+        "key": "admin.affiliate.view.commission_settings",
+        "value": "Configuración de Comisión"
+    },
+    {
+        "key": "admin.affiliate.view.referral_url",
+        "value": "URL de Referencia"
+    },
+    {
+        "key": "admin.affiliate.delete.confirm_title",
+        "value": "Eliminar Afiliado"
+    },
+    {
+        "key": "admin.affiliate.delete.confirm_button",
+        "value": "Eliminar"
+    },
+    {
+        "key": "admin.affiliate.form.name",
+        "value": "Nombre Completo"
+    },
+    {
+        "key": "admin.affiliate.form.email",
+        "value": "Dirección de Correo Electrónico"
+    },
+    {
+        "key": "admin.affiliate.form.phone",
+        "value": "Número de Teléfono"
+    },
+    {
+        "key": "admin.affiliate.form.website",
+        "value": "Sitio Web"
+    },
+    {
+        "key": "admin.affiliate.form.business_name",
+        "value": "Nombre de la Empresa"
+    },
+    {
+        "key": "admin.affiliate.form.commission_rate",
+        "value": "Tasa de Comisión"
+    },
+    {
+        "key": "admin.affiliate.form.commission_type",
+        "value": "Tipo de Comisión"
+    },
+    {
+        "key": "admin.affiliate.form.notes",
+        "value": "Notas"
+    },
+    {
+        "key": "admin.affiliate.commission_type.percentage",
+        "value": "Porcentaje"
+    },
+    {
+        "key": "admin.affiliate.commission_type.fixed",
+        "value": "Monto Fijo"
+    },
+    {
+        "key": "admin.affiliate.commission_type.tiered",
+        "value": "Por Niveles"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.earned",
+        "value": "Ganado"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.applied_to_plan",
+        "value": "Aplicado al Plan"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.payout",
+        "value": "Pago"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.adjustment",
+        "value": "Ajuste"
+    },
+    {
+        "key": "settings.affiliate_earnings.balance_after",
+        "value": "Saldo Después"
+    },
+    {
+        "key": "common.error",
+        "value": "Error"
+    },
+    {
+        "key": "common.close",
+        "value": "Cerrar"
+    },
+    {
+        "key": "common.confirm",
+        "value": "Confirmar"
+    },
+    {
+        "key": "common.cancel",
+        "value": "Cancelar"
     }
 ]

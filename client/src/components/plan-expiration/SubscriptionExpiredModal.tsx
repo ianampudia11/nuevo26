@@ -53,7 +53,7 @@ export default function SubscriptionExpiredModal({
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
-          className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+          className="bg-card rounded-lg shadow-xl max-w-md w-full p-6"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">

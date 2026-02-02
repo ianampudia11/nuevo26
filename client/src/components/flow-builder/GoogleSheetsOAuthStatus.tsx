@@ -62,10 +62,10 @@ export function GoogleSheetsOAuthStatus({ onAuthSuccess, onDisconnect, className
   if (isConnected) {
     return (
       <div className={className}>
-        <Alert className="bg-green-50 border-green-200">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <AlertTitle className="text-green-700">Connected</AlertTitle>
-          <AlertDescription className="text-green-600 space-y-3">
+        <Alert className="bg-primary/10 border-primary/20">
+          <CheckCircle2 className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-primary">Connected</AlertTitle>
+          <AlertDescription className="text-primary space-y-3">
             <p>Your Google Sheets is connected and ready to use.</p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -73,7 +73,7 @@ export function GoogleSheetsOAuthStatus({ onAuthSuccess, onDisconnect, className
                 disabled={isAuthenticating || isDisconnecting}
                 variant="outline"
                 size="sm"
-                className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+                className="border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/30"
                 title="Connect a different Google account"
               >
                 {isAuthenticating ? (
@@ -93,7 +93,7 @@ export function GoogleSheetsOAuthStatus({ onAuthSuccess, onDisconnect, className
                 disabled={isDisconnecting || isAuthenticating}
                 variant="outline"
                 size="sm"
-                className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                className="border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/30"
                 title="Disconnect Google Sheets integration"
               >
                 {isDisconnecting ? (
@@ -117,15 +117,15 @@ export function GoogleSheetsOAuthStatus({ onAuthSuccess, onDisconnect, className
 
   return (
     <div className={className}>
-      <Alert className="bg-amber-50 border-amber-200">
-        <AlertCircle className="h-4 w-4 text-amber-500" />
-        <AlertTitle className="text-amber-700">Authentication Required</AlertTitle>
-        <AlertDescription className="text-amber-600 space-y-3">
+      <Alert className="bg-muted/50 border-muted">
+        <AlertCircle className="h-4 w-4 text-muted-foreground" />
+        <AlertTitle className="text-foreground">Authentication Required</AlertTitle>
+        <AlertDescription className="text-muted-foreground space-y-3">
           <p>Connect your Google Sheets account to use this node.</p>
           <Button
             onClick={handleConnectClick}
             disabled={isAuthenticating}
-            className="bg-green-500 hover:bg-green-600 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
             size="sm"
           >
             {isAuthenticating ? (

@@ -1,17 +1,6 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useToast } from './use-toast';
 
-
-const useWebSocket = () => {
-  return {
-    socket: null,
-    subscribe: (_event: string, _callback: (data: any) => void) => {
-
-      return () => {};
-    }
-  };
-};
-
 interface MentionNotification {
   messageId: number;
   conversationId: number;
@@ -21,24 +10,24 @@ interface MentionNotification {
   createdAt: Date;
 }
 
-interface MentionSuggestion {
+export interface MentionSuggestion {
   userId: number;
   userName: string;
   displayName: string;
   avatar?: string;
 }
 
+/** TikTok uses @username format (no markdown-style @[Name](id)) */
+const TIKTOK_MENTION_REGEX = /@(\w+)/g;
+
 /**
- * Hook for managing mentions
+ * Hook for managing mentions (TikTok Business Messaging API).
+ * Uses TikTok's @username format; validation should ensure mentions only within messaging window.
  */
 export function useTikTokMentions() {
-  const { socket, subscribe } = useWebSocket();
   const { toast } = useToast();
   const [unreadMentions, setUnreadMentions] = useState<MentionNotification[]>([]);
 
-  /**
-   * Load unread mentions
-   */
   const loadUnreadMentions = useCallback(async () => {
     try {
       const response = await fetch('/api/tiktok/mentions/unread');
@@ -51,9 +40,6 @@ export function useTikTokMentions() {
     }
   }, []);
 
-  /**
-   * Mark mention as read
-   */
   const markMentionAsRead = useCallback(async (messageId: number) => {
     try {
       const response = await fetch(`/api/tiktok/mentions/${messageId}/read`, {
@@ -68,9 +54,6 @@ export function useTikTokMentions() {
     }
   }, []);
 
-  /**
-   * Clear all mentions
-   */
   const clearAllMentions = useCallback(async () => {
     try {
       const response = await fetch('/api/tiktok/mentions', {
@@ -84,38 +67,6 @@ export function useTikTokMentions() {
       console.error('Error clearing mentions:', error);
     }
   }, []);
-
-  /**
-   * Listen to mention notifications via WebSocket
-   */
-  useEffect(() => {
-    if (!socket) return;
-
-    const unsubscribe = subscribe('mention', (data: any) => {
-      const notification: MentionNotification = {
-        messageId: data.messageId,
-        conversationId: data.conversationId,
-        mentionedUserId: data.mentionedUserId,
-        mentionedByUserId: data.mentionedByUserId,
-        messageContent: data.messageContent,
-        createdAt: new Date(data.createdAt || Date.now())
-      };
-
-      setUnreadMentions(prev => [notification, ...prev]);
-
-
-      toast({
-        title: 'You were mentioned',
-        description: data.messageContent.substring(0, 50) + '...',
-        duration: 5000
-      });
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [socket, subscribe, toast]);
-
 
   useEffect(() => {
     loadUnreadMentions();
@@ -131,7 +82,7 @@ export function useTikTokMentions() {
 }
 
 /**
- * Hook for mention input with autocomplete
+ * Hook for mention input with autocomplete (TikTok: @username format)
  */
 export function useMentionInput(
   initialValue: string = '',
@@ -144,11 +95,7 @@ export function useMentionInput(
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
 
-  /**
-   * Parse current mention query
-   */
   const getCurrentMentionQuery = useCallback((text: string, cursorPosition: number): string | null => {
-
     let atIndex = -1;
     for (let i = cursorPosition - 1; i >= 0; i--) {
       if (text[i] === '@') {
@@ -162,10 +109,7 @@ export function useMentionInput(
 
     if (atIndex === -1) return null;
 
-
     const query = text.substring(atIndex + 1, cursorPosition);
-    
-
     if (query.includes(' ') || query.includes('\n')) {
       return null;
     }
@@ -174,9 +118,6 @@ export function useMentionInput(
     return query;
   }, []);
 
-  /**
-   * Filter users based on query
-   */
   const filterUsers = useCallback((query: string): MentionSuggestion[] => {
     if (!query) return users.slice(0, 5);
 
@@ -189,9 +130,6 @@ export function useMentionInput(
       .slice(0, 5);
   }, [users]);
 
-  /**
-   * Handle input change
-   */
   const handleChange = useCallback((newValue: string, cursorPosition?: number) => {
     setValue(newValue);
 
@@ -210,18 +148,15 @@ export function useMentionInput(
     }
   }, [getCurrentMentionQuery, filterUsers]);
 
-  /**
-   * Insert mention
-   */
+  /** Insert TikTok-style mention: @username */
   const insertMention = useCallback((user: MentionSuggestion) => {
     if (mentionStart === null || !inputRef.current) return;
 
     const cursor = inputRef.current.selectionStart || value.length;
     const before = value.substring(0, mentionStart);
     const after = value.substring(cursor);
-    
 
-    const mention = `@[${user.displayName}](${user.userId})`;
+    const mention = `@${user.userName}`;
     const newValue = before + mention + ' ' + after;
     const newCursor = before.length + mention.length + 1;
 
@@ -229,7 +164,6 @@ export function useMentionInput(
     setShowSuggestions(false);
     setSuggestions([]);
     setMentionStart(null);
-
 
     setTimeout(() => {
       if (inputRef.current) {
@@ -240,9 +174,6 @@ export function useMentionInput(
     }, 0);
   }, [mentionStart, value]);
 
-  /**
-   * Handle keyboard navigation
-   */
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!showSuggestions) return;
 
@@ -269,29 +200,27 @@ export function useMentionInput(
     }
   }, [showSuggestions, suggestions, selectedIndex, insertMention]);
 
-  /**
-   * Parse mentions from text
-   */
+  /** Parse TikTok @username mentions from text */
   const parseMentions = useCallback((text: string): { userId: number; userName: string }[] => {
     const mentions: { userId: number; userName: string }[] = [];
-    const pattern = /@\[([^\]]+)\]\((\d+)\)/g;
-    let match;
+    const matches = text.matchAll(TIKTOK_MENTION_REGEX);
+    const seen = new Set<string>();
 
-    while ((match = pattern.exec(text)) !== null) {
-      mentions.push({
-        userName: match[1],
-        userId: parseInt(match[2])
-      });
+    for (const match of matches) {
+      const userName = match[1];
+      if (seen.has(userName)) continue;
+      seen.add(userName);
+      const user = users.find(u => u.userName === userName || u.userName.toLowerCase() === userName.toLowerCase());
+      if (user) {
+        mentions.push({ userId: user.userId, userName: user.userName });
+      }
     }
 
     return mentions;
-  }, []);
+  }, [users]);
 
-  /**
-   * Format text for display (remove mention syntax)
-   */
   const formatForDisplay = useCallback((text: string): string => {
-    return text.replace(/@\[([^\]]+)\]\(\d+\)/g, '@$1');
+    return text; // TikTok @username is display-ready
   }, []);
 
   return {
@@ -310,20 +239,18 @@ export function useMentionInput(
 }
 
 /**
- * Hook for parsing mentions from text
- * Returns array of mention segments for rendering
+ * Hook for parsing mentions from text (TikTok @username format)
  */
-export function useMentionHighlight(text: string) {
+export function useMentionHighlight(text: string, users: MentionSuggestion[] = []) {
   const [segments, setSegments] = useState<Array<{ type: 'text' | 'mention'; content: string; userId?: number; index?: number }>>([]);
 
   useEffect(() => {
-    const pattern = /@\[([^\]]+)\]\((\d+)\)/g;
     const parts: Array<{ type: 'text' | 'mention'; content: string; userId?: number; index?: number }> = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = pattern.exec(text)) !== null) {
-
+    const re = new RegExp(TIKTOK_MENTION_REGEX.source, 'g');
+    while ((match = re.exec(text)) !== null) {
       if (match.index > lastIndex) {
         parts.push({
           type: 'text',
@@ -331,17 +258,18 @@ export function useMentionHighlight(text: string) {
         });
       }
 
+      const userName = match[1];
+      const user = users.find(u => u.userName === userName || u.userName.toLowerCase() === userName.toLowerCase());
 
       parts.push({
         type: 'mention',
-        content: match[1],
-        userId: parseInt(match[2]),
+        content: userName,
+        userId: user?.userId,
         index: match.index
       });
 
       lastIndex = match.index + match[0].length;
     }
-
 
     if (lastIndex < text.length) {
       parts.push({
@@ -351,8 +279,7 @@ export function useMentionHighlight(text: string) {
     }
 
     setSegments(parts);
-  }, [text]);
+  }, [text, users]);
 
   return segments;
 }
-

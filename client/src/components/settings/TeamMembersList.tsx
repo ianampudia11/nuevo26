@@ -46,7 +46,11 @@ interface TeamInvitation {
   updatedAt: string;
 }
 
-export function TeamMembersList() {
+interface TeamMembersListProps {
+  maxUsers?: number;
+}
+
+export function TeamMembersList({ maxUsers }: TeamMembersListProps) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -185,12 +189,12 @@ export function TeamMembersList() {
   
   const getAvatarColorClass = (id: number) => {
     const colors = [
-      'bg-primary-100 text-primary-600',
-      'bg-blue-100 text-blue-600',
-      'bg-green-100 text-green-600',
-      'bg-purple-100 text-purple-600',
-      'bg-amber-100 text-amber-600',
-      'bg-cyan-100 text-cyan-600'
+      'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400',
+      'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+      'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+      'bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
+      'bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
+      'bg-cyan-100 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400'
     ];
     return colors[id % colors.length];
   };
@@ -200,7 +204,7 @@ export function TeamMembersList() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium">
-            Members ({teamMembers.length}/5)
+            Members ({teamMembers.length}{maxUsers !== undefined ? `/${maxUsers}` : ''})
           </h3>
           <Button className='btn-brand-primary' onClick={() => setShowInviteModal(true)}>
             <i className="ri-user-add-line mr-1  "></i> Add Team Member
@@ -212,20 +216,20 @@ export function TeamMembersList() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="border border-border rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Name
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Email
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Role
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
                   <th scope="col" className="relative px-6 py-3">
@@ -233,7 +237,7 @@ export function TeamMembersList() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-background divide-y divide-border">
                 {teamMembers.map(member => (
                   <tr key={`member-${member.id}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -250,27 +254,27 @@ export function TeamMembersList() {
                           )}
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-foreground">
                             {member.fullName}
                           </div>
                           {currentUser?.id === member.id && (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                               You
                             </div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {member.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={member.role === 'admin' ? 'secondary' : 'default'} className="capitalize">
+                      <Badge variant={member.role === 'admin' ? 'secondary' : 'default'} className="capitalize !bg-muted !text-muted-foreground">
                         {member.role === 'admin' ? 'Administrator' : 'Agent'}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                      <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400">
                         Active
                       </span>
                     </td>
@@ -290,8 +294,8 @@ export function TeamMembersList() {
                               Edit Member
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDeleteMemberClick(member)}>
-                              <UserX className="h-4 w-4 mr-2 text-red-600" />
-                              <span className="text-red-600">Remove Member</span>
+                              <UserX className="h-4 w-4 mr-2 text-destructive" />
+                              <span className="text-destructive">Remove Member</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -304,26 +308,26 @@ export function TeamMembersList() {
                   <tr key={`invite-${invitation.id}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                           <i className="ri-user-line text-lg"></i>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-foreground">
                             Pending Invitation
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {invitation.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={invitation.role === 'admin' ? 'secondary' : 'default'} className="capitalize">
+                      <Badge variant={invitation.role === 'admin' ? 'secondary' : 'default'} className="capitalize !bg-muted !text-muted-foreground">
                         {invitation.role === 'admin' ? 'Administrator' : 'Agent'}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
+                      <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400">
                         Invited
                       </span>
                     </td>
@@ -342,8 +346,8 @@ export function TeamMembersList() {
                             Resend Invitation
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteInvitationClick(invitation.id)}>
-                            <UserMinus className="h-4 w-4 mr-2 text-red-600" />
-                            <span className="text-red-600">Cancel Invitation</span>
+                            <UserMinus className="h-4 w-4 mr-2 text-destructive" />
+                            <span className="text-destructive">Cancel Invitation</span>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -353,7 +357,7 @@ export function TeamMembersList() {
                 
                 {teamMembers.length === 0 && teamInvitations.filter(inv => inv.status === 'pending').length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">
                       No team members found. Invite members to join your team.
                     </td>
                   </tr>
@@ -382,7 +386,7 @@ export function TeamMembersList() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              <div className="flex items-center text-red-600">
+              <div className="flex items-center text-destructive">
                 <AlertTriangle className="h-5 w-5 mr-2" />
                 {deleteType === 'member' ? 'Remove Team Member' : 'Cancel Invitation'}
               </div>
@@ -399,7 +403,7 @@ export function TeamMembersList() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
             >
               {(deleteType === 'member' ? deleteTeamMemberMutation.isPending : cancelInvitationMutation.isPending) && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -204,7 +204,7 @@ export function DocumentList({
     if (mimeType.includes('word')) {
       return <FileText className="w-4 h-4 text-blue-500" />;
     }
-    return <File className="w-4 h-4 text-gray-500" />;
+    return <File className="w-4 h-4 text-muted-foreground" />;
   };
 
   const getStatusIcon = (status: Document['status']) => {

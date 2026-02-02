@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useReactFlow } from 'reactflow';
-import { Trash2, Copy, Globe, Settings, Plus, X, Play, CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Copy, Settings, Plus, X, Play, CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { useFlowContext } from '../../pages/flow-builder';
 import { Button } from "@/components/ui/button";
 import {
@@ -165,12 +165,12 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
 
   const getMethodColor = (method: string) => {
     switch (method) {
-      case 'GET': return 'text-blue-600';
-      case 'POST': return 'text-green-600';
-      case 'PUT': return 'text-orange-600';
-      case 'DELETE': return 'text-red-600';
-      case 'PATCH': return 'text-purple-600';
-      default: return 'text-gray-600';
+      case 'GET': return 'text-primary';
+      case 'POST': return 'text-primary';
+      case 'PUT': return 'text-primary';
+      case 'DELETE': return 'text-destructive';
+      case 'PATCH': return 'text-primary';
+      default: return 'text-muted-foreground';
     }
   };
 
@@ -326,7 +326,7 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
   };
 
   return (
-    <div className="node-webhook p-3 rounded-lg bg-white border border-blue-200 shadow-sm max-w-[320px] group">
+    <div className="node-webhook p-3 rounded-lg bg-card border border-border shadow-sm max-w-[320px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -366,7 +366,11 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
       </div>
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <Globe className="h-4 w-4 text-blue-600" />
+        <img 
+          src="https://cdn-icons-png.flaticon.com/128/919/919829.png" 
+          alt="Webhook" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.webhook', 'Webhook')}</span>
     <button
                 className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -386,7 +390,7 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
               </button>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2 bg-card rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <Settings className="h-3.5 w-3.5 text-muted-foreground" />
           <span className={cn("font-medium", getMethodColor(method))}>{method}</span>
@@ -398,17 +402,17 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
 
         <div className="mt-1 flex flex-wrap gap-1">
           {authType !== 'none' && (
-            <span className="text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded">
+            <span className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded">
               Auth: {AUTH_TYPES.find(t => t.id === authType)?.name}
             </span>
           )}
           {headers.length > 0 && (
-            <span className="text-[10px] bg-purple-100 text-purple-800 px-1 py-0.5 rounded">
+            <span className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded">
               {headers.length} header{headers.length !== 1 ? 's' : ''}
             </span>
           )}
           {body && (method === 'POST' || method === 'PUT' || method === 'PATCH') && (
-            <span className="text-[10px] bg-green-100 text-green-800 px-1 py-0.5 rounded">
+            <span className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded">
               {t('flow_builder.webhook_body_configured', 'Body configured')}
             </span>
           )}
@@ -416,7 +420,7 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
       </div>
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border border-border rounded p-2 bg-card">
           <div>
             <Label className="block mb-1 font-medium">{t('flow_builder.webhook_method', 'HTTP Method')}</Label>
             <Select
@@ -619,19 +623,18 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
 
           <div className="text-[10px] text-muted-foreground mt-2">
             <p>
-              The webhook node will make an HTTP request to the specified URL.
-              Response data will be available as variables in subsequent nodes.
+              The webhook node makes an HTTP request when reached in the flow and continues immediately to the next node. Response data is stored in variables (webhook.lastResponse, webhook.status, etc.) for use in subsequent nodes. The webhook executes only once per flow execution.
             </p>
           </div>
 
           {showTestResult && testResult && (
-            <div className="mt-3 border rounded p-2 bg-secondary/5">
+            <div className="mt-3 border border-border rounded p-2 bg-card">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {testResult.success ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-primary" />
                   ) : (
-                    <XCircle className="h-4 w-4 text-red-600" />
+                    <XCircle className="h-4 w-4 text-destructive" />
                   )}
                   <span className="text-xs font-medium">
                     {testResult.success ? 'Test Successful' : 'Test Failed'}
@@ -653,7 +656,7 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
               </div>
 
               {testResult.error ? (
-                <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
                   {testResult.error}
                 </div>
               ) : (
@@ -662,8 +665,8 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
                     <span className="font-medium">Status:</span>
                     <span className={`px-1 py-0.5 rounded text-[10px] ${
                       testResult.success
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-destructive/10 text-destructive'
                     }`}>
                       {testResult.status} {testResult.statusText}
                     </span>
@@ -683,10 +686,10 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
                         )}
                       </button>
                       {showResponseHeaders && (
-                        <div className="mt-1 text-[10px] bg-gray-50 p-2 rounded font-mono max-h-20 overflow-y-auto">
+                        <div className="mt-1 text-[10px] bg-muted/50 p-2 rounded font-mono max-h-20 overflow-y-auto">
                           {Object.entries(testResult.headers).map(([key, value]) => (
                             <div key={key} className="truncate">
-                              <span className="text-gray-600">{key}:</span> {value}
+                              <span className="text-muted-foreground">{key}:</span> {value}
                             </div>
                           ))}
                         </div>
@@ -699,7 +702,7 @@ export function WebhookNode({ id, data, isConnectable }: WebhookNodeProps) {
                       <div className="text-xs font-medium text-muted-foreground mb-1">
                         Response Body:
                       </div>
-                      <div className="text-[10px] bg-gray-50 p-2 rounded font-mono max-h-32 overflow-y-auto">
+                      <div className="text-[10px] bg-muted/50 p-2 rounded font-mono max-h-32 overflow-y-auto">
                         {typeof testResult.data === 'string'
                           ? testResult.data
                           : JSON.stringify(testResult.data, null, 2)

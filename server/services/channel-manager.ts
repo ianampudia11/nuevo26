@@ -1,8 +1,6 @@
 import { storage } from '../storage';
 import whatsAppService, { deleteWhatsAppMessage } from './channels/whatsapp';
 import whatsAppOfficialService from './channels/whatsapp-official';
-import whatsAppTwilioService from './channels/whatsapp-twilio';
-import whatsApp360DialogPartnerService from './channels/whatsapp-360dialog-partner';
 import messengerService from './channels/messenger';
 import instagramService from './channels/instagram';
 import TikTokService from './channels/tiktok';
@@ -15,8 +13,17 @@ export interface ChannelCapabilities {
   supportsReply: boolean;
   supportsDelete: boolean;
   supportsQuotedMessages: boolean;
-  deleteTimeLimit?: number; 
+  deleteTimeLimit?: number;
   replyFormat: 'quoted' | 'threaded' | 'mention';
+  supportsTypingIndicator?: boolean;
+  supportsReadReceipts?: boolean;
+  supportsReactions?: boolean;
+  supportsRichMedia?: boolean;
+  supportedMediaTypes?: string[];
+  hasMessagingWindow?: boolean;
+  messagingWindowDuration?: number;
+  maxMessageLength?: number;
+  requiresBusinessAccount?: boolean;
 }
 
 export interface ReplyOptions {
@@ -59,22 +66,6 @@ class ChannelManager {
           supportsQuotedMessages: true,
           replyFormat: 'quoted'
         };
-
-      case 'whatsapp_twilio':
-        return {
-          supportsReply: true,
-          supportsDelete: false,
-          supportsQuotedMessages: true,
-          replyFormat: 'quoted'
-        };
-
-      case 'whatsapp_360dialog':
-        return {
-          supportsReply: true,
-          supportsDelete: false,
-          supportsQuotedMessages: true,
-          replyFormat: 'quoted'
-        };
       
       case 'messenger':
         return {
@@ -97,7 +88,16 @@ class ChannelManager {
           supportsReply: true,
           supportsDelete: false,
           supportsQuotedMessages: false,
-          replyFormat: 'mention'
+          replyFormat: 'mention',
+          supportsTypingIndicator: false,
+          supportsReadReceipts: false,
+          supportsReactions: false,
+          supportsRichMedia: true,
+          supportedMediaTypes: ['text', 'image', 'video', 'sticker'],
+          hasMessagingWindow: true,
+          messagingWindowDuration: 48 * 60 * 60 * 1000,
+          maxMessageLength: 2000,
+          requiresBusinessAccount: true
         };
 
       case 'email':
@@ -253,30 +253,6 @@ class ChannelManager {
             companyId
           );
 
-        case 'whatsapp_twilio':
-          if (conversation.isGroup) {
-            return { success: false, error: 'Twilio WhatsApp does not support group chat replies' };
-          }
-          return await this.sendTwilioWhatsAppReply(
-            conversation.channelId,
-            userId,
-            recipient,
-            messageContent,
-            replyOptions
-          );
-
-        case 'whatsapp_360dialog':
-          if (conversation.isGroup) {
-            return { success: false, error: '360Dialog WhatsApp does not support group chat replies' };
-          }
-          return await this.send360DialogPartnerWhatsAppReply(
-            conversation.channelId,
-            userId,
-            recipient,
-            messageContent,
-            replyOptions
-          );
-
         case 'messenger':
           if (conversation.isGroup) {
             return { success: false, error: 'Messenger does not support group chat replies' };
@@ -309,7 +285,9 @@ class ChannelManager {
             conversationId,
             recipient,
             messageContent,
-            replyOptions
+            replyOptions,
+            companyId ?? conversation.companyId!,
+            userId
           );
 
         case 'email':
@@ -512,54 +490,6 @@ class ChannelManager {
     }
   }
 
-  private async sendTwilioWhatsAppReply(
-    connectionId: number,
-    userId: number,
-    recipient: string,
-    content: string,
-    replyOptions: ReplyOptions
-  ): Promise<ChannelServiceResult> {
-    try {
-      const quotedContent = `"${replyOptions.originalContent}"\n\n${content}`;
-
-      const message = await whatsAppTwilioService.sendMessage(
-        connectionId,
-        userId,
-        recipient,
-        quotedContent
-      );
-
-      return { success: true, data: message };
-    } catch (error: any) {
-      console.error('Error sending Twilio WhatsApp reply:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  private async send360DialogPartnerWhatsAppReply(
-    connectionId: number,
-    userId: number,
-    recipient: string,
-    content: string,
-    replyOptions: ReplyOptions
-  ): Promise<ChannelServiceResult> {
-    try {
-      const quotedContent = `"${replyOptions.originalContent}"\n\n${content}`;
-
-      const message = await whatsApp360DialogPartnerService.sendMessage(
-        connectionId,
-        userId,
-        recipient,
-        quotedContent
-      );
-
-      return { success: true, data: message };
-    } catch (error: any) {
-      console.error('Error sending 360Dialog Partner WhatsApp reply:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
   private async sendMessengerReply(
     connectionId: number,
     to: string,
@@ -610,19 +540,45 @@ class ChannelManager {
     conversationId: number,
     to: string,
     content: string,
-    replyOptions: ReplyOptions
+    replyOptions: ReplyOptions,
+    companyId: number,
+    userId: number
   ): Promise<ChannelServiceResult> {
     try {
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation) {
+        return { success: false, error: 'Conversation not found' };
+      }
+      const tiktokConversationId = (conversation.groupMetadata as any)?.tiktokConversationId;
+      if (!tiktokConversationId) {
+        return { success: false, error: 'TikTok conversation ID not found' };
+      }
+
+
+      const windowCheck = await TikTokService.checkMessagingWindow(conversationId);
+      if (!windowCheck.isOpen) {
+        return {
+          success: false,
+          error: 'Messaging window has closed. User must send a message to reopen the conversation.',
+          data: {
+            windowStatus: windowCheck.status,
+            expiresAt: windowCheck.expiresAt,
+            lastInteractionAt: windowCheck.lastInteractionAt
+          }
+        };
+      }
 
       const replyContent = `@${replyOptions.originalSender} ${content}`;
 
 
       const message = await TikTokService.sendAndSaveMessage(
         connectionId,
-        conversationId,
+        companyId,
+        tiktokConversationId,
         to,
-        replyContent,
-        'text'
+        userId,
+        'text',
+        replyContent
       );
 
       return {
@@ -632,7 +588,13 @@ class ChannelManager {
       };
     } catch (error: any) {
       console.error('Error sending TikTok reply:', error);
-      return { success: false, error: error.message };
+      const message =
+        (error?.error?.message != null && typeof error.error.message === 'string')
+          ? error.error.message
+          : (error?.message != null && typeof error.message === 'string')
+            ? error.message
+            : 'Failed to send message';
+      return { success: false, error: message };
     }
   }
 
@@ -803,6 +765,307 @@ class ChannelManager {
 
   getCapabilities(channelType: string): ChannelCapabilities {
     return this.getChannelCapabilities(channelType);
+  }
+
+  /**
+   * Send a direct message to a specific phone number/contact via a channel
+   * This method is used by the Contact Notification Node to send messages
+   * to contacts that may not have an existing conversation
+   */
+  async sendDirectMessage(
+    channelType: string,
+    phoneNumber: string,
+    messageType: string,
+    content: string,
+    mediaUrl?: string,
+    subject?: string,
+    companyId?: number
+  ): Promise<ChannelServiceResult> {
+    try {
+
+      const { storage } = await import('../storage');
+      
+      if (!companyId) {
+        return { success: false, error: 'Company ID is required' };
+      }
+
+
+      const connections = await storage.getChannelConnections(null, companyId);
+      const channelConnection = connections.find(
+        (conn: any) => conn.channelType === channelType && conn.status === 'active'
+      );
+
+      if (!channelConnection) {
+        return { success: false, error: `No active ${channelType} channel connection found` };
+      }
+
+
+      const identifierType = channelType === 'whatsapp_official' ? 'whatsapp' : 
+                             channelType === 'whatsapp_unofficial' ? 'whatsapp' :
+                             channelType === 'email' ? 'email' :
+                             channelType === 'messenger' ? 'messenger' :
+                             channelType === 'instagram' ? 'instagram' :
+                             channelType === 'tiktok' ? 'tiktok' :
+                             channelType === 'webchat' ? 'webchat' :
+                             'phone';
+
+
+      let contact = await storage.getContactByPhone(phoneNumber, companyId);
+      if (!contact) {
+
+        contact = await storage.getContactByIdentifier(phoneNumber, identifierType);
+        if (contact && contact.companyId !== companyId) {
+          contact = undefined; // Don't use contact from different company
+        }
+      }
+
+      if (!contact) {
+
+        const contactData: any = {
+          identifier: phoneNumber,
+          identifierType: identifierType,
+          phone: channelType === 'email' ? null : phoneNumber,
+          email: channelType === 'email' ? phoneNumber : null,
+          companyId: companyId,
+          name: phoneNumber,
+          source: channelType
+        };
+        contact = await storage.getOrCreateContact(contactData);
+      }
+
+
+      let conversation = await storage.getConversationByContactAndChannel(
+        contact.id,
+        channelConnection.id
+      );
+
+      if (!conversation) {
+        conversation = await storage.createConversation({
+          contactId: contact.id,
+          channelId: channelConnection.id,
+          companyId: companyId || 0,
+          channelType: channelType,
+          status: 'open'
+        });
+      }
+
+
+
+      let userId = channelConnection.userId || 0;
+      if (!userId || userId === 0) {
+
+        const companyUsers = await storage.getUsersByCompany(companyId);
+        if (companyUsers && companyUsers.length > 0) {
+          userId = companyUsers[0].id;
+        }
+      }
+
+
+      if (!userId || userId === 0) {
+        return { success: false, error: 'No valid user found for sending message' };
+      }
+
+
+      let messageResult: ChannelServiceResult;
+
+      switch (channelType) {
+        case 'whatsapp_unofficial':
+        case 'whatsapp':
+          if (messageType === 'text') {
+            const result = await whatsAppService.sendMessage(
+              channelConnection.id,
+              userId, // Use valid user ID instead of 0
+              phoneNumber,
+              content,
+              false,
+              conversation.id
+            );
+            messageResult = { success: !!result, messageId: result?.id?.toString(), data: result };
+          } else if (mediaUrl) {
+
+            if (messageType !== 'image' && messageType !== 'video' && messageType !== 'audio' && messageType !== 'document') {
+              messageResult = { success: false, error: `Unsupported message type: ${messageType}` };
+              break;
+            }
+
+
+
+            const typedMediaType: 'image' | 'video' | 'audio' | 'document' = messageType as any;
+            const result = await whatsAppService.sendMediaMessage(
+              channelConnection.id,
+              userId, // Use valid user ID instead of 0
+              phoneNumber,
+              typedMediaType,
+              mediaUrl,
+              content || undefined, // caption
+              undefined, // fileName (optional)
+              false, // isFromBot
+              conversation.id // conversationId (optional)
+            );
+            messageResult = { success: !!result, messageId: result?.id?.toString(), data: result };
+          } else {
+            messageResult = { success: false, error: 'Media URL required for media messages' };
+          }
+          break;
+
+        case 'whatsapp_official':
+          if (messageType === 'text') {
+            const result = await whatsAppOfficialService.sendMessage(
+              channelConnection.id,
+              userId, // Use valid user ID instead of 0
+              companyId || 0,
+              phoneNumber,
+              content
+            );
+            messageResult = { success: !!result, messageId: result?.externalId || result?.id?.toString(), data: result };
+          } else if (mediaUrl && (messageType === 'image' || messageType === 'video' || messageType === 'audio' || messageType === 'document')) {
+            const result = await whatsAppOfficialService.sendMedia(
+              channelConnection.id,
+              userId, // Use valid user ID instead of 0
+              companyId || 0,
+              phoneNumber,
+              messageType as 'image' | 'video' | 'audio' | 'document',
+              mediaUrl,
+              content
+            );
+            messageResult = { success: !!result, messageId: result?.externalId || result?.id?.toString(), data: result };
+          } else {
+            messageResult = { success: false, error: 'Media URL required for media messages' };
+          }
+          break;
+
+        case 'messenger':
+          if (messageType === 'text') {
+            const result = await messengerService.sendMessage(channelConnection.id, phoneNumber, content);
+            messageResult = { success: result.success, messageId: result.messageId, error: result.error };
+          } else if (mediaUrl && (messageType === 'image' || messageType === 'video' || messageType === 'audio' || messageType === 'document')) {
+
+
+
+            messageResult = { success: false, error: 'Media messages via URL are not yet supported for Messenger. Please use text messages.' };
+          } else {
+            messageResult = { success: false, error: 'Media URL required for media messages' };
+          }
+          break;
+
+        case 'instagram':
+          if (messageType === 'text') {
+            const result = await instagramService.sendMessage(channelConnection.id, phoneNumber, content);
+            messageResult = { success: result.success, messageId: result.messageId, error: result.error };
+          } else if (mediaUrl && (messageType === 'image' || messageType === 'video')) {
+            const result = await instagramService.sendMedia(
+              channelConnection.id,
+              phoneNumber,
+              mediaUrl,
+              messageType as 'image' | 'video',
+              content
+            );
+            messageResult = { success: result.success, messageId: result.messageId, error: result.error };
+          } else {
+            messageResult = { success: false, error: 'Media URL required for media messages. Instagram only supports image and video.' };
+          }
+          break;
+
+        case 'tiktok': {
+          const tiktokConversationId = (conversation.groupMetadata as any)?.tiktokConversationId;
+          const tiktokCompanyId = conversation.companyId;
+          if (!tiktokConversationId || !tiktokCompanyId) {
+            messageResult = { success: false, error: 'TikTok conversation or company not found' };
+            break;
+          }
+          if (messageType === 'text') {
+            const message = await TikTokService.sendAndSaveMessage(
+              channelConnection.id,
+              tiktokCompanyId,
+              tiktokConversationId,
+              phoneNumber,
+              userId,
+              'text',
+              content
+            );
+            messageResult = { success: true, messageId: message.id.toString(), data: message };
+          } else if (mediaUrl && (messageType === 'image' || messageType === 'video')) {
+            const message = await TikTokService.sendAndSaveMessage(
+              channelConnection.id,
+              tiktokCompanyId,
+              tiktokConversationId,
+              phoneNumber,
+              userId,
+              messageType as 'image' | 'video',
+              mediaUrl
+            );
+            messageResult = { success: true, messageId: message.id.toString(), data: message };
+          } else {
+            messageResult = { success: false, error: 'Media URL required for media messages. TikTok only supports text, image, and video.' };
+          }
+          break;
+        }
+
+        case 'email':
+          if (!subject) {
+            messageResult = { success: false, error: 'Subject is required for email messages' };
+            break;
+          }
+          try {
+
+
+
+            const result = await emailService.sendMessage(
+              channelConnection.id,
+              userId, // Use valid user ID instead of 0
+              phoneNumber,
+              subject,
+              content,
+              {
+                isHtml: false
+
+
+              }
+            );
+            messageResult = { success: true, messageId: result.id?.toString(), data: result };
+          } catch (err: any) {
+            messageResult = { success: false, error: err?.message || 'Failed to send email' };
+          }
+          break;
+
+        case 'twilio_sms':
+          if (messageType !== 'text') {
+            messageResult = { success: false, error: 'Twilio SMS only supports text messages' };
+            break;
+          }
+          try {
+            const message = await twilioSmsService.sendMessage(
+              channelConnection.id,
+              userId, // Use valid user ID instead of 0
+              phoneNumber,
+              content
+            );
+            messageResult = { success: true, messageId: message.id?.toString(), data: message };
+          } catch (err: any) {
+            messageResult = { success: false, error: err?.message || 'Failed to send SMS' };
+          }
+          break;
+
+        case 'webchat':
+          if (messageType === 'text') {
+            const message = await webchatService.sendMessage(channelConnection.id, phoneNumber, content);
+            messageResult = { success: true, messageId: message?.id?.toString(), data: message };
+          } else {
+
+
+            messageResult = { success: false, error: 'Media messages are not yet supported for WebChat via direct message. Please use text messages.' };
+          }
+          break;
+
+        default:
+          messageResult = { success: false, error: `Unsupported channel type: ${channelType}` };
+      }
+
+      return messageResult;
+    } catch (error: any) {
+      console.error('Error sending direct message:', error);
+      return { success: false, error: error.message || 'Failed to send direct message' };
+    }
   }
 }
 

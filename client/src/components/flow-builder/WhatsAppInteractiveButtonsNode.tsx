@@ -12,8 +12,7 @@ import {
   Copy,
   Eye,
   EyeOff,
-  AlertCircle,
-  Smartphone
+  AlertCircle
 } from 'lucide-react';
 import {
   Tooltip,
@@ -142,7 +141,7 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
     });
 
   return (
-    <div className="node-whatsapp-interactive-buttons p-3 rounded-lg bg-white border border-green-200 shadow-sm min-w-[380px] max-w-[480px] group">
+    <div className="node-whatsapp-interactive-buttons p-3 rounded-lg bg-card border border-border shadow-sm min-w-[380px] max-w-[480px] group">
       {/* Node Toolbar */}
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip>
@@ -181,10 +180,10 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
       {/* Node Header */}
       <div className="font-medium flex items-center gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <Smartphone className="h-4 w-4 text-green-600" />
+          <img src="https://cdn-icons-png.flaticon.com/128/1516/1516938.png" alt="WhatsApp Interactive Buttons" className="h-4 w-4" />
           <span className="text-sm">{t('whatsapp_interactive.node_title', 'WhatsApp Interactive Buttons')}</span>
         </div>
-        <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border border-primary/20">
           {t('whatsapp_interactive.official_api', 'Official API')}
         </Badge>
         <button
@@ -207,9 +206,9 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
 
       {/* Error Indicator */}
       {hasErrors && (
-        <div className="flex items-center gap-2 mb-3 p-2 bg-red-50 border border-red-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-red-500" />
-          <span className="text-xs text-red-600">
+        <div className="flex items-center gap-2 mb-3 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-xs text-destructive">
             {t('whatsapp_interactive.validation_errors', 'Please fix validation errors')}
           </span>
         </div>
@@ -219,20 +218,20 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
       {!isEditing && (
         <div className="space-y-3">
           {/* WhatsApp Message Preview */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
             {headerText && (
-              <div className="font-medium text-sm text-gray-800 mb-2">
+              <div className="font-medium text-sm text-foreground mb-2">
                 {headerText}
               </div>
             )}
-            <div className="text-sm text-gray-700 mb-3">
+            <div className="text-sm text-foreground mb-3">
               {bodyText}
             </div>
             <div className="space-y-2">
               {buttons.map((button) => (
                 <div
                   key={button.id}
-                  className="border border-green-300 rounded-md p-2 text-center text-sm bg-white hover:bg-green-50 transition-colors relative"
+                  className="border border-primary/20 rounded-md p-2 text-center text-sm bg-card hover:bg-primary/10 transition-colors relative"
                 >
                   {button.title}
                   <Handle
@@ -250,13 +249,13 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
               ))}
             </div>
             {footerText && (
-              <div className="text-xs text-gray-500 mt-3">
+              <div className="text-xs text-muted-foreground mt-3">
                 {footerText}
               </div>
             )}
           </div>
           
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {t('whatsapp_interactive.button_count', `${buttons.length} button(s) configured`)}
           </div>
         </div>
@@ -269,19 +268,19 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_interactive.header_text', 'Header Text')}
-              <span className="text-gray-500 ml-1">({t('common.optional', 'Optional')})</span>
+              <span className="text-muted-foreground ml-1">({t('common.optional', 'Optional')})</span>
             </Label>
             <Input
               value={headerText}
               onChange={(e) => setHeaderText(e.target.value)}
               placeholder={t('whatsapp_interactive.header_placeholder', 'Optional header text...')}
-              className={cn("text-xs", headerError && "border-red-300")}
+              className={cn("text-xs", headerError && "border-destructive")}
               maxLength={60}
             />
             {headerError && (
-              <p className="text-xs text-red-500">{headerError}</p>
+              <p className="text-xs text-destructive">{headerError}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {headerText.length}/60 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -290,19 +289,19 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_interactive.body_text', 'Body Text')}
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-destructive ml-1">*</span>
             </Label>
             <Textarea
               value={bodyText}
               onChange={(e) => setBodyText(e.target.value)}
               placeholder={t('whatsapp_interactive.body_placeholder', 'Enter your message text...')}
-              className={cn("text-xs min-h-[60px]", bodyError && "border-red-300")}
+              className={cn("text-xs min-h-[60px]", bodyError && "border-destructive")}
               maxLength={1024}
             />
             {bodyError && (
-              <p className="text-xs text-red-500">{bodyError}</p>
+              <p className="text-xs text-destructive">{bodyError}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {bodyText.length}/1024 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -312,7 +311,7 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
             <div className="flex items-center justify-between">
               <Label className="text-xs font-medium">
                 {t('whatsapp_interactive.buttons', 'Interactive Buttons')}
-                <span className="text-red-500 ml-1">*</span>
+                <span className="text-destructive ml-1">*</span>
               </Label>
               <Button
                 type="button"
@@ -331,9 +330,9 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
               {buttons.map((button, index) => {
                 const validation = validateButton(button);
                 return (
-                  <div key={button.id} className="border rounded-lg p-3 bg-gray-50 relative">
+                  <div key={button.id} className="border rounded-lg p-3 bg-muted relative">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-700">
+                      <span className="text-xs font-medium text-foreground">
                         {t('whatsapp_interactive.button', 'Button')} {index + 1}
                       </span>
                       {buttons.length > 1 && (
@@ -342,7 +341,7 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
                           variant="ghost"
                           size="sm"
                           onClick={() => removeButton(button.id)}
-                          className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
+                          className="h-5 w-5 p-0 text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -353,19 +352,19 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
                       <div>
                         <Label className="text-xs">
                           {t('whatsapp_interactive.button_title', 'Button Title')}
-                          <span className="text-red-500 ml-1">*</span>
+                          <span className="text-destructive ml-1">*</span>
                         </Label>
                         <Input
                           value={button.title}
                           onChange={(e) => updateButton(button.id, 'title', e.target.value)}
                           placeholder={t('whatsapp_interactive.title_placeholder', 'Button text...')}
-                          className={cn("text-xs", !validation.titleValid && "border-red-300")}
+                          className={cn("text-xs", !validation.titleValid && "border-destructive")}
                           maxLength={20}
                         />
                         {validation.titleError && (
-                          <p className="text-xs text-red-500">{validation.titleError}</p>
+                          <p className="text-xs text-destructive">{validation.titleError}</p>
                         )}
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {button.title.length}/20 {t('common.characters', 'characters')}
                         </p>
                       </div>
@@ -373,19 +372,19 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
                       <div>
                         <Label className="text-xs">
                           {t('whatsapp_interactive.button_payload', 'Button Payload')}
-                          <span className="text-red-500 ml-1">*</span>
+                          <span className="text-destructive ml-1">*</span>
                         </Label>
                         <Input
                           value={button.payload}
                           onChange={(e) => updateButton(button.id, 'payload', e.target.value)}
                           placeholder={t('whatsapp_interactive.payload_placeholder', 'button_value')}
-                          className={cn("text-xs", !validation.payloadValid && "border-red-300")}
+                          className={cn("text-xs", !validation.payloadValid && "border-destructive")}
                           maxLength={256}
                         />
                         {validation.payloadError && (
-                          <p className="text-xs text-red-500">{validation.payloadError}</p>
+                          <p className="text-xs text-destructive">{validation.payloadError}</p>
                         )}
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {button.payload.length}/256 {t('common.characters', 'characters')}
                         </p>
                       </div>
@@ -408,7 +407,7 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
               })}
             </div>
 
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {t('whatsapp_interactive.button_limit', 'Maximum 3 buttons allowed by WhatsApp API')}
             </p>
           </div>
@@ -417,28 +416,28 @@ const WhatsAppInteractiveButtonsNode: React.FC<WhatsAppInteractiveButtonsNodePro
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_interactive.footer_text', 'Footer Text')}
-              <span className="text-gray-500 ml-1">({t('common.optional', 'Optional')})</span>
+              <span className="text-muted-foreground ml-1">({t('common.optional', 'Optional')})</span>
             </Label>
             <Input
               value={footerText}
               onChange={(e) => setFooterText(e.target.value)}
               placeholder={t('whatsapp_interactive.footer_placeholder', 'Optional footer text...')}
-              className={cn("text-xs", footerError && "border-red-300")}
+              className={cn("text-xs", footerError && "border-destructive")}
               maxLength={60}
             />
             {footerError && (
-              <p className="text-xs text-red-500">{footerError}</p>
+              <p className="text-xs text-destructive">{footerError}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {footerText.length}/60 {t('common.characters', 'characters')}
             </p>
           </div>
 
           {/* API Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div className="text-xs text-blue-800">
+              <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
+              <div className="text-xs text-primary">
                 <p className="font-medium mb-1">
                   {t('whatsapp_interactive.api_info_title', 'WhatsApp Business API Requirements')}
                 </p>

@@ -8,9 +8,11 @@ import { useConversations } from '@/context/ConversationContext';
 import QuotedMessagePreview from './QuotedMessagePreview';
 import OptimizedMediaBubble from './OptimizedMediaBubble';
 import { GroupParticipantAvatar } from '@/components/groups/GroupParticipantAvatar';
+import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { stripAgentSignature } from '@/utils/messageUtils';
-import { parseFormattedText, hasFormatting } from '@/utils/textFormatter';
+import { parseFormattedText, hasFormatting, extractUrls } from '@/utils/textFormatter';
 import PollMessage from './PollMessage';
+import LinkPreview from './LinkPreview';
 import PollResponse from './PollResponse';
 import { useQuery } from '@tanstack/react-query';
 import { formatMessageDateTime } from '@/utils/dateUtils';
@@ -157,6 +159,7 @@ interface ChannelCapabilities {
   supportsQuotedMessages: boolean;
   deleteTimeLimit?: number;
   replyFormat: 'quoted' | 'threaded' | 'mention';
+  supportsReactions?: boolean;
 }
 
 interface MessageBubbleProps {
@@ -192,21 +195,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
   const isInbound = message.direction === 'inbound';
   
 
-  if (channelType === 'webchat') {
-    console.log('[WebChat Message Debug]', {
-      messageId: message.id,
-      direction: message.direction,
-      senderType: message.senderType,
-      content: message.content?.substring(0, 30),
-      isInbound,
-      sentAt: message.sentAt,
-      createdAt: message.createdAt,
-      metadataTimestamp: message.metadata?.timestamp,
 
-      sentAtMs: message.sentAt ? new Date(message.sentAt).getTime() : null,
-      createdAtMs: new Date(message.createdAt).getTime()
-    });
-  }
 
   const isFromBot = message.isFromBot === true;
   const timestamp = message.sentAt || 
@@ -591,11 +580,32 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
     const isThreaded = emailInReplyTo || (emailReferences && emailReferences.length > 0);
     const isReply = emailSubject && (emailSubject.startsWith('Re:') || emailSubject.startsWith('RE:'));
 
+
+    const extractPlainTextFromHtml = (html: string): string => {
+      if (!html) return '';
+
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      return tempDiv.textContent || tempDiv.innerText || '';
+    };
+
+
+
+    const getEmailContentForLinkPreview = (): string => {
+      if (emailPlainText) {
+        return emailPlainText;
+      }
+      if (emailHtml) {
+        return extractPlainTextFromHtml(emailHtml);
+      }
+      return stripAgentSignature(message.content || '');
+    };
+
     return (
       <div className="email-message">
         {/* Email Threading Indicator */}
         {isThreaded && (
-          <div className="email-thread-indicator mb-2 flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+          <div className="email-thread-indicator mb-2 flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
             <Mail className="w-3 h-3" />
             <ArrowRight className="w-3 h-3" />
             <span>{isReply ? t('message_bubble.email.reply_in_thread', 'Reply in thread') : t('message_bubble.email.part_of_thread', 'Part of email thread')}</span>
@@ -604,16 +614,16 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
 
         {/* Email Subject */}
         {emailSubject && (
-          <div className="email-subject mb-2 pb-2 border-b border-gray-200">
-            <h4 className="font-semibold text-sm text-gray-800 flex items-center gap-2">
-              {isReply && <Reply className="w-4 h-4 text-blue-600" />}
+          <div className="email-subject mb-2 pb-2 border-b border-border">
+            <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
+              {isReply && <Reply className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
               {emailSubject}
             </h4>
           </div>
         )}
 
         {/* Email Headers */}
-        <div className="email-headers mb-3 text-xs text-gray-600 space-y-1">
+        <div className="email-headers mb-3 text-xs text-muted-foreground space-y-1">
           {emailFrom && (
             <div>
               <span className="font-medium">{t('message_bubble.email.from', 'From')}:</span> {emailFrom}
@@ -625,7 +635,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
             </div>
           )}
           {isThreaded && emailInReplyTo && (
-            <div className="text-blue-600">
+            <div className="text-blue-600 dark:text-blue-400">
               <span className="font-medium">{t('message_bubble.email.in_reply_to', 'In reply to')}:</span> {emailInReplyTo}
             </div>
           )}
@@ -651,21 +661,34 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
           )}
         </div>
 
+        {/* Link Previews for Email Content */}
+        {(() => {
+          const emailContent = getEmailContentForLinkPreview();
+          const urlsToPreview = extractUrls(emailContent);
+          return urlsToPreview.length > 0 ? (
+            <div className="mt-2 space-y-2">
+              {urlsToPreview.map(url => (
+                <LinkPreview key={url} url={url} isInbound={isInbound} />
+              ))}
+            </div>
+          ) : null;
+        })()}
+
         {/* Email Attachments */}
         {emailAttachments.length > 0 && (
-          <div className="email-attachments mt-3 pt-3 border-t border-gray-200">
-            <div className="text-xs text-gray-600 mb-2 font-medium">
+          <div className="email-attachments mt-3 pt-3 border-t border-border">
+            <div className="text-xs text-muted-foreground mb-2 font-medium">
               <i className="ri-attachment-line mr-1"></i>
               {t('message_bubble.email.attachments', 'Attachments')} ({emailAttachments.length})
             </div>
             <div className="space-y-2">
               {emailAttachments.map((attachment: any, index: number) => (
-                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs">
+                <div key={index} className="flex items-center justify-between bg-muted p-2 rounded text-xs">
                   <div className="flex items-center flex-1 min-w-0">
-                    <i className="ri-file-line mr-2 text-gray-500 flex-shrink-0"></i>
+                    <i className="ri-file-line mr-2 text-muted-foreground flex-shrink-0"></i>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{attachment.filename}</div>
-                      <div className="text-gray-500">
+                      <div className="text-muted-foreground">
                         {attachment.contentType} • {Math.round(attachment.size / 1024)}KB
                       </div>
                     </div>
@@ -674,7 +697,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
                     href={attachment.downloadUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded text-xs transition-all ml-2 flex-shrink-0"
+                    className="flex items-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground py-1 px-2 rounded text-xs transition-all ml-2 flex-shrink-0"
                   >
                     <Download className="h-3 w-3" />
                     <span>{t('message_bubble.download', 'Download')}</span>
@@ -686,8 +709,8 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
         )}
 
         {isLoadingAttachments && (
-          <div className="email-attachments mt-3 pt-3 border-t border-gray-200">
-            <div className="flex items-center text-xs text-gray-500">
+          <div className="email-attachments mt-3 pt-3 border-t border-border">
+            <div className="flex items-center text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin mr-2" />
               {t('message_bubble.email.loading_attachments', 'Loading attachments...')}
             </div>
@@ -715,6 +738,90 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
     }
   };
 
+  const getExternalAdReply = () => {
+    try {
+      const metadata = typeof message.metadata === 'string' 
+        ? JSON.parse(message.metadata) 
+        : message.metadata || {};
+      
+      return metadata.externalAdReply || null;
+    } catch (error) {
+      console.error('Error parsing externalAdReply metadata:', error);
+      return null;
+    }
+  };
+
+  const renderAdPreview = (adReply: any) => {
+    if (!adReply) return null;
+
+    const handleCardClick = () => {
+      if (adReply.sourceUrl) {
+        window.open(adReply.sourceUrl, '_blank', 'noopener,noreferrer');
+      }
+    };
+
+    const displayTitle = adReply.title || '';
+    const displayBody = adReply.body || '';
+    const displayThumbnail = adReply.thumbnail;
+    const displaySiteName = adReply.sourceUrl ? (() => {
+      try {
+        const url = new URL(adReply.sourceUrl);
+        return url.hostname.replace('www.', '');
+      } catch {
+        return adReply.sourceUrl;
+      }
+    })() : '';
+
+    return (
+      <div
+        className={`link-preview-card ${isInbound ? 'inbound' : 'outbound'}`}
+        onClick={handleCardClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleCardClick();
+          }
+        }}
+      >
+        {displayThumbnail && (
+          <div className="link-preview-image-container">
+            <img
+              src={displayThumbnail}
+              alt={displayTitle}
+              className="link-preview-image"
+              loading="lazy"
+              crossOrigin="anonymous"
+            />
+          </div>
+        )}
+        <div className="link-preview-content">
+          {adReply.showAdAttribution && (
+            <div className="link-preview-site-name" style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+              Ad
+            </div>
+          )}
+          {displaySiteName && (
+            <div className="link-preview-site-name" title={displaySiteName}>
+              {displaySiteName.length > 50 ? `${displaySiteName.substring(0, 50)}...` : displaySiteName}
+            </div>
+          )}
+          {displayTitle && (
+            <div className="link-preview-title" title={displayTitle}>
+              {displayTitle}
+            </div>
+          )}
+          {displayBody && (
+            <div className="link-preview-description" title={displayBody}>
+              {displayBody}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderTemplateMessage = () => {
     const displayContent = stripAgentSignature(message.content || '');
     const metadata = typeof message.metadata === 'string' 
@@ -735,9 +842,9 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
     return (
       <div className="template-message">
         {/* Template badge */}
-        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-200">
+        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border">
           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-          <span className="text-xs font-medium text-gray-600">
+          <span className="text-xs font-medium text-muted-foreground">
             {t('message_bubble.template_message', 'Template Message')}
           </span>
         </div>
@@ -763,17 +870,17 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
           </div>
         )}
         {canShowDocument && (
-          <div className="mb-3 p-3 bg-gray-100 rounded-lg flex items-center gap-2">
-            <i className="ri-file-text-line text-xl text-gray-600"></i>
+          <div className="mb-3 p-3 bg-muted rounded-lg flex items-center gap-2">
+            <i className="ri-file-text-line text-xl text-muted-foreground"></i>
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">
+              <p className="text-sm font-medium text-foreground">
                 {metadata.documentFilename || 'Document'}
               </p>
               <a 
                 href={headerDocument} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
               >
                 {t('message_bubble.view_document', 'View Document')}
               </a>
@@ -792,13 +899,25 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
           )}
         </div>
 
+        {/* Link Previews for Template Content */}
+        {(() => {
+          const urlsToPreview = extractUrls(displayContent);
+          return urlsToPreview.length > 0 ? (
+            <div className="mt-2 space-y-2">
+              {urlsToPreview.map(url => (
+                <LinkPreview key={url} url={url} isInbound={isInbound} />
+              ))}
+            </div>
+          ) : null;
+        })()}
+
         {/* Buttons (if any) */}
         {metadata.buttons && metadata.buttons.length > 0 && (
           <div className="mt-3 space-y-2">
             {metadata.buttons.map((button: any, index: number) => (
               <div 
                 key={index}
-                className="p-2 border border-gray-300 rounded-lg text-center text-sm text-gray-700 bg-white"
+                className="p-2 border border-border rounded-lg text-center text-sm text-foreground bg-background"
               >
                 {button.text || button.title || `Button ${index + 1}`}
               </div>
@@ -810,18 +929,30 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
   };
 
   const renderMessageContent = () => {
-    const { type = 'text', content, channelType } = message;
+    const { type = 'text', content } = message;
+    const msgChannelType = message.channelType || channelType;
     const rawMediaUrl = message.mediaUrl || localMediaUrl || getMediaUrlFromMetadata();
-
     const mediaUrl = getCacheBustedMediaUrl(rawMediaUrl);
+    const metadata = typeof message.metadata === 'string' ? (message.metadata ? JSON.parse(message.metadata) : {}) : (message.metadata || {});
+    const shareType = metadata?.share_type ?? metadata?.shareType;
+    const effectiveType = (msgChannelType === 'tiktok' && (shareType === 'video_share' || type === 'tiktok_video_share')) ? 'tiktok_video_share' : type;
 
-
-    if (channelType === 'email' && (message.emailHtml || message.emailPlainText || message.emailSubject)) {
+    if (msgChannelType === 'email' && (message.emailHtml || message.emailPlainText || message.emailSubject)) {
       return renderEmailContent();
     }
 
     const displayContent = stripAgentSignature(content || '');
 
+    if (effectiveType === 'tiktok_video_share') {
+      return (
+        <OptimizedMediaBubble
+          message={{ ...message, type: 'tiktok_video_share', metadata: metadata }}
+          mediaUrl={mediaUrl}
+          onDownload={downloadMedia}
+          isDownloading={isDownloading}
+        />
+      );
+    }
 
     if (['image', 'video', 'audio', 'document', 'sticker'].includes(type)) {
       return (
@@ -851,12 +982,12 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
 
 
       return (
-        <div className="poll-fallback bg-green-50 border border-green-200 rounded-lg p-3">
+        <div className="poll-fallback bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-4 h-4 rounded-full bg-green-600"></div>
-            <span className="text-sm font-medium text-green-800">Poll</span>
+            <span className="text-sm font-medium text-green-800 dark:text-green-300">Poll</span>
           </div>
-          <p className="text-sm text-gray-900">{displayContent}</p>
+          <p className="text-sm text-foreground">{displayContent}</p>
         </div>
       );
     }
@@ -884,23 +1015,55 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
 
       case 'text':
       default:
+        const externalAdReply = getExternalAdReply();
+        const urlsToPreview = extractUrls(displayContent);
+        
         if (hasFormatting(displayContent)) {
           const formattedNodes = parseFormattedText(displayContent);
           return (
-            <div className="whitespace-pre-wrap break-words">
-              {formattedNodes.map((node, index) => (
-                <span key={index}>{node}</span>
-              ))}
-            </div>
+            <>
+              <div className="whitespace-pre-wrap break-words">
+                {formattedNodes.map((node, index) => (
+                  <span key={index}>{node}</span>
+                ))}
+              </div>
+              {externalAdReply ? (
+                <div className="mt-2">
+                  {renderAdPreview(externalAdReply)}
+                </div>
+              ) : urlsToPreview.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {urlsToPreview.map(url => (
+                    <LinkPreview key={url} url={url} isInbound={isInbound} />
+                  ))}
+                </div>
+              )}
+            </>
           );
         }
 
-        return <p className="whitespace-pre-wrap break-words">{displayContent}</p>;
+        return (
+          <>
+            <p className="whitespace-pre-wrap break-words">{displayContent}</p>
+            {externalAdReply ? (
+              <div className="mt-2">
+                {renderAdPreview(externalAdReply)}
+              </div>
+            ) : urlsToPreview.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {urlsToPreview.map(url => (
+                  <LinkPreview key={url} url={url} isInbound={isInbound} />
+                ))}
+              </div>
+            )}
+          </>
+        );
     }
   };
 
 
   const renderReactions = () => {
+    if (channelCapabilities?.supportsReactions === false) return null;
     if (!reactions || reactions.length === 0) {
       return null;
     }
@@ -922,12 +1085,12 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
           return (
             <div
               key={emoji}
-              className="inline-flex items-center gap-1 bg-gray-100 hover:bg-gray-200 rounded-full px-2 py-1 text-xs cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1 bg-muted hover:bg-muted/80 rounded-full px-2 py-1 text-xs cursor-pointer transition-colors"
               title={`${reactions.length} reaction${reactions.length > 1 ? 's' : ''}`}
             >
               <span className="text-sm">{emoji}</span>
               {reactions.length > 1 && (
-                <span className="text-gray-600 font-medium">{reactions.length}</span>
+                <span className="text-muted-foreground font-medium">{reactions.length}</span>
               )}
             </div>
           );
@@ -951,17 +1114,19 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
               enableAutoFetch={true}
             />
           ) : (
-            <img
-              src={contact?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact?.name || 'User')}&background=random`}
-              alt={contact?.name || t('message_bubble.contact_avatar', 'Contact avatar')}
-              className="w-8 h-8 rounded-full"
-            />
+            contact && (
+              <ContactAvatar
+                contact={contact}
+                size="sm"
+                showRefreshButton={false}
+              />
+            )
           )}
         </div>
         <div className="max-w-[75%] md:max-w-[70%]">
           {isGroupChat() && participantInfo && (
             <div className="mb-1">
-              <span className="text-xs font-medium text-gray-600">
+              <span className="text-xs font-medium text-muted-foreground">
                 {formatParticipantName(participantInfo)}
               </span>
             </div>
@@ -971,7 +1136,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            <div className="bg-white p-3 rounded-lg chat-bubble-contact shadow-sm">
+            <div className="bg-card dark:bg-card p-3 rounded-lg chat-bubble-contact shadow-sm">
               {quotedInfo && (
                 <QuotedMessagePreview
                   quotedMessageId={quotedInfo.quotedMessageId}
@@ -983,7 +1148,10 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
               {renderReactions()}
               <div className="flex items-end justify-between mt-1 gap-2">
                 <div className="flex-1"></div>
-                <div className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                  {channelType === 'tiktok' && (
+                    <i className="ri-tiktok-line text-muted-foreground" title={t('conversations.view.channel.tiktok', 'TikTok')} />
+                  )}
                   <span className="message-time">{formattedTime}</span>
                   {message.status && message.status !== 'delivered' && (
                     <span className="message-status">
@@ -996,11 +1164,11 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
             </div>
 
             {(isHovered || showDeleteConfirm) && (canReply || canDelete) && (
-              <div className="absolute top-13 right-0 flex items-center gap-1 bg-white rounded-lg shadow-lg border border-gray-200 p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+              <div className="absolute top-13 right-0 flex items-center gap-1 bg-card dark:bg-card rounded-lg shadow-lg border border-border p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
                 {canReply && (
                   <button
                     onClick={handleReplyToMessage}
-                    className="p-1.5 rounded-md hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
+                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
                     title={t('message_bubble.reply', 'Reply to this message')}
                     aria-label={t('message_bubble.reply', 'Reply to this message')}
                   >
@@ -1010,7 +1178,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
                 {canDelete && (
                   <button
                     onClick={handleDeleteConfirm}
-                    className="p-1.5 rounded-md hover:bg-gray-100 text-gray-600 hover:text-red-600 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
+                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
                     title={t('message_bubble.delete', 'Delete this message')}
                     aria-label={t('message_bubble.delete', 'Delete this message')}
                   >
@@ -1034,7 +1202,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          <div className="bg-sky-500 p-3 rounded-lg chat-bubble-user text-white shadow-sm">
+          <div className="bg-sky-500 dark:bg-[#005c4b] p-3 rounded-lg chat-bubble-user text-white shadow-sm">
             {quotedInfo && (
               <QuotedMessagePreview
                 quotedMessageId={quotedInfo.quotedMessageId}
@@ -1047,6 +1215,9 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
             <div className="flex items-end justify-between mt-1 gap-2">
               <div className="flex-1"></div>
               <div className="flex items-center gap-1 text-xs flex-shrink-0">
+                {channelType === 'tiktok' && (
+                  <i className="ri-tiktok-line opacity-80" title={t('conversations.view.channel.tiktok', 'TikTok')} />
+                )}
                 <span className="message-time">{formattedTime}</span>
                 {message.status && message.status !== 'sent' && (
                   <span className="message-status">
@@ -1061,11 +1232,11 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
           </div>
 
           {(isHovered || showDeleteConfirm) && (canReply || canDelete) && (
-            <div className="absolute top-13 left-2 flex items-center gap-1 bg-white rounded-lg shadow-lg border border-gray-200 p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+            <div className="absolute top-13 left-2 flex items-center gap-1 bg-card dark:bg-card rounded-lg shadow-lg border border-border p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
               {canReply && (
                 <button
                   onClick={handleReplyToMessage}
-                  className="p-1.5 rounded-md hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
+                  className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
                   title={t('message_bubble.reply', 'Reply to this message')}
                   aria-label={t('message_bubble.reply', 'Reply to this message')}
                 >
@@ -1075,7 +1246,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
               {canDelete && (
                 <button
                   onClick={handleDeleteConfirm}
-                  className="p-1.5 rounded-md hover:bg-gray-100 text-gray-600 hover:text-red-600 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
+                  className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
                   title={t('message_bubble.delete', 'Delete this message')}
                   aria-label={t('message_bubble.delete', 'Delete this message')}
                 >
@@ -1088,30 +1259,30 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
       </div>
       <div className="flex-shrink-0 ml-2">
         {isFromBot ? (
-          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
             <BotIcon size={16} color="#7c3aed" />
           </div>
         ) : message.senderType === 'user' ? (
-          <div className="w-8 h-8 rounded-full bg-sky-200 flex items-center justify-center text-sky-700 font-medium">
+          <div className="w-8 h-8 rounded-full bg-sky-200 dark:bg-sky-900/40 flex items-center justify-center text-sky-700 dark:text-sky-300 font-medium">
             <span>A</span>
           </div>
         ) : (
-          <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center">
-            <i className="ri-customer-service-2-line text-sky-600"></i>
+          <div className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
+            <i className="ri-customer-service-2-line text-sky-600 dark:text-sky-400"></i>
           </div>
         )}
       </div>
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+          <div className="bg-card dark:bg-card rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <Trash2 className="h-5 w-5 text-red-600" />
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                  <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
                 <div className="ml-4">
-                  <h3 className="text-lg font-medium text-gray-900">
+                  <h3 className="text-lg font-medium text-foreground">
                     {isWhatsAppMessage()
                       ? (isGroupChat()
                           ? t('message_bubble.confirm_delete_whatsapp_group_title', 'Delete Group Message for Everyone')
@@ -1120,7 +1291,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
                       : t('message_bubble.confirm_delete_title', 'Delete Message')
                     }
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {isWhatsAppMessage()
                       ? (isMessageTooOld()
                           ? (isGroupChat()
@@ -1138,8 +1309,8 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
                 </div>
               </div>
 
-              <div className="bg-gray-50 p-3 rounded-md mb-4">
-                <p className="text-sm text-gray-700 line-clamp-3">
+              <div className="bg-muted p-3 rounded-md mb-4">
+                <p className="text-sm text-foreground line-clamp-3">
                   {stripAgentSignature(message.content || '') || t('message_bubble.media_message', 'Media message')}
                 </p>
               </div>
@@ -1147,7 +1318,7 @@ export default function MessageBubble({ message, contact, channelType, onReply, 
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={handleDeleteCancel}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-input rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   disabled={isDeleting}
                 >
                   {t('common.cancel', 'Cancel')}

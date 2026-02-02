@@ -26,7 +26,7 @@ function InboxContent() {
   const [activeTab, setActiveTab] = useState<'individual' | 'groups'>('individual');
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Header />
 
       <div className="flex flex-1 overflow-hidden relative">
@@ -46,8 +46,8 @@ function InboxContent() {
         `}>
           {showGroupChats ? (
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'individual' | 'groups')} className="flex flex-col h-full">
-              <div className="border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col h-full">
-                <div className="p-3 sm:p-4 border-b border-gray-200">
+              <div className="border-r border-border bg-background flex-shrink-0 overflow-hidden flex flex-col h-full">
+                <div className="p-3 sm:p-4 border-b border-border">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="individual" className="text-xs sm:text-sm">
                       {t('inbox.individual', 'Individual')}

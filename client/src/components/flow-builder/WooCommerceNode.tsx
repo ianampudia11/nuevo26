@@ -345,7 +345,7 @@ export function WooCommerceNode({ id, data, isConnectable }: WooCommerceNodeProp
       case 'post': return 'text-green-600';
       case 'put': return 'text-orange-600';
       case 'delete': return 'text-red-600';
-      default: return 'text-gray-600';
+      default: return 'text-muted-foreground';
     }
   };
 
@@ -539,7 +539,7 @@ export function WooCommerceNode({ id, data, isConnectable }: WooCommerceNodeProp
               </button>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <Store className="h-3.5 w-3.5 text-muted-foreground" />
           <span className={cn("font-medium", getActionColor(action))}>{action.toUpperCase()}</span>
@@ -577,7 +577,7 @@ export function WooCommerceNode({ id, data, isConnectable }: WooCommerceNodeProp
       </div>
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border rounded p-2 ">
           <div>
             <Label className="block mb-1 font-medium">Quick Templates</Label>
             <Select
@@ -863,7 +863,7 @@ export function WooCommerceNode({ id, data, isConnectable }: WooCommerceNodeProp
 
           {/* Test Result Display */}
           {showTestResult && testResult && (
-            <div className="mt-3 border rounded p-2 bg-secondary/5">
+            <div className="mt-3 border rounded p-2 ">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {testResult.success ? (

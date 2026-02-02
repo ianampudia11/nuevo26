@@ -93,7 +93,7 @@ function parseFormattingOnly(text: string): React.ReactNode[] {
       replacement: (match, content, index) => (
         <code
           key={`code-${index}`}
-          className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200 dark:border-gray-600"
+          className="bg-muted text-muted-foreground px-1.5 py-0.5 rounded text-sm font-mono border border-border"
         >
           {content}
         </code>
@@ -217,6 +217,37 @@ export const stripFormatting = (text: string): string => {
     .replace(/_([^_]+)_/g, '$1')
     .replace(/~([^~]+)~/g, '$1')
     .replace(/`([^`]+)`/g, '$1');   // Remove inline code
+};
+
+/**
+ * Extracts all non-image URLs from text
+ * 
+ * @param text - The text content to extract URLs from
+ * @returns Array of unique URLs found in the text (excluding image URLs)
+ */
+export const extractUrls = (text: string): string[] => {
+  if (!text) return [];
+
+  const urlPattern = /(https?:\/\/[^\s]+)/g;
+  const imagePattern = /\.(jpeg|jpg|gif|png)$/i;
+  const urls: string[] = [];
+  const urlSet = new Set<string>();
+  let match;
+
+  urlPattern.lastIndex = 0;
+
+  while ((match = urlPattern.exec(text)) !== null) {
+    const url = match[1];
+
+    if (!imagePattern.test(url)) {
+      if (!urlSet.has(url)) {
+        urlSet.add(url);
+        urls.push(url);
+      }
+    }
+  }
+
+  return urls;
 };
 
 /**

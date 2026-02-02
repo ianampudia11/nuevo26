@@ -189,3 +189,27 @@ export function useUsageAlerts(companyId: number) {
 
   return alerts;
 }
+
+/**
+ * Hook to trigger manual usage recalculation (admin only)
+ */
+export function useRecalculateCompanyUsage(companyId: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/admin/companies/${companyId}/usage/recalculate`);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to recalculate usage');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+
+      queryClient.invalidateQueries({ queryKey: ['company-usage', companyId] });
+    },
+  });
+}

@@ -79,7 +79,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 px-4 py-8">
       <div className="w-full max-w-4xl mx-auto">
-        <Card className="w-full shadow-2xl border-0 bg-white/80 backdrop-blur-sm dark:bg-gray-800/80">
+        <Card className="w-full shadow-2xl border-0 bg-card/80 backdrop-blur-sm">
           <CardContent className="p-8 md:p-12">
             <div className="text-center space-y-8">
               <div className="relative">
@@ -109,11 +109,11 @@ export default function NotFound() {
                   {t('errors.404_badge', 'Page Not Found')}
                 </Badge>
 
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground">
                   {t('errors.404_title', 'Oops! Page Not Found')}
                 </h2>
 
-                <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
                   {t('errors.404_description', 'The page you\'re looking for doesn\'t exist or has been moved. Don\'t worry, it happens to the best of us!')}
                 </p>
               </div>
@@ -160,7 +160,7 @@ export default function NotFound() {
               return (
                 <Card
                   key={index}
-                  className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 bg-white/60 backdrop-blur-sm dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80"
+                  className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 bg-card/60 backdrop-blur-sm hover:bg-card/80"
                   onClick={() => setLocation(link.path)}
                 >
                   <CardContent className="p-6 text-center space-y-3">
@@ -173,10 +173,10 @@ export default function NotFound() {
                         style={{ color: branding.primaryColor }}
                       />
                     </div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                    <h3 className="font-semibold text-foreground">
                       {link.label}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                    <p className="text-sm text-muted-foreground">
                       {link.description}
                     </p>
                   </CardContent>
@@ -186,12 +186,12 @@ export default function NotFound() {
           </div>
         )}
 
-        <Card className="mt-8 border-0 bg-white/60 backdrop-blur-sm dark:bg-gray-800/60">
+        <Card className="mt-8 border-0 bg-card/60 backdrop-blur-sm">
           <CardContent className="p-6">
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center space-x-2">
-                <HelpCircle className="h-5 w-5 text-gray-500" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                <h3 className="text-lg font-semibold text-foreground">
                   {t('errors.404_need_help', 'Need Help?')}
                 </h3>
               </div>

@@ -1150,6 +1150,130 @@
         "value": "Password"
     },
     {
+        "key": "flow_builder.contact_notification",
+        "value": "Contact Notification"
+    },
+    {
+        "key": "flow_builder.contact_notification_desc",
+        "value": "Send message to specific contact"
+    },
+    {
+        "key": "flow_builder.phone_number",
+        "value": "Phone Number"
+    },
+    {
+        "key": "flow_builder.phone_number_placeholder",
+        "value": "No phone number"
+    },
+    {
+        "key": "flow_builder.phone_number_required",
+        "value": "Please enter a phone number"
+    },
+    {
+        "key": "flow_builder.channel_type",
+        "value": "Channel Type"
+    },
+    {
+        "key": "flow_builder.select_channel",
+        "value": "Select channel"
+    },
+    {
+        "key": "flow_builder.message_type",
+        "value": "Message Type"
+    },
+    {
+        "key": "flow_builder.message_content",
+        "value": "Message Content"
+    },
+    {
+        "key": "flow_builder.message_placeholder",
+        "value": "Enter your message..."
+    },
+    {
+        "key": "flow_builder.message_configured",
+        "value": "Message configured"
+    },
+    {
+        "key": "flow_builder.media_url",
+        "value": "Media URL"
+    },
+    {
+        "key": "flow_builder.media_url_placeholder",
+        "value": "https://example.com/image.jpg"
+    },
+    {
+        "key": "flow_builder.media_not_supported",
+        "value": "Media messages are not supported for this channel type"
+    },
+    {
+        "key": "flow_builder.caption",
+        "value": "Caption"
+    },
+    {
+        "key": "flow_builder.caption_placeholder",
+        "value": "Optional caption..."
+    },
+    {
+        "key": "flow_builder.email_subject",
+        "value": "Email Subject"
+    },
+    {
+        "key": "flow_builder.email_subject_placeholder",
+        "value": "Subject line"
+    },
+    {
+        "key": "flow_builder.test_notification",
+        "value": "Test Notification"
+    },
+    {
+        "key": "flow_builder.notification_sent",
+        "value": "Notification sent successfully"
+    },
+    {
+        "key": "flow_builder.notification_failed",
+        "value": "Failed to send notification"
+    },
+    {
+        "key": "flow_builder.advanced_options",
+        "value": "Advanced Options"
+    },
+    {
+        "key": "flow_builder.timeout_seconds",
+        "value": "Timeout (seconds)"
+    },
+    {
+        "key": "flow_builder.error_handling",
+        "value": "Error Handling"
+    },
+    {
+        "key": "flow_builder.continue_on_error",
+        "value": "Continue on Error"
+    },
+    {
+        "key": "flow_builder.stop_on_error",
+        "value": "Stop on Error"
+    },
+    {
+        "key": "flow_builder.retry_attempts",
+        "value": "Retry Attempts"
+    },
+    {
+        "key": "flow_builder.contact_notification_help",
+        "value": "The contact notification node sends a message to a specific contact via phone number when reached in the flow and continues immediately to the next node."
+    },
+    {
+        "key": "flow_builder.auto_channel",
+        "value": "Auto (from conversation)"
+    },
+    {
+        "key": "flow_builder.auto_channel_info",
+        "value": "Channel type is automatically determined from the Message Trigger. The notification will use the same channel as the incoming message."
+    },
+    {
+        "key": "flow_builder.variable_syntax_help",
+        "value": "Use {{variable}} syntax for dynamic values"
+    },
+    {
         "key": "flow_builder.calendar_event",
         "value": "Calendar Event"
     },
@@ -1594,6 +1718,414 @@
         "value": "Actions"
     },
     {
+        "key": "admin.companies.title",
+        "value": "Companies"
+    },
+    {
+        "key": "admin.companies.delete_selected",
+        "value": "Delete Selected ({{count}})"
+    },
+    {
+        "key": "admin.companies.refresh",
+        "value": "Refresh"
+    },
+    {
+        "key": "admin.companies.manage_title",
+        "value": "Manage Companies"
+    },
+    {
+        "key": "admin.companies.search_placeholder",
+        "value": "Search companies..."
+    },
+    {
+        "key": "admin.companies.no_search_results",
+        "value": "No companies match your search"
+    },
+    {
+        "key": "admin.companies.table.company",
+        "value": "Company"
+    },
+    {
+        "key": "admin.companies.table.users",
+        "value": "Users"
+    },
+    {
+        "key": "admin.companies.manage_button",
+        "value": "Manage"
+    },
+    {
+        "key": "admin.companies.login_as",
+        "value": "Login As"
+    },
+    {
+        "key": "admin.companies.clear_data",
+        "value": "Clear Data"
+    },
+    {
+        "key": "admin.companies.delete",
+        "value": "Delete"
+    },
+    {
+        "key": "admin.companies.loading_plan_details",
+        "value": "Loading plan details..."
+    },
+    {
+        "key": "admin.companies.no_description",
+        "value": "No description available"
+    },
+    {
+        "key": "admin.companies.plan_price",
+        "value": "Price:"
+    },
+    {
+        "key": "admin.companies.plan_max_users",
+        "value": "Max Users:"
+    },
+    {
+        "key": "admin.companies.plan_max_contacts",
+        "value": "Max Contacts:"
+    },
+    {
+        "key": "admin.companies.plan_max_channels",
+        "value": "Max Channels:"
+    },
+    {
+        "key": "admin.companies.impersonate_title",
+        "value": "Impersonate Company"
+    },
+    {
+        "key": "admin.companies.impersonate_description",
+        "value": "You are about to log in as an admin user for {{name}}. This will allow you to access the company dashboard and perform actions as a company admin."
+    },
+    {
+        "key": "admin.companies.impersonating",
+        "value": "Impersonating..."
+    },
+    {
+        "key": "admin.companies.login_as_admin",
+        "value": "Login as Company Admin"
+    },
+    {
+        "key": "admin.companies.bulk_delete_title",
+        "value": "Delete Multiple Companies"
+    },
+    {
+        "key": "admin.companies.bulk_delete_description",
+        "value": "You are about to delete {{count}} companies and all their associated data. This action cannot be undone. Are you sure you want to continue?"
+    },
+    {
+        "key": "admin.companies.bulk_delete_action",
+        "value": "Delete {{count}} Companies"
+    },
+    {
+        "key": "admin.companies.bulk_delete_success",
+        "value": "Successfully deleted {{successCount}} companies{{failures}}"
+    },
+    {
+        "key": "admin.companies.bulk_delete_no_deleted",
+        "value": "No companies were deleted. Please check the server logs for details."
+    },
+    {
+        "key": "admin.companies.bulk_delete_error",
+        "value": "Failed to delete companies"
+    },
+    {
+        "key": "admin.companies.bulk_delete_failed",
+        "value": "Failed to delete companies: {{error}}"
+    },
+    {
+        "key": "admin.companies.detail.title",
+        "value": "Company: {{name}}"
+    },
+    {
+        "key": "admin.companies.detail.impersonate_button",
+        "value": "Impersonate"
+    },
+    {
+        "key": "admin.companies.detail.tabs.details",
+        "value": "Company Details"
+    },
+    {
+        "key": "admin.companies.detail.tabs.users",
+        "value": "Users"
+    },
+    {
+        "key": "admin.companies.detail.tabs.data_usage",
+        "value": "Data & Usage"
+    },
+    {
+        "key": "admin.companies.detail.card.title",
+        "value": "Company Information"
+    },
+    {
+        "key": "admin.companies.detail.card.description",
+        "value": "Manage company details and settings"
+    },
+    {
+        "key": "admin.companies.detail.uploading",
+        "value": "Uploading..."
+    },
+    {
+        "key": "admin.companies.detail.change_logo",
+        "value": "Change Logo"
+    },
+    {
+        "key": "admin.companies.detail.form.company_name",
+        "value": "Company Name"
+    },
+    {
+        "key": "admin.companies.detail.form.slug",
+        "value": "Slug"
+    },
+    {
+        "key": "admin.companies.detail.form.slug_description",
+        "value": "Used for URL and identification"
+    },
+    {
+        "key": "admin.companies.detail.form.logo_url",
+        "value": "Logo URL"
+    },
+    {
+        "key": "admin.companies.detail.form.primary_color",
+        "value": "Primary Color"
+    },
+    {
+        "key": "admin.companies.detail.form.color_placeholder",
+        "value": "#333235"
+    },
+    {
+        "key": "admin.companies.detail.form.plan",
+        "value": "Plan"
+    },
+    {
+        "key": "admin.companies.detail.form.select_plan_placeholder",
+        "value": "Select a plan"
+    },
+    {
+        "key": "admin.companies.detail.form.loading_plans",
+        "value": "Loading plans..."
+    },
+    {
+        "key": "admin.companies.detail.form.no_plans_available",
+        "value": "No plans available"
+    },
+    {
+        "key": "admin.companies.detail.form.plan_description",
+        "value": "Select a subscription plan for this company"
+    },
+    {
+        "key": "admin.companies.detail.form.max_users",
+        "value": "Max Users"
+    },
+    {
+        "key": "admin.companies.detail.form.active_status",
+        "value": "Active Status"
+    },
+    {
+        "key": "admin.companies.detail.form.active_status_description",
+        "value": "When inactive, users cannot access the platform"
+    },
+    {
+        "key": "admin.companies.detail.deactivating",
+        "value": "Deactivating..."
+    },
+    {
+        "key": "admin.companies.detail.deactivate_company",
+        "value": "Deactivate Company"
+    },
+    {
+        "key": "admin.companies.detail.confirm.deactivate",
+        "value": "Are you sure you want to deactivate this company? This will prevent all users from accessing the platform."
+    },
+    {
+        "key": "admin.companies.detail.users.title",
+        "value": "Company Users"
+    },
+    {
+        "key": "admin.companies.detail.users.description",
+        "value": "Manage users for this company"
+    },
+    {
+        "key": "admin.companies.detail.users.no_users",
+        "value": "No users found for this company."
+    },
+    {
+        "key": "admin.companies.detail.users.table.user",
+        "value": "User"
+    },
+    {
+        "key": "admin.companies.detail.users.table.email",
+        "value": "Email"
+    },
+    {
+        "key": "admin.companies.detail.users.table.role",
+        "value": "Role"
+    },
+    {
+        "key": "admin.companies.detail.users.table.actions",
+        "value": "Actions"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.title",
+        "value": "Edit User"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.description",
+        "value": "Update user information and permissions."
+    },
+    {
+        "key": "admin.companies.detail.edit_user.full_name",
+        "value": "Full Name"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.email",
+        "value": "Email"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role",
+        "value": "Role"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.select_role_placeholder",
+        "value": "Select role"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role_user",
+        "value": "User"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role_admin",
+        "value": "Admin"
+    },
+    {
+        "key": "admin.companies.detail.edit_user.role_superadmin",
+        "value": "Super Admin"
+    },
+    {
+        "key": "admin.companies.detail.validation.company_name_required",
+        "value": "Company name is required"
+    },
+    {
+        "key": "admin.companies.detail.validation.slug_required",
+        "value": "Slug is required"
+    },
+    {
+        "key": "admin.companies.detail.validation.slug_invalid",
+        "value": "Slug can only contain lowercase letters, numbers, and hyphens"
+    },
+    {
+        "key": "admin.companies.detail.validation.color_invalid",
+        "value": "Must be a valid hex color"
+    },
+    {
+        "key": "admin.companies.detail.validation.plan_required",
+        "value": "Plan is required"
+    },
+    {
+        "key": "admin.companies.detail.validation.max_users_required",
+        "value": "Must have at least 1 user"
+    },
+    {
+        "key": "admin.companies.detail.error.fetch_company",
+        "value": "Failed to fetch company"
+    },
+    {
+        "key": "admin.companies.detail.error.fetch_users",
+        "value": "Failed to fetch company users"
+    },
+    {
+        "key": "admin.companies.detail.error.update_failed",
+        "value": "Failed to update company"
+    },
+    {
+        "key": "admin.companies.detail.error.deactivate_failed",
+        "value": "Failed to deactivate company"
+    },
+    {
+        "key": "admin.companies.detail.error.upload_logo_failed",
+        "value": "Failed to upload logo"
+    },
+    {
+        "key": "admin.companies.detail.error.update_user_failed",
+        "value": "Failed to update user"
+    },
+    {
+        "key": "admin.companies.detail.toast.update_success_title",
+        "value": "Company updated"
+    },
+    {
+        "key": "admin.companies.detail.toast.update_success_description",
+        "value": "The company has been updated successfully"
+    },
+    {
+        "key": "admin.companies.detail.toast.update_failed_title",
+        "value": "Update failed"
+    },
+    {
+        "key": "admin.companies.detail.toast.deactivate_success_title",
+        "value": "Company deactivated"
+    },
+    {
+        "key": "admin.companies.detail.toast.deactivate_success_description",
+        "value": "The company has been deactivated successfully"
+    },
+    {
+        "key": "admin.companies.detail.toast.deactivate_failed_title",
+        "value": "Deactivation failed"
+    },
+    {
+        "key": "admin.companies.detail.toast.logo_updated_title",
+        "value": "Logo Updated"
+    },
+    {
+        "key": "admin.companies.detail.toast.logo_updated_description",
+        "value": "Company logo has been updated successfully."
+    },
+    {
+        "key": "admin.companies.detail.toast.error_title",
+        "value": "Error"
+    },
+    {
+        "key": "admin.companies.detail.toast.upload_logo_error",
+        "value": "Failed to upload logo: {{error}}"
+    },
+    {
+        "key": "admin.companies.detail.toast.user_updated_title",
+        "value": "User Updated"
+    },
+    {
+        "key": "admin.companies.detail.toast.user_updated_description",
+        "value": "User has been updated successfully."
+    },
+    {
+        "key": "admin.companies.detail.toast.update_user_failed_title",
+        "value": "Update Failed"
+    },
+    {
+        "key": "admin.companies.detail.toast.invalid_file_type_title",
+        "value": "Invalid file type"
+    },
+    {
+        "key": "admin.companies.detail.toast.invalid_file_type_description",
+        "value": "Please select a valid image file (JPEG, PNG, GIF, or WebP)."
+    },
+    {
+        "key": "admin.companies.detail.toast.file_too_large_title",
+        "value": "File too large"
+    },
+    {
+        "key": "admin.companies.detail.toast.file_too_large_description",
+        "value": "Please select an image smaller than 5MB."
+    },
+    {
+        "key": "common.saving",
+        "value": "Saving..."
+    },
+    {
+        "key": "common.save_changes",
+        "value": "Save Changes"
+    },
+    {
         "key": "common.active",
         "value": "Active"
     },
@@ -1731,7 +2263,7 @@
     },
     {
         "key": "registration.page_subtitle",
-        "value": "Create your company account and start managing conversations"
+        "value": "Create your company account and manage all your channels in one place!"
     },
     {
         "key": "registration.company_slug",
@@ -1892,6 +2424,46 @@
     {
         "key": "registration.error.register_failed",
         "value": "Failed to register company"
+    },
+    {
+        "key": "registration.referral_detected",
+        "value": "Great! You're signing up through a referral from affiliate {{code}}."
+    },
+    {
+        "key": "registration.referral_benefit",
+        "value": "You may be eligible for special benefits or discounts."
+    },
+    {
+        "key": "registration.already_have_account",
+        "value": "Already have an account?"
+    },
+    {
+        "key": "registration.sign_in",
+        "value": "Sign in"
+    },
+    {
+        "key": "registration.affiliate.cta_title",
+        "value": "Interested in Earning Commissions?"
+    },
+    {
+        "key": "registration.affiliate.cta_description",
+        "value": "Join our affiliate program and earn up to 30% commission by referring businesses to {{appName}}"
+    },
+    {
+        "key": "registration.affiliate.button_text",
+        "value": "Become a Partner & Earn Commissions"
+    },
+    {
+        "key": "registration.plan.trial_days",
+        "value": "{{days}} day trial"
+    },
+    {
+        "key": "registration.plan.free_plan",
+        "value": "Free plan"
+    },
+    {
+        "key": "registration.plan.monthly_suffix",
+        "value": "/month"
     },
     {
         "key": "flow_builder.error.no_file",
@@ -2458,6 +3030,14 @@
         "value": "Unknown Contact"
     },
     {
+        "key": "common.na",
+        "value": "N/A"
+    },
+    {
+        "key": "common.unknown_error",
+        "value": "Unknown error occurred"
+    },
+    {
         "key": "common.cancel",
         "value": "Cancel"
     },
@@ -2596,6 +3176,1394 @@
     {
         "key": "pipeline.delete_stage",
         "value": "Delete Stage"
+    },
+    {
+        "key": "pipeline.search_placeholder",
+        "value": "Search deals, contacts, tags... (Ctrl+F)"
+    },
+    {
+        "key": "pipeline.search_title",
+        "value": "Search by deal title, contact name, phone, tags, description... (Ctrl+F)"
+    },
+    {
+        "key": "pipeline.filters",
+        "value": "Filters"
+    },
+    {
+        "key": "pipeline.clear_all",
+        "value": "Clear All"
+    },
+    {
+        "key": "pipeline.clear",
+        "value": "Clear"
+    },
+    {
+        "key": "pipeline.loading_pipelines",
+        "value": "Loading pipelines..."
+    },
+    {
+        "key": "pipeline.select_pipeline",
+        "value": "Select pipeline"
+    },
+    {
+        "key": "pipeline.default",
+        "value": "Default"
+    },
+    {
+        "key": "pipeline.manage",
+        "value": "Manage"
+    },
+    {
+        "key": "pipeline.my_deals",
+        "value": "My Deals"
+    },
+    {
+        "key": "pipeline.high_priority",
+        "value": "High Priority"
+    },
+    {
+        "key": "pipeline.overdue",
+        "value": "Overdue"
+    },
+    {
+        "key": "pipeline.unassigned",
+        "value": "Unassigned"
+    },
+    {
+        "key": "pipeline.pipeline_label",
+        "value": "Pipeline: {{names}}"
+    },
+    {
+        "key": "pipeline.stage_label",
+        "value": "Stage: {{names}}"
+    },
+    {
+        "key": "pipeline.stage_label_more",
+        "value": "Stage: {{names}} +{{count}} more"
+    },
+    {
+        "key": "pipeline.stage_selected",
+        "value": "Stage: {{count}} selected"
+    },
+    {
+        "key": "pipeline.priority_label",
+        "value": "Priority: {{priorities}}"
+    },
+    {
+        "key": "pipeline.value_label",
+        "value": "Value: {{range}}"
+    },
+    {
+        "key": "pipeline.status_label",
+        "value": "Status: {{status}}"
+    },
+    {
+        "key": "pipeline.due_label",
+        "value": "Due: {{range}}"
+    },
+    {
+        "key": "pipeline.created_label",
+        "value": "Created: {{range}}"
+    },
+    {
+        "key": "pipeline.assigned_label",
+        "value": "Assigned: {{count}} user(s)"
+    },
+    {
+        "key": "pipeline.tags_label",
+        "value": "Tags: {{tags}}"
+    },
+    {
+        "key": "pipeline.add_new_deal",
+        "value": "Add New Deal"
+    },
+    {
+        "key": "pipeline.adding_deal_to",
+        "value": "Adding deal to"
+    },
+    {
+        "key": "pipeline.create_new_deal",
+        "value": "Create a new deal in your pipeline"
+    },
+    {
+        "key": "pipeline.loading_form_data",
+        "value": "Loading form data..."
+    },
+    {
+        "key": "pipeline.deal_title",
+        "value": "Deal Title"
+    },
+    {
+        "key": "pipeline.enter_deal_title",
+        "value": "Enter deal title"
+    },
+    {
+        "key": "pipeline.deal_value",
+        "value": "Deal Value"
+    },
+    {
+        "key": "pipeline.stage",
+        "value": "Stage"
+    },
+    {
+        "key": "pipeline.select_stage",
+        "value": "Select stage"
+    },
+    {
+        "key": "pipeline.contact",
+        "value": "Contact"
+    },
+    {
+        "key": "pipeline.select_contact",
+        "value": "Select contact"
+    },
+    {
+        "key": "pipeline.none",
+        "value": "None"
+    },
+    {
+        "key": "pipeline.no_contacts_available",
+        "value": "No contacts available"
+    },
+    {
+        "key": "pipeline.add_new_contact",
+        "value": "Add new contact"
+    },
+    {
+        "key": "pipeline.priority",
+        "value": "Priority"
+    },
+    {
+        "key": "pipeline.select_priority",
+        "value": "Select priority"
+    },
+    {
+        "key": "pipeline.low",
+        "value": "Low"
+    },
+    {
+        "key": "pipeline.medium",
+        "value": "Medium"
+    },
+    {
+        "key": "pipeline.high",
+        "value": "High"
+    },
+    {
+        "key": "pipeline.due_date",
+        "value": "Due Date"
+    },
+    {
+        "key": "pipeline.pick_date",
+        "value": "Pick a date"
+    },
+    {
+        "key": "pipeline.assigned_to",
+        "value": "Assigned To"
+    },
+    {
+        "key": "pipeline.assign_to",
+        "value": "Assign to"
+    },
+    {
+        "key": "pipeline.tags",
+        "value": "Tags"
+    },
+    {
+        "key": "pipeline.add_tags",
+        "value": "Add tags"
+    },
+    {
+        "key": "pipeline.press_enter_to_add_tag",
+        "value": "Press Enter or click Add to add a tag"
+    },
+    {
+        "key": "pipeline.description",
+        "value": "Description"
+    },
+    {
+        "key": "pipeline.enter_deal_description",
+        "value": "Enter deal description"
+    },
+    {
+        "key": "pipeline.cancel",
+        "value": "Cancel"
+    },
+    {
+        "key": "pipeline.creating",
+        "value": "Creating..."
+    },
+    {
+        "key": "pipeline.create_deal",
+        "value": "Create Deal"
+    },
+    {
+        "key": "pipeline.deal_created",
+        "value": "Deal has been created"
+    },
+    {
+        "key": "pipeline.deal_create_failed",
+        "value": "Failed to create deal: {{error}}"
+    },
+    {
+        "key": "pipeline.add_new_contact_title",
+        "value": "Add New Contact"
+    },
+    {
+        "key": "pipeline.create_new_contact_desc",
+        "value": "Create a new contact with the information below."
+    },
+    {
+        "key": "pipeline.upload_contact_photo",
+        "value": "Upload contact photo"
+    },
+    {
+        "key": "pipeline.optional_jpg_png",
+        "value": "Optional - JPG, PNG up to 5MB"
+    },
+    {
+        "key": "pipeline.choose_photo",
+        "value": "Choose Photo"
+    },
+    {
+        "key": "pipeline.name_required",
+        "value": "Name *"
+    },
+    {
+        "key": "pipeline.enter_contact_name",
+        "value": "Enter contact name"
+    },
+    {
+        "key": "pipeline.email",
+        "value": "Email"
+    },
+    {
+        "key": "pipeline.enter_email_address",
+        "value": "Enter email address"
+    },
+    {
+        "key": "pipeline.phone",
+        "value": "Phone"
+    },
+    {
+        "key": "pipeline.valid_phone_number",
+        "value": "Valid phone number"
+    },
+    {
+        "key": "pipeline.company",
+        "value": "Company"
+    },
+    {
+        "key": "pipeline.enter_company_name",
+        "value": "Enter company name"
+    },
+    {
+        "key": "pipeline.channel",
+        "value": "Channel"
+    },
+    {
+        "key": "pipeline.select_channel",
+        "value": "Select channel"
+    },
+    {
+        "key": "pipeline.channel_identifier",
+        "value": "Channel Identifier"
+    },
+    {
+        "key": "pipeline.phone_number_or_id",
+        "value": "Phone number or ID"
+    },
+    {
+        "key": "pipeline.whatsapp_official",
+        "value": "WhatsApp Official"
+    },
+    {
+        "key": "pipeline.whatsapp_unofficial",
+        "value": "WhatsApp Unofficial"
+    },
+    {
+        "key": "pipeline.facebook_messenger",
+        "value": "Facebook Messenger"
+    },
+    {
+        "key": "pipeline.instagram",
+        "value": "Instagram"
+    },
+    {
+        "key": "pipeline.type_tags_separated",
+        "value": "Type tags separated by commas..."
+    },
+    {
+        "key": "pipeline.notes",
+        "value": "Notes"
+    },
+    {
+        "key": "pipeline.additional_notes_contact",
+        "value": "Additional notes about this contact..."
+    },
+    {
+        "key": "pipeline.contact_created",
+        "value": "Contact created"
+    },
+    {
+        "key": "pipeline.contact_created_success",
+        "value": "The contact has been successfully created."
+    },
+    {
+        "key": "pipeline.create_contact",
+        "value": "Create Contact"
+    },
+    {
+        "key": "pipeline.creation_failed",
+        "value": "Creation failed"
+    },
+    {
+        "key": "pipeline.contact_name_required",
+        "value": "Contact name is required"
+    },
+    {
+        "key": "pipeline.file_too_large",
+        "value": "File too large"
+    },
+    {
+        "key": "pipeline.avatar_must_be_less_than_5mb",
+        "value": "Avatar must be less than 5MB"
+    },
+    {
+        "key": "pipeline.invalid_file_type",
+        "value": "Invalid file type"
+    },
+    {
+        "key": "pipeline.please_select_image_file",
+        "value": "Please select an image file (JPG, PNG)"
+    },
+    {
+        "key": "pipeline.manage_pipelines",
+        "value": "Manage Pipelines"
+    },
+    {
+        "key": "pipeline.create_edit_organize",
+        "value": "Create, edit, and organize your pipelines"
+    },
+    {
+        "key": "pipeline.create_new",
+        "value": "Create New"
+    },
+    {
+        "key": "pipeline.no_pipelines_yet",
+        "value": "No pipelines yet. Create your first pipeline to get started."
+    },
+    {
+        "key": "pipeline.set_as_default",
+        "value": "Set as default"
+    },
+    {
+        "key": "pipeline.pipeline_deleted_success",
+        "value": "Pipeline deleted successfully"
+    },
+    {
+        "key": "pipeline.pipeline_delete_failed",
+        "value": "Failed to delete pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.default_pipeline_updated",
+        "value": "Default pipeline updated"
+    },
+    {
+        "key": "pipeline.default_pipeline_update_failed",
+        "value": "Failed to set default pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.reorder_failed",
+        "value": "Failed to reorder pipelines: {{error}}"
+    },
+    {
+        "key": "pipeline.cannot_delete_default",
+        "value": "Cannot delete the default pipeline. Please set another pipeline as default first."
+    },
+    {
+        "key": "pipeline.delete_pipeline",
+        "value": "Delete Pipeline"
+    },
+    {
+        "key": "pipeline.delete_pipeline_confirmation",
+        "value": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
+    },
+    {
+        "key": "pipeline.pipeline_has_deals",
+        "value": "This pipeline has {{count}} deal(s). You must select a target stage from another pipeline to move them to."
+    },
+    {
+        "key": "pipeline.move_deals_to_stage",
+        "value": "Move deals to stage *"
+    },
+    {
+        "key": "pipeline.no_other_pipelines_available",
+        "value": "No other pipelines available. Cannot delete pipeline with deals."
+    },
+    {
+        "key": "pipeline.select_stage_from_another_pipeline",
+        "value": "Select a stage from another pipeline"
+    },
+    {
+        "key": "pipeline.pipeline_stage_name",
+        "value": "{{pipelineName}} - {{stageName}}"
+    },
+    {
+        "key": "pipeline.please_select_target_stage",
+        "value": "Please select a target stage to move deals to before deleting this pipeline."
+    },
+    {
+        "key": "pipeline.cannot_delete_with_deals",
+        "value": "Cannot delete pipeline with deals. No other pipelines available to move deals to."
+    },
+    {
+        "key": "pipeline.deleting",
+        "value": "Deleting..."
+    },
+    {
+        "key": "pipeline.delete",
+        "value": "Delete"
+    },
+    {
+        "key": "pipeline.close",
+        "value": "Close"
+    },
+    {
+        "key": "pipeline.selected",
+        "value": "selected"
+    },
+    {
+        "key": "pipeline.move",
+        "value": "Move"
+    },
+    {
+        "key": "pipeline.assign",
+        "value": "Assign"
+    },
+    {
+        "key": "pipeline.move_to_pipeline",
+        "value": "Move to Pipeline"
+    },
+    {
+        "key": "pipeline.delete_selected",
+        "value": "Delete Selected"
+    },
+    {
+        "key": "pipeline.move_deals",
+        "value": "Move {{count}} Deals"
+    },
+    {
+        "key": "pipeline.select_stage_to_move",
+        "value": "Select the stage to move the selected deals to."
+    },
+    {
+        "key": "pipeline.target_stage",
+        "value": "Target Stage"
+    },
+    {
+        "key": "pipeline.moving",
+        "value": "Moving..."
+    },
+    {
+        "key": "pipeline.move_deals_action",
+        "value": "Move Deals"
+    },
+    {
+        "key": "pipeline.delete_deals",
+        "value": "Delete {{count}} Deals"
+    },
+    {
+        "key": "pipeline.delete_deals_confirmation",
+        "value": "Are you sure you want to delete these deals? This action cannot be undone."
+    },
+    {
+        "key": "pipeline.delete_deals_action",
+        "value": "Delete Deals"
+    },
+    {
+        "key": "pipeline.assign_deals",
+        "value": "Assign {{count}} Deals"
+    },
+    {
+        "key": "pipeline.select_user_to_assign",
+        "value": "Select a user to assign the selected deals to."
+    },
+    {
+        "key": "pipeline.assignee",
+        "value": "Assignee"
+    },
+    {
+        "key": "pipeline.select_user",
+        "value": "Select a user"
+    },
+    {
+        "key": "pipeline.assigning",
+        "value": "Assigning..."
+    },
+    {
+        "key": "pipeline.assign_deals_action",
+        "value": "Assign Deals"
+    },
+    {
+        "key": "pipeline.move_deals_to_another_pipeline",
+        "value": "Move {{count}} Deals to Another Pipeline"
+    },
+    {
+        "key": "pipeline.select_target_pipeline_stage",
+        "value": "Select the target pipeline and stage for the selected deals."
+    },
+    {
+        "key": "pipeline.target_pipeline",
+        "value": "Target Pipeline"
+    },
+    {
+        "key": "pipeline.select_pipeline_first",
+        "value": "Select pipeline first"
+    },
+    {
+        "key": "pipeline.deals_moved_success",
+        "value": "{{count}} deals moved successfully"
+    },
+    {
+        "key": "pipeline.deals_move_failed",
+        "value": "Failed to move deals: {{error}}"
+    },
+    {
+        "key": "pipeline.deals_deleted_success",
+        "value": "{{count}} deals deleted successfully"
+    },
+    {
+        "key": "pipeline.deals_deleted_partial",
+        "value": "{{deletedCount}} deals deleted successfully, {{failedCount}} failed (already deleted or not found)"
+    },
+    {
+        "key": "pipeline.deals_delete_failed",
+        "value": "Failed to delete deals: {{error}}"
+    },
+    {
+        "key": "pipeline.deals_assigned_success",
+        "value": "{{count}} deals assigned successfully"
+    },
+    {
+        "key": "pipeline.deals_assign_failed",
+        "value": "Failed to assign deals: {{error}}"
+    },
+    {
+        "key": "pipeline.partial_success",
+        "value": "Partially Completed"
+    },
+    {
+        "key": "pipeline.deals_moved_to_new_pipeline",
+        "value": "{{movedCount}} deals moved to new pipeline successfully"
+    },
+    {
+        "key": "pipeline.deals_moved_partial",
+        "value": "{{movedCount}} deals moved successfully, {{failedCount}} failed"
+    },
+    {
+        "key": "pipeline.quick_edit",
+        "value": "Quick Edit"
+    },
+    {
+        "key": "pipeline.view_details",
+        "value": "View Details"
+    },
+    {
+        "key": "pipeline.more_actions",
+        "value": "More Actions"
+    },
+    {
+        "key": "pipeline.view_contact",
+        "value": "View Contact"
+    },
+    {
+        "key": "pipeline.open_chat",
+        "value": "Open Chat"
+    },
+    {
+        "key": "pipeline.move_to_pipeline_action",
+        "value": "Move to Pipeline"
+    },
+    {
+        "key": "pipeline.delete_deal",
+        "value": "Delete Deal"
+    },
+    {
+        "key": "pipeline.are_you_sure",
+        "value": "Are you sure?"
+    },
+    {
+        "key": "pipeline.remove_deal_confirmation",
+        "value": "This will remove the deal \"{{title}}\" from your pipeline. This action cannot be undone."
+    },
+    {
+        "key": "pipeline.priority_priority",
+        "value": "{{priority}} priority"
+    },
+    {
+        "key": "pipeline.assigned_to_user",
+        "value": "Assigned to: {{name}}"
+    },
+    {
+        "key": "pipeline.due",
+        "value": "Due: {{date}}"
+    },
+    {
+        "key": "pipeline.last_activity",
+        "value": "Last activity: {{date}}"
+    },
+    {
+        "key": "pipeline.open_conversation",
+        "value": "Open conversation with {{name}}"
+    },
+    {
+        "key": "pipeline.redirecting_to_inbox",
+        "value": "Redirecting to inbox"
+    },
+    {
+        "key": "pipeline.opening_conversation",
+        "value": "Opening conversation with {{name}}"
+    },
+    {
+        "key": "pipeline.revert_scheduled",
+        "value": "Revert {{time}}"
+    },
+    {
+        "key": "pipeline.reverts",
+        "value": "{{count}} reverts"
+    },
+    {
+        "key": "pipeline.scheduled_stage_reverts",
+        "value": "{{count}} scheduled stage reverts"
+    },
+    {
+        "key": "pipeline.scheduled_to_revert",
+        "value": "Scheduled to revert to stage \"{{stageName}}\""
+    },
+    {
+        "key": "pipeline.if_no_activity",
+        "value": " (if no activity)"
+    },
+    {
+        "key": "pipeline.welcome_to_pipeline",
+        "value": "Welcome to your Pipeline!"
+    },
+    {
+        "key": "pipeline.get_started_message",
+        "value": "Get started by creating your first pipeline stage, then add deals to track your sales opportunities."
+    },
+    {
+        "key": "pipeline.create_first_stage_button",
+        "value": "Create First Stage"
+    },
+    {
+        "key": "pipeline.add_deal_button",
+        "value": "Add Deal"
+    },
+    {
+        "key": "pipeline.no_deals_found",
+        "value": "No deals found"
+    },
+    {
+        "key": "pipeline.try_adjusting_filters",
+        "value": "Try adjusting your search criteria or filters to find what you're looking for."
+    },
+    {
+        "key": "pipeline.clear_filters",
+        "value": "Clear Filters"
+    },
+    {
+        "key": "pipeline.no_deals_yet",
+        "value": "No deals yet"
+    },
+    {
+        "key": "pipeline.start_building_message",
+        "value": "Start building your pipeline by adding your first deal."
+    },
+    {
+        "key": "pipeline.add_first_deal",
+        "value": "Add Your First Deal"
+    },
+    {
+        "key": "pipeline.no_deals_in_stage",
+        "value": "No deals in {{stageName}}"
+    },
+    {
+        "key": "pipeline.export_deals",
+        "value": "Export Deals"
+    },
+    {
+        "key": "pipeline.import_deals",
+        "value": "Import Deals"
+    },
+    {
+        "key": "pipeline.import_export_deals",
+        "value": "Import / Export Deals"
+    },
+    {
+        "key": "pipeline.download_deals_data",
+        "value": "Download your deals data in CSV, Excel, or JSON format"
+    },
+    {
+        "key": "pipeline.upload_file_to_import",
+        "value": "Upload a CSV, Excel, or JSON file to import deals"
+    },
+    {
+        "key": "pipeline.choose_import_export",
+        "value": "Choose whether to import or export deals data"
+    },
+    {
+        "key": "pipeline.exporting_from_stage",
+        "value": "Exporting deals from the current filtered stage only."
+    },
+    {
+        "key": "pipeline.exporting_all_deals",
+        "value": "Exporting all deals from your pipeline."
+    },
+    {
+        "key": "pipeline.export_as_csv",
+        "value": "Export as CSV"
+    },
+    {
+        "key": "pipeline.export_as_excel",
+        "value": "Export as Excel"
+    },
+    {
+        "key": "pipeline.export_as_json",
+        "value": "Export as JSON"
+    },
+    {
+        "key": "pipeline.export_success",
+        "value": "Deals exported successfully"
+    },
+    {
+        "key": "pipeline.export_failed",
+        "value": "Failed to export deals: {{error}}"
+    },
+    {
+        "key": "pipeline.download_template",
+        "value": "Download Template"
+    },
+    {
+        "key": "pipeline.csv_template",
+        "value": "CSV Template"
+    },
+    {
+        "key": "pipeline.json_template",
+        "value": "JSON Template"
+    },
+    {
+        "key": "pipeline.upload_file_description",
+        "value": "Upload a CSV, Excel, or JSON file with deal data. Make sure your file includes the required fields."
+    },
+    {
+        "key": "pipeline.click_to_upload",
+        "value": "Click to upload or drag and drop your file here"
+    },
+    {
+        "key": "pipeline.supports_file_formats",
+        "value": "Supports CSV, Excel, and JSON files (max 10MB)"
+    },
+    {
+        "key": "pipeline.processing_file",
+        "value": "Processing file..."
+    },
+    {
+        "key": "pipeline.imported",
+        "value": "Imported"
+    },
+    {
+        "key": "pipeline.failed",
+        "value": "Failed"
+    },
+    {
+        "key": "pipeline.import_errors",
+        "value": "Import Errors:"
+    },
+    {
+        "key": "pipeline.row",
+        "value": "Row {{row}}:"
+    },
+    {
+        "key": "pipeline.more_errors",
+        "value": "+{{count}} more errors"
+    },
+    {
+        "key": "pipeline.import_success",
+        "value": "{{count}} deals imported successfully"
+    },
+    {
+        "key": "pipeline.import_partial",
+        "value": "{{count}} deals failed to import"
+    },
+    {
+        "key": "pipeline.import_failed",
+        "value": "Failed to import deals: {{error}}"
+    },
+    {
+        "key": "pipeline.invalid_file_type",
+        "value": "Please upload a CSV, Excel, or JSON file"
+    },
+    {
+        "key": "pipeline.back",
+        "value": "Back"
+    },
+    {
+        "key": "pipeline.done",
+        "value": "Done"
+    },
+    {
+        "key": "pipeline.create_new_pipeline",
+        "value": "Create New Pipeline"
+    },
+    {
+        "key": "pipeline.choose_creation_method",
+        "value": "Choose how you want to create your pipeline"
+    },
+    {
+        "key": "pipeline.configure_pipeline_details",
+        "value": "Configure your pipeline details"
+    },
+    {
+        "key": "pipeline.from_template",
+        "value": "From Template"
+    },
+    {
+        "key": "pipeline.start_with_template",
+        "value": "Start with a pre-configured template"
+    },
+    {
+        "key": "pipeline.from_scratch",
+        "value": "From Scratch"
+    },
+    {
+        "key": "pipeline.create_custom_pipeline",
+        "value": "Create a custom pipeline"
+    },
+    {
+        "key": "pipeline.pipeline_name",
+        "value": "Pipeline Name *"
+    },
+    {
+        "key": "pipeline.pipeline_name_placeholder",
+        "value": "e.g., Sales Pipeline"
+    },
+    {
+        "key": "pipeline.pipeline_description",
+        "value": "Description"
+    },
+    {
+        "key": "pipeline.describe_pipeline",
+        "value": "Describe what this pipeline is for..."
+    },
+    {
+        "key": "pipeline.icon",
+        "value": "Icon"
+    },
+    {
+        "key": "pipeline.icon_placeholder",
+        "value": "e.g., TrendingUp, Users"
+    },
+    {
+        "key": "pipeline.color",
+        "value": "Color"
+    },
+    {
+        "key": "pipeline.template_preview",
+        "value": "Template Preview"
+    },
+    {
+        "key": "pipeline.pipeline_created_success",
+        "value": "Pipeline created successfully"
+    },
+    {
+        "key": "pipeline.pipeline_create_failed",
+        "value": "Failed to create pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.pipeline_name_required",
+        "value": "Pipeline name is required"
+    },
+    {
+        "key": "pipeline.creating_pipeline",
+        "value": "Creating..."
+    },
+    {
+        "key": "pipeline.create_pipeline",
+        "value": "Create Pipeline"
+    },
+    {
+        "key": "pipeline.edit_pipeline",
+        "value": "Edit Pipeline"
+    },
+    {
+        "key": "pipeline.update_pipeline_details",
+        "value": "Update pipeline details and settings"
+    },
+    {
+        "key": "pipeline.pipeline_statistics",
+        "value": "Pipeline Statistics"
+    },
+    {
+        "key": "pipeline.stages_count",
+        "value": "{{count}} stages"
+    },
+    {
+        "key": "pipeline.deals_count",
+        "value": "{{count}} deals"
+    },
+    {
+        "key": "pipeline.this_is_default",
+        "value": "This is the default pipeline"
+    },
+    {
+        "key": "pipeline.duplicate_pipeline",
+        "value": "Duplicate Pipeline"
+    },
+    {
+        "key": "pipeline.enter_name_for_duplicate",
+        "value": "Enter a name for the duplicated pipeline"
+    },
+    {
+        "key": "pipeline.pipeline_name_copy",
+        "value": "e.g., Sales Pipeline Copy"
+    },
+    {
+        "key": "pipeline.pipeline_updated_success",
+        "value": "Pipeline updated successfully"
+    },
+    {
+        "key": "pipeline.pipeline_update_failed",
+        "value": "Failed to update pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.pipeline_duplicated_success",
+        "value": "Pipeline duplicated successfully"
+    },
+    {
+        "key": "pipeline.pipeline_duplicate_failed",
+        "value": "Failed to duplicate pipeline: {{error}}"
+    },
+    {
+        "key": "pipeline.updating",
+        "value": "Updating..."
+    },
+    {
+        "key": "pipeline.update_pipeline",
+        "value": "Update Pipeline"
+    },
+    {
+        "key": "pipeline.duplicating",
+        "value": "Duplicating..."
+    },
+    {
+        "key": "pipeline.duplicate",
+        "value": "Duplicate"
+    },
+    {
+        "key": "pipeline.filter_deals",
+        "value": "Filter Deals"
+    },
+    {
+        "key": "pipeline.pipeline_stage",
+        "value": "Pipeline & Stage"
+    },
+    {
+        "key": "pipeline.deal_properties",
+        "value": "Deal Properties"
+    },
+    {
+        "key": "pipeline.dates",
+        "value": "Dates"
+    },
+    {
+        "key": "pipeline.assignment_tags",
+        "value": "Assignment & Tags"
+    },
+    {
+        "key": "pipeline.custom_fields",
+        "value": "Custom Fields"
+    },
+    {
+        "key": "pipeline.all_pipelines",
+        "value": "All pipelines"
+    },
+    {
+        "key": "pipeline.all_stages",
+        "value": "All stages"
+    },
+    {
+        "key": "pipeline.all_priorities",
+        "value": "All priorities"
+    },
+    {
+        "key": "pipeline.status",
+        "value": "Status"
+    },
+    {
+        "key": "pipeline.all_statuses",
+        "value": "All statuses"
+    },
+    {
+        "key": "pipeline.active",
+        "value": "Active"
+    },
+    {
+        "key": "pipeline.won",
+        "value": "Won"
+    },
+    {
+        "key": "pipeline.lost",
+        "value": "Lost"
+    },
+    {
+        "key": "pipeline.due_date_filter",
+        "value": "Due Date"
+    },
+    {
+        "key": "pipeline.created_date",
+        "value": "Created Date"
+    },
+    {
+        "key": "pipeline.assigned_users",
+        "value": "Assigned Users"
+    },
+    {
+        "key": "pipeline.all_users",
+        "value": "All users"
+    },
+    {
+        "key": "pipeline.include_unassigned_deals",
+        "value": "Include unassigned deals"
+    },
+    {
+        "key": "pipeline.all_tags",
+        "value": "All tags"
+    },
+    {
+        "key": "pipeline.clear_all_filters",
+        "value": "Clear All Filters"
+    },
+    {
+        "key": "pipeline.apply_filters",
+        "value": "Apply Filters"
+    },
+    {
+        "key": "pipeline.operator",
+        "value": "Operator"
+    },
+    {
+        "key": "pipeline.equals",
+        "value": "Equals"
+    },
+    {
+        "key": "pipeline.contains",
+        "value": "Contains"
+    },
+    {
+        "key": "pipeline.greater_than",
+        "value": "Greater than"
+    },
+    {
+        "key": "pipeline.less_than",
+        "value": "Less than"
+    },
+    {
+        "key": "pipeline.enter_value",
+        "value": "Enter value..."
+    },
+    {
+        "key": "pipeline.no_filter_applied",
+        "value": "No filter applied"
+    },
+    {
+        "key": "pipeline.move_deal_to_another_pipeline",
+        "value": "Move Deal to Another Pipeline"
+    },
+    {
+        "key": "pipeline.select_target_pipeline_stage_deal",
+        "value": "Select the target pipeline and stage for this deal."
+    },
+    {
+        "key": "pipeline.current_pipeline",
+        "value": "Current Pipeline"
+    },
+    {
+        "key": "pipeline.deal_moved_success",
+        "value": "Deal moved to new pipeline successfully"
+    },
+    {
+        "key": "pipeline.deal_move_failed",
+        "value": "Failed to move deal: {{error}}"
+    },
+    {
+        "key": "pipeline.move_deal",
+        "value": "Move Deal"
+    },
+    {
+        "key": "pipeline.edit_deal",
+        "value": "Edit Deal"
+    },
+    {
+        "key": "pipeline.deal_in",
+        "value": "Deal in"
+    },
+    {
+        "key": "pipeline.update_deal_information",
+        "value": "Update the deal information"
+    },
+    {
+        "key": "pipeline.pipeline_stage_label",
+        "value": "Pipeline Stage"
+    },
+    {
+        "key": "pipeline.deal_value_dollar",
+        "value": "Deal Value ($)"
+    },
+    {
+        "key": "pipeline.select_assignee",
+        "value": "Select assignee"
+    },
+    {
+        "key": "pipeline.enter_deal_description_placeholder",
+        "value": "Enter deal description..."
+    },
+    {
+        "key": "pipeline.add_tag_placeholder",
+        "value": "Add a tag..."
+    },
+    {
+        "key": "pipeline.deal_updated",
+        "value": "Deal has been updated"
+    },
+    {
+        "key": "pipeline.deal_update_failed_edit",
+        "value": "Failed to update deal: {{error}}"
+    },
+    {
+        "key": "pipeline.updating_deal",
+        "value": "Updating..."
+    },
+    {
+        "key": "pipeline.update_deal",
+        "value": "Update Deal"
+    },
+    {
+        "key": "pipeline.contact_information",
+        "value": "Contact Information"
+    },
+    {
+        "key": "pipeline.deal_information",
+        "value": "Deal Information"
+    },
+    {
+        "key": "pipeline.pipeline_stage_info",
+        "value": "Pipeline Stage"
+    },
+    {
+        "key": "pipeline.last_activity_info",
+        "value": "Last Activity"
+    },
+    {
+        "key": "pipeline.recent_activities",
+        "value": "Recent Activities"
+    },
+    {
+        "key": "pipeline.automated",
+        "value": "Automated"
+    },
+    {
+        "key": "pipeline.via_rule",
+        "value": "via rule \"{{ruleName}}\""
+    },
+    {
+        "key": "pipeline.pipeline_movement_history",
+        "value": "Pipeline Movement History"
+    },
+    {
+        "key": "pipeline.scheduled_stage_reverts_title",
+        "value": "Scheduled Stage Reverts"
+    },
+    {
+        "key": "pipeline.scheduled_to_revert_to",
+        "value": "Scheduled to revert to \"{{stageName}}\""
+    },
+    {
+        "key": "pipeline.only_if_no_activity",
+        "value": "Only if no activity"
+    },
+    {
+        "key": "pipeline.cancel_scheduled_revert",
+        "value": "Are you sure you want to cancel this scheduled revert?"
+    },
+    {
+        "key": "pipeline.revert_cancelled_success",
+        "value": "Scheduled revert cancelled successfully"
+    },
+    {
+        "key": "pipeline.revert_cancel_failed",
+        "value": "Failed to cancel scheduled revert"
+    },
+    {
+        "key": "pipeline.created",
+        "value": "Created"
+    },
+    {
+        "key": "pipeline.last_updated",
+        "value": "Last Updated"
+    },
+    {
+        "key": "pipeline.contact_details",
+        "value": "Contact Details"
+    },
+    {
+        "key": "pipeline.view_deals",
+        "value": "View Deals"
+    },
+    {
+        "key": "pipeline.identifier",
+        "value": "Identifier"
+    },
+    {
+        "key": "pipeline.not_provided",
+        "value": "Not provided"
+    },
+    {
+        "key": "pipeline.identifier_type",
+        "value": "Identifier Type"
+    },
+    {
+        "key": "pipeline.not_specified",
+        "value": "Not specified"
+    },
+    {
+        "key": "pipeline.first_contacted",
+        "value": "First Contacted"
+    },
+    {
+        "key": "pipeline.unknown",
+        "value": "Unknown"
+    },
+    {
+        "key": "pipeline.last_activity_contact",
+        "value": "Last Activity"
+    },
+    {
+        "key": "pipeline.no_recent_activity",
+        "value": "No recent activity"
+    },
+    {
+        "key": "pipeline.recent_conversations",
+        "value": "Recent Conversations ({{count}})"
+    },
+    {
+        "key": "pipeline.last_message",
+        "value": "Last message: {{time}}"
+    },
+    {
+        "key": "pipeline.associated_deals",
+        "value": "Associated Deals ({{count}})"
+    },
+    {
+        "key": "pipeline.min",
+        "value": "Min"
+    },
+    {
+        "key": "pipeline.max",
+        "value": "Max"
+    },
+    {
+        "key": "pipeline.no_limit",
+        "value": "No limit"
+    },
+    {
+        "key": "pipeline.min_greater_than_max",
+        "value": "Minimum value cannot be greater than maximum"
+    },
+    {
+        "key": "pipeline.select_options",
+        "value": "Select options..."
+    },
+    {
+        "key": "pipeline.search",
+        "value": "Search..."
+    },
+    {
+        "key": "pipeline.select_all",
+        "value": "Select All"
+    },
+    {
+        "key": "pipeline.deselect_all",
+        "value": "Deselect All"
+    },
+    {
+        "key": "pipeline.no_options_found",
+        "value": "No options found"
+    },
+    {
+        "key": "pipeline.select_date_range",
+        "value": "Select date range..."
+    },
+    {
+        "key": "pipeline.quick_presets",
+        "value": "Quick Presets"
+    },
+    {
+        "key": "pipeline.overdue_preset",
+        "value": "Overdue"
+    },
+    {
+        "key": "pipeline.due_today",
+        "value": "Due Today"
+    },
+    {
+        "key": "pipeline.due_this_week",
+        "value": "Due This Week"
+    },
+    {
+        "key": "pipeline.due_this_month",
+        "value": "Due This Month"
+    },
+    {
+        "key": "pipeline.due_today_preset",
+        "value": "Due Today"
+    },
+    {
+        "key": "pipeline.due_this_week_preset",
+        "value": "Due This Week"
+    },
+    {
+        "key": "pipeline.due_this_month_preset",
+        "value": "Due This Month"
+    },
+    {
+        "key": "pipeline.pipelines",
+        "value": "Pipelines"
+    },
+    {
+        "key": "pipeline.stages",
+        "value": "Stages"
+    },
+    {
+        "key": "pipeline.validation.title_min",
+        "value": "Title must be at least 2 characters"
+    },
+    {
+        "key": "pipeline.validation.stage_required",
+        "value": "Please select a pipeline stage"
+    },
+    {
+        "key": "pipeline.validation.contact_required",
+        "value": "Please select a contact"
+    },
+    {
+        "key": "pipeline.value_range_summary",
+        "value": "Value range"
+    },
+    {
+        "key": "pipeline.set_date_range",
+        "value": "Set date range to {{label}}"
     },
     {
         "key": "calendar.event_created",
@@ -2940,6 +4908,10 @@
     {
         "key": "campaigns.filter.draft",
         "value": "Draft"
+    },
+    {
+        "key": "campaigns.filter.scheduled",
+        "value": "Scheduled"
     },
     {
         "key": "campaigns.filter.running",
@@ -5030,6 +7002,38 @@
         "value": "Failed to create segment"
     },
     {
+        "key": "segments.add_to_existing.title",
+        "value": "Add to Existing Segment"
+    },
+    {
+        "key": "segments.add_to_existing.button",
+        "value": "Add to Segment"
+    },
+    {
+        "key": "segments.add_to_existing.select_label",
+        "value": "Select Segment"
+    },
+    {
+        "key": "segments.add_to_existing.select_placeholder",
+        "value": "Choose a segment..."
+    },
+    {
+        "key": "segments.add_to_existing.selected_count",
+        "value": "{{count}} contact(s) selected"
+    },
+    {
+        "key": "segments.add_to_existing.no_segments",
+        "value": "No manual segments available. Create a segment first."
+    },
+    {
+        "key": "segments.add_to_existing.success",
+        "value": "Added {{count}} contact(s) to segment \"{{name}}\""
+    },
+    {
+        "key": "segments.add_to_existing.error",
+        "value": "Failed to add contacts to segment"
+    },
+    {
         "key": "segments.edit.title",
         "value": "Edit Contact Segment"
     },
@@ -5240,6 +7244,38 @@
     {
         "key": "segments.edit.restore_contact_tooltip",
         "value": "Restore contact"
+    },
+    {
+        "key": "segments.add_to_existing.title",
+        "value": "Add Contacts to Existing Segment"
+    },
+    {
+        "key": "segments.add_to_existing.select_label",
+        "value": "Select Segment"
+    },
+    {
+        "key": "segments.add_to_existing.select_placeholder",
+        "value": "Choose a segment..."
+    },
+    {
+        "key": "segments.add_to_existing.no_segments",
+        "value": "No manual segments available. Create one first."
+    },
+    {
+        "key": "segments.add_to_existing.selected_count",
+        "value": "{{count}} contacts will be added"
+    },
+    {
+        "key": "segments.add_to_existing.success",
+        "value": "Successfully added {{count}} contacts to segment \"{{name}}\""
+    },
+    {
+        "key": "segments.add_to_existing.error",
+        "value": "Failed to add contacts to segment"
+    },
+    {
+        "key": "segments.add_to_existing.button",
+        "value": "Add to Segment"
     },
     {
         "key": "templates.create.title",
@@ -6963,6 +8999,22 @@
         "value": "Enter a sample message to see how it will be split and timed..."
     },
     {
+        "key": "settings.whatsapp.enable_history_sync",
+        "value": "Sync existing message history"
+    },
+    {
+        "key": "settings.whatsapp.history_sync_tooltip",
+        "value": "Import up to 6 months of chat history from your WhatsApp Business app. Sync may take 4-6 hours depending on message volume."
+    },
+    {
+        "key": "settings.whatsapp.history_sync_in_progress",
+        "value": "Syncing Phase {phase}/3: {progress}% complete"
+    },
+    {
+        "key": "settings.whatsapp.history_sync_phase_complete",
+        "value": "History sync phase {phase} completed"
+    },
+    {
         "key": "common.success",
         "value": "Success"
     },
@@ -7209,130 +9261,6 @@
     {
         "key": "subdomain.admin_contact_help",
         "value": "If you're a company administrator, please contact support to reactivate your account."
-    },
-    {
-        "key": "whatsapp_360dialog.validation_error",
-        "value": "Validation Error"
-    },
-    {
-        "key": "whatsapp_360dialog.api_key_required",
-        "value": "API Key and Phone Number are required for validation."
-    },
-    {
-        "key": "whatsapp_360dialog.credentials_valid",
-        "value": "Credentials Valid"
-    },
-    {
-        "key": "whatsapp_360dialog.validation_success",
-        "value": "Successfully validated 360Dialog API key for phone number: {{phoneNumber}}"
-    },
-    {
-        "key": "whatsapp_360dialog.invalid_credentials",
-        "value": "Invalid credentials"
-    },
-    {
-        "key": "whatsapp_360dialog.validation_failed",
-        "value": "Validation Failed"
-    },
-    {
-        "key": "whatsapp_360dialog.validation_failed_desc",
-        "value": "Failed to validate 360Dialog credentials."
-    },
-    {
-        "key": "whatsapp_360dialog.success",
-        "value": "Success"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_created",
-        "value": "360Dialog WhatsApp connection created successfully!"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_failed",
-        "value": "Failed to create connection"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_error",
-        "value": "Connection Error"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_error_desc",
-        "value": "Failed to connect to 360Dialog WhatsApp"
-    },
-    {
-        "key": "whatsapp_360dialog.connect_title",
-        "value": "Connect 360Dialog WhatsApp"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_name",
-        "value": "Connection Name"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_name_placeholder",
-        "value": "My 360Dialog WhatsApp"
-    },
-    {
-        "key": "whatsapp_360dialog.connection_name_help",
-        "value": "A friendly name for this connection"
-    },
-    {
-        "key": "whatsapp_360dialog.api_key",
-        "value": "API Key"
-    },
-    {
-        "key": "whatsapp_360dialog.api_key_placeholder",
-        "value": "Your 360Dialog API key..."
-    },
-    {
-        "key": "whatsapp_360dialog.api_key_help",
-        "value": "Your 360Dialog API key from the Hub dashboard"
-    },
-    {
-        "key": "whatsapp_360dialog.phone_number",
-        "value": "WhatsApp Phone Number"
-    },
-    {
-        "key": "whatsapp_360dialog.phone_number_placeholder",
-        "value": "+1234567890"
-    },
-    {
-        "key": "whatsapp_360dialog.phone_number_help",
-        "value": "Your WhatsApp Business phone number registered with 360Dialog"
-    },
-    {
-        "key": "whatsapp_360dialog.validating",
-        "value": "Validating..."
-    },
-    {
-        "key": "whatsapp_360dialog.test",
-        "value": "Test"
-    },
-    {
-        "key": "whatsapp_360dialog.webhook_url",
-        "value": "Webhook URL"
-    },
-    {
-        "key": "whatsapp_360dialog.webhook_url_placeholder",
-        "value": "https://yourdomain.com/api/webhooks/360dialog-whatsapp"
-    },
-    {
-        "key": "whatsapp_360dialog.webhook_url_help",
-        "value": "URL where 360Dialog will send webhook notifications"
-    },
-    {
-        "key": "whatsapp_360dialog.setup_title",
-        "value": "360Dialog WhatsApp Setup"
-    },
-    {
-        "key": "whatsapp_360dialog.setup_steps",
-        "value": "1. Create a 360Dialog account and get WhatsApp Business approved\\n2. Generate an API key in the 360Dialog Hub\\n3. Configure the webhook URL in your 360Dialog settings\\n4. Test the connection to ensure everything works"
-    },
-    {
-        "key": "whatsapp_360dialog.connecting",
-        "value": "Connecting..."
-    },
-    {
-        "key": "whatsapp_360dialog.connect",
-        "value": "Connect"
     },
     {
         "key": "admin.languages.create_failed",
@@ -8331,138 +10259,6 @@
         "value": "Manage Pages"
     },
     {
-        "key": "whatsapp_twilio.validation_error",
-        "value": "Validation Error"
-    },
-    {
-        "key": "whatsapp_twilio.required_fields",
-        "value": "Account SID, Auth Token, and Conversation Service SID are required for validation."
-    },
-    {
-        "key": "whatsapp_twilio.credentials_valid",
-        "value": "Credentials Valid"
-    },
-    {
-        "key": "whatsapp_twilio.validation_success",
-        "value": "Successfully validated Twilio service: {{serviceName}}"
-    },
-    {
-        "key": "whatsapp_twilio.invalid_credentials",
-        "value": "Invalid credentials"
-    },
-    {
-        "key": "whatsapp_twilio.validation_failed",
-        "value": "Validation Failed"
-    },
-    {
-        "key": "whatsapp_twilio.validation_failed_desc",
-        "value": "Failed to validate Twilio credentials."
-    },
-    {
-        "key": "whatsapp_twilio.connection_created",
-        "value": "Twilio WhatsApp connection created successfully!"
-    },
-    {
-        "key": "whatsapp_twilio.connection_failed",
-        "value": "Failed to create connection"
-    },
-    {
-        "key": "whatsapp_twilio.connection_error",
-        "value": "Connection Error"
-    },
-    {
-        "key": "whatsapp_twilio.connection_error_desc",
-        "value": "Failed to connect to Twilio WhatsApp"
-    },
-    {
-        "key": "whatsapp_twilio.connect_title",
-        "value": "Connect Twilio WhatsApp"
-    },
-    {
-        "key": "whatsapp_twilio.connection_name",
-        "value": "Connection Name"
-    },
-    {
-        "key": "whatsapp_twilio.connection_name_placeholder",
-        "value": "My Twilio WhatsApp"
-    },
-    {
-        "key": "whatsapp_twilio.connection_name_help",
-        "value": "A friendly name for this connection"
-    },
-    {
-        "key": "whatsapp_twilio.account_sid",
-        "value": "Account SID"
-    },
-    {
-        "key": "whatsapp_twilio.account_sid_placeholder",
-        "value": "ACxxxxx..."
-    },
-    {
-        "key": "whatsapp_twilio.account_sid_help",
-        "value": "Your Twilio Account SID from the console"
-    },
-    {
-        "key": "whatsapp_twilio.auth_token",
-        "value": "Auth Token"
-    },
-    {
-        "key": "whatsapp_twilio.auth_token_placeholder",
-        "value": "Your auth token..."
-    },
-    {
-        "key": "whatsapp_twilio.auth_token_help",
-        "value": "Your Twilio Auth Token (keep this secure)"
-    },
-    {
-        "key": "whatsapp_twilio.conversation_service_sid",
-        "value": "Conversation Service SID"
-    },
-    {
-        "key": "whatsapp_twilio.conversation_service_sid_placeholder",
-        "value": "ISxxxxx..."
-    },
-    {
-        "key": "whatsapp_twilio.conversation_service_sid_help",
-        "value": "Your Twilio Conversations Service SID"
-    },
-    {
-        "key": "whatsapp_twilio.whatsapp_number",
-        "value": "WhatsApp Number"
-    },
-    {
-        "key": "whatsapp_twilio.whatsapp_number_placeholder",
-        "value": "whatsapp:+14155238886"
-    },
-    {
-        "key": "whatsapp_twilio.whatsapp_number_help",
-        "value": "Your Twilio WhatsApp number (sandbox or approved number)"
-    },
-    {
-        "key": "whatsapp_twilio.setup_title",
-        "value": "Twilio WhatsApp Setup"
-    },
-    {
-        "key": "whatsapp_twilio.setup_steps",
-        "value": "1. Create a Twilio account and Conversations Service\\n2. Enable WhatsApp for your service\\n3. Configure webhook endpoints\\n4. Test the connection"
-    },
-    {
-        "key": "whatsapp_twilio.validating",
-        "value": "Validating..."
-    },
-    {
-        "key": "whatsapp_twilio.test",
-        "value": "Test"
-    },
-    {
-        "key": "whatsapp_twilio.connecting",
-        "value": "Connecting..."
-    },
-    {
-        "key": "whatsapp_twilio.connect",
-        "value": "Connect"
-    },
-    {
         "key": "whatsapp_business.validation_error",
         "value": "Validation Error"
     },
@@ -9431,6 +11227,10 @@
         "value": "Pipeline"
     },
     {
+        "key": "flow_builder.node_types.manage_contact",
+        "value": "Manage Contact"
+    },
+    {
         "key": "flow_builder.node_types.agent_handoff",
         "value": "Agent Handoff"
     },
@@ -9481,6 +11281,10 @@
     {
         "key": "flow_builder.node_types.chat_pdf_ai",
         "value": "Chat PDF AI"
+    },
+    {
+        "key": "flow_builder.node_types.call_agent",
+        "value": "Call Agent"
     },
     {
         "key": "flow_builder.sections.triggers",
@@ -11816,14 +13620,6 @@
         "value": "WhatsApp (Official)"
     },
     {
-        "key": "flow_builder.trigger_channel_whatsapp_twilio",
-        "value": "WhatsApp (Twilio)"
-    },
-    {
-        "key": "flow_builder.trigger_channel_whatsapp_360dialog",
-        "value": "WhatsApp (360Dialog)"
-    },
-    {
         "key": "flow_builder.trigger_channel_messenger",
         "value": "Facebook Messenger"
     },
@@ -13288,6 +15084,178 @@
         "value": "Week of"
     },
     {
+        "key": "calendar.bot_available_slots_for",
+        "value": "Available time slots for {{date}}:"
+    },
+    {
+        "key": "calendar.bot_no_available_slots",
+        "value": "No available time slots found for {{date}}."
+    },
+    {
+        "key": "calendar.bot_slot_no_longer_available",
+        "value": "I'm sorry, but the time slot {{time}} is no longer available (may have been booked by another user or conflicts with an existing appointment). Here are the current available time slots for {{date}}:"
+    },
+    {
+        "key": "calendar.bot_select_time_from_options",
+        "value": "Please select a time from the options above."
+    },
+    {
+        "key": "calendar.bot_slots_duration_note",
+        "value": "Slots shown account for your {{duration}} minute appointment duration{{bufferNote}}."
+    },
+    {
+        "key": "calendar.bot_buffer_note",
+        "value": " and {{buffer}} minute buffer time"
+    },
+    {
+        "key": "calendar.bot_buffer_warning",
+        "value": "Note: Each appointment requires a {{buffer}} minute buffer before and after."
+    },
+    {
+        "key": "calendar.bot_appointment_scheduled",
+        "value": "Perfect! I've scheduled your appointment and the time slot has been reserved."
+    },
+    {
+        "key": "calendar.bot_appointment_details",
+        "value": "{{summary}}\n{{date}}\nDuration: {{duration}} minutes\nLocation: {{location}}"
+    },
+    {
+        "key": "calendar.bot_event_link",
+        "value": "Event link: {{link}}"
+    },
+    {
+        "key": "calendar.bot_calendar_invitation",
+        "value": "You will receive a calendar invitation shortly."
+    },
+    {
+        "key": "calendar.bot_date_required",
+        "value": "Date is required when booking. Please provide the date along with the time (e.g., \"2025-11-28 16:00\" or use ISO format \"2025-11-28T16:00:00\")."
+    },
+    {
+        "key": "calendar.bot_invalid_time_format",
+        "value": "Invalid time format: \"{{time}}\". Please provide time in format \"HH:MM\" (24-hour) or \"HH:MM AM/PM\" (12-hour)."
+    },
+    {
+        "key": "calendar.bot_failed_parse_time",
+        "value": "Failed to parse time \"{{time}}\". Please provide time in format \"HH:MM\" (24-hour) or \"HH:MM AM/PM\" (12-hour) along with the date."
+    },
+    {
+        "key": "calendar.bot_start_end_required",
+        "value": "Start and end times are required for booking. Please provide the date and time in ISO format (YYYY-MM-DDTHH:MM:SS) or specify both date and time separately."
+    },
+    {
+        "key": "calendar.bot_invalid_datetime_format",
+        "value": "Invalid date/time format. Please use ISO format (YYYY-MM-DDTHH:MM:SS) or provide date and time separately. Received: start={{start}}, end={{end}}"
+    },
+    {
+        "key": "calendar.bot_start_before_end",
+        "value": "Start time must be before end time."
+    },
+    {
+        "key": "calendar.bot_appointment_cancelled",
+        "value": "Done! I've cancelled your appointment."
+    },
+    {
+        "key": "calendar.bot_appointment_cancelled_with_link",
+        "value": "Your appointment has been cancelled successfully. Event link: {{eventLink}}"
+    },
+    {
+        "key": "calendar.bot_appointment_cancelled_via_link",
+        "value": "Your appointment has been successfully cancelled using the provided event link. You will receive a cancellation notification shortly."
+    },
+    {
+        "key": "calendar.bot_provide_event_link",
+        "value": "To cancel your appointment, please provide the event link you received when you booked it."
+    },
+    {
+        "key": "calendar.bot_cancellation_failed",
+        "value": "I encountered an error while cancelling your appointment: {{error}}"
+    },
+    {
+        "key": "calendar.bot_recent_appointments",
+        "value": "Here are your recent appointments:\n{{appointments}}"
+    },
+    {
+        "key": "calendar.bot_appointment_details_with_link",
+        "value": "• {{summary}} on {{date}} at {{time}}\n  Event link: {{eventLink}}"
+    },
+    {
+        "key": "calendar.bot_appointment_not_found",
+        "value": "I couldn't find an appointment at {{date}} {{time}}. Could you please provide more details or check your calendar?"
+    },
+    {
+        "key": "calendar.bot_need_event_id_or_datetime",
+        "value": "I need the event ID to cancel the appointment. Please provide the event ID or specify the exact date and time of the appointment you want to cancel."
+    },
+    {
+        "key": "calendar.bot_need_event_id_or_datetime_short",
+        "value": "I need either an event ID or the date/time of the appointment to cancel it. Please provide this information."
+    },
+    {
+        "key": "calendar.bot_upcoming_appointments",
+        "value": "Your upcoming appointments:"
+    },
+    {
+        "key": "calendar.bot_no_appointments_default",
+        "value": "No appointments found in the last/next 30 days."
+    },
+    {
+        "key": "calendar.bot_no_appointments_period",
+        "value": "No appointments found for the specified period."
+    },
+    {
+        "key": "calendar.bot_attendees",
+        "value": "Attendees: {{attendees}}"
+    },
+    {
+        "key": "calendar.bot_error_checking_availability",
+        "value": "Error checking availability"
+    },
+    {
+        "key": "calendar.bot_error_booking_appointment",
+        "value": "Error booking appointment"
+    },
+    {
+        "key": "calendar.bot_error_cancelling_appointment",
+        "value": "Error cancelling appointment"
+    },
+    {
+        "key": "calendar.bot_error_listing_appointments",
+        "value": "Error listing appointments"
+    },
+    {
+        "key": "calendar.bot_error_updating_appointment",
+        "value": "Error updating appointment"
+    },
+    {
+        "key": "calendar.bot_slot_not_available_fallback",
+        "value": "I'm sorry, but that time slot is not available. Would you like me to check available time slots for that day, or would you prefer a different time?"
+    },
+    {
+        "key": "calendar.bot_generic_calendar_error",
+        "value": "I encountered an issue with the calendar. Please try again."
+    },
+    {
+        "key": "calendar.bot_slot_not_available_short",
+        "value": "That time slot is not available in our calendar. You can try another time."
+    },
+    {
+        "key": "calendar.bot_appointment_updated",
+        "value": "Excellent! I've updated your appointment."
+    },
+    {
+        "key": "calendar.bot_appointment_updated_details",
+        "value": "{{summary}}\nNew time: {{date}}"
+    },
+    {
+        "key": "calendar.bot_need_event_id_to_update",
+        "value": "I need the event ID to update the appointment. Please provide the event ID or specify the exact date and time of the appointment you want to update."
+    },
+    {
+        "key": "calendar.bot_need_event_id_or_datetime_to_update",
+        "value": "I need either an event ID or the date/time of the appointment to update it. Please provide this information."
+    },
+    {
         "key": "campaigns.unknown_error",
         "value": "Unknown error occurred"
     },
@@ -13972,8 +15940,8 @@
         "value": "File Name:"
     },
     {
-        "key": "flow_builder.message_received",
-        "value": "Message Received"
+        "key": "flow_builder.trigger_node",
+        "value": "Message Trigger"
     },
     {
         "key": "flow_builder.when",
@@ -14438,14 +16406,6 @@
     {
         "key": "admin.settings.platform.description",
         "value": "Configure platform-wide partner API integrations and Tech Provider credentials"
-    },
-    {
-        "key": "admin.settings.platform.360dialog.title",
-        "value": "360Dialog Partner API"
-    },
-    {
-        "key": "admin.settings.platform.360dialog.description",
-        "value": "Configure 360Dialog Partner credentials for company onboarding"
     },
     {
         "key": "admin.settings.platform.meta.title",
@@ -16110,5 +18070,1969 @@
     {
         "key": "flow_builder.ai_default_system_prompt",
         "value": "You are a helpful assistant. Answer user questions concisely and accurately. Only perform specific actions when the user explicitly requests them."
+    },
+    {
+        "key": "flow_builder.manage_contact",
+        "value": "Manage Contact"
+    },
+    {
+        "key": "flow_builder.manage_contact_description",
+        "value": "Update or delete contact information"
+    },
+    {
+        "key": "flow_builder.update_contact",
+        "value": "Update Contact"
+    },
+    {
+        "key": "flow_builder.delete_contact",
+        "value": "Delete Contact"
+    },
+    {
+        "key": "flow_builder.contact_id_variable",
+        "value": "Contact ID Variable"
+    },
+    {
+        "key": "flow_builder.contact_id_variable_help",
+        "value": "Variable containing the contact ID or phone number"
+    },
+    {
+        "key": "flow_builder.fields_to_update",
+        "value": "Fields to Update"
+    },
+    {
+        "key": "flow_builder.contact_name",
+        "value": "Contact Name"
+    },
+    {
+        "key": "flow_builder.contact_email",
+        "value": "Contact Email"
+    },
+    {
+        "key": "flow_builder.contact_phone",
+        "value": "Contact Phone"
+    },
+    {
+        "key": "flow_builder.contact_company",
+        "value": "Contact Company"
+    },
+    {
+        "key": "flow_builder.contact_tags",
+        "value": "Contact Tags"
+    },
+    {
+        "key": "flow_builder.contact_notes",
+        "value": "Contact Notes"
+    },
+    {
+        "key": "flow_builder.contact_is_active",
+        "value": "Is Active"
+    },
+    {
+        "key": "flow_builder.contact_is_archived",
+        "value": "Is Archived"
+    },
+    {
+        "key": "flow_builder.delete_warning",
+        "value": "Warning: This will permanently delete the contact and all associated data"
+    },
+    {
+        "key": "flow_builder.delete_confirmation",
+        "value": "I understand this will permanently delete the contact"
+    },
+    {
+        "key": "flow_builder.delete_info",
+        "value": "This action will delete the contact, conversations, messages, notes, and deals. This cannot be undone."
+    },
+    {
+        "key": "flow_builder.delete_associated_data",
+        "value": "Delete associated data (conversations, messages, notes, deals)"
+    },
+    {
+        "key": "flow_builder.skip_empty_values",
+        "value": "Skip empty values"
+    },
+    {
+        "key": "flow_builder.contact_updated",
+        "value": "Contact updated successfully"
+    },
+    {
+        "key": "flow_builder.contact_deleted",
+        "value": "Contact deleted successfully"
+    },
+    {
+        "key": "flow_builder.contact_update_failed",
+        "value": "Failed to update contact"
+    },
+    {
+        "key": "flow_builder.contact_delete_failed",
+        "value": "Failed to delete contact"
+    },
+    {
+        "key": "flow_builder.operation_type",
+        "value": "Operation Type"
+    },
+    {
+        "key": "flow_builder.operation_type_help",
+        "value": "Choose what action to perform on the contact"
+    },
+    {
+        "key": "flow_builder.select_operation",
+        "value": "Select operation"
+    },
+    {
+        "key": "flow_builder.enter_tag_name",
+        "value": "Enter tag name"
+    },
+    {
+        "key": "flow_builder.enter_notes",
+        "value": "Enter notes..."
+    },
+    {
+        "key": "flow_builder.fields_to_update_summary",
+        "value": "Fields to update:"
+    },
+    {
+        "key": "flow_builder.advanced_options",
+        "value": "Advanced Options"
+    },
+    {
+        "key": "flow_builder.error_handling",
+        "value": "Error Handling"
+    },
+    {
+        "key": "flow_builder.continue_on_error",
+        "value": "Continue on error"
+    },
+    {
+        "key": "flow_builder.stop_on_error",
+        "value": "Stop on error"
+    },
+    {
+        "key": "nav.call_logs",
+        "value": "Call Logs"
+    },
+    {
+        "key": "call_logs.title",
+        "value": "Call Logs"
+    },
+    {
+        "key": "call_logs.description",
+        "value": "View and manage all calls made through CallAgent"
+    },
+    {
+        "key": "call_logs.total_calls",
+        "value": "Total Calls"
+    },
+    {
+        "key": "call_logs.inbound_calls",
+        "value": "Inbound Calls"
+    },
+    {
+        "key": "call_logs.outbound_calls",
+        "value": "Outbound Calls"
+    },
+    {
+        "key": "call_logs.avg_duration",
+        "value": "Average Duration"
+    },
+    {
+        "key": "call_logs.total_cost",
+        "value": "Total Cost"
+    },
+    {
+        "key": "call_logs.filter.all",
+        "value": "All"
+    },
+    {
+        "key": "call_logs.filter.completed",
+        "value": "Completed"
+    },
+    {
+        "key": "call_logs.filter.failed",
+        "value": "Failed"
+    },
+    {
+        "key": "call_logs.filter.in_progress",
+        "value": "In Progress"
+    },
+    {
+        "key": "call_logs.filter.no_answer",
+        "value": "No Answer"
+    },
+    {
+        "key": "call_logs.direction.inbound",
+        "value": "Inbound"
+    },
+    {
+        "key": "call_logs.direction.outbound",
+        "value": "Outbound"
+    },
+    {
+        "key": "call_logs.export",
+        "value": "Export"
+    },
+    {
+        "key": "call_logs.download_transcript",
+        "value": "Download Transcript"
+    },
+    {
+        "key": "call_logs.download_recording",
+        "value": "Download Recording"
+    },
+    {
+        "key": "call_logs.re_initiate",
+        "value": "Re-initiate Call"
+    },
+    {
+        "key": "call_logs.add_notes",
+        "value": "Add Notes"
+    },
+    {
+        "key": "call_logs.delete",
+        "value": "Delete"
+    },
+    {
+        "key": "call_logs.no_calls_found",
+        "value": "No calls found"
+    },
+    {
+        "key": "call_logs.call_details",
+        "value": "Call Details"
+    },
+    {
+        "key": "call_logs.transcript",
+        "value": "Transcript"
+    },
+    {
+        "key": "call_logs.recording",
+        "value": "Recording"
+    },
+    {
+        "key": "call_logs.metadata",
+        "value": "Metadata"
+    },
+    {
+        "key": "call_logs.live_updates",
+        "value": "Live updates"
+    },
+    {
+        "key": "call_logs.polling_mode",
+        "value": "Polling mode"
+    },
+    {
+        "key": "call_logs.search_placeholder",
+        "value": "Search by phone number or contact name..."
+    },
+    {
+        "key": "call_logs.filter.status",
+        "value": "Status"
+    },
+    {
+        "key": "call_logs.filter.direction",
+        "value": "Direction"
+    },
+    {
+        "key": "call_logs.table.status",
+        "value": "Status"
+    },
+    {
+        "key": "call_logs.table.contact",
+        "value": "Contact/Phone"
+    },
+    {
+        "key": "call_logs.table.direction",
+        "value": "Direction"
+    },
+    {
+        "key": "call_logs.table.duration",
+        "value": "Duration"
+    },
+    {
+        "key": "call_logs.table.flow",
+        "value": "Flow"
+    },
+    {
+        "key": "call_logs.table.cost",
+        "value": "Cost"
+    },
+    {
+        "key": "call_logs.table.started_at",
+        "value": "Started At"
+    },
+    {
+        "key": "call_logs.table.actions",
+        "value": "Actions"
+    },
+    {
+        "key": "call_logs.view_details",
+        "value": "View Details"
+    },
+    {
+        "key": "call_logs.star",
+        "value": "Star"
+    },
+    {
+        "key": "call_logs.unstar",
+        "value": "Unstar"
+    },
+    {
+        "key": "call_logs.confirm_delete",
+        "value": "Are you sure you want to delete this call log?"
+    },
+    {
+        "key": "call_logs.deleted",
+        "value": "Call Deleted"
+    },
+    {
+        "key": "call_logs.deleted_successfully",
+        "value": "Call log deleted successfully."
+    },
+    {
+        "key": "call_logs.exported",
+        "value": "Export Successful"
+    },
+    {
+        "key": "call_logs.exported_message",
+        "value": "Call logs exported successfully."
+    },
+    {
+        "key": "call_logs.export_failed",
+        "value": "Failed to export call logs."
+    },
+    {
+        "key": "call_logs.export_csv",
+        "value": "Export as CSV"
+    },
+    {
+        "key": "call_logs.export_excel",
+        "value": "Export as Excel"
+    },
+    {
+        "key": "call_logs.call_completed",
+        "value": "Call Completed"
+    },
+    {
+        "key": "call_logs.call_finished",
+        "value": "Call has finished processing."
+    },
+    {
+        "key": "call_logs.call_failed",
+        "value": "Call Failed"
+    },
+    {
+        "key": "call_logs.call_failed_message",
+        "value": "Call failed to complete."
+    },
+    {
+        "key": "call_logs.overview",
+        "value": "Overview"
+    },
+    {
+        "key": "call_logs.call_info",
+        "value": "Call Information"
+    },
+    {
+        "key": "call_logs.status",
+        "value": "Status"
+    },
+    {
+        "key": "call_logs.direction",
+        "value": "Direction"
+    },
+    {
+        "key": "call_logs.from",
+        "value": "From"
+    },
+    {
+        "key": "call_logs.to",
+        "value": "To"
+    },
+    {
+        "key": "call_logs.duration",
+        "value": "Duration"
+    },
+    {
+        "key": "call_logs.cost",
+        "value": "Cost"
+    },
+    {
+        "key": "call_logs.timestamps",
+        "value": "Timestamps"
+    },
+    {
+        "key": "call_logs.started_at",
+        "value": "Started At"
+    },
+    {
+        "key": "call_logs.ended_at",
+        "value": "Ended At"
+    },
+    {
+        "key": "call_logs.contact",
+        "value": "Contact"
+    },
+    {
+        "key": "call_logs.name",
+        "value": "Name"
+    },
+    {
+        "key": "call_logs.phone",
+        "value": "Phone"
+    },
+    {
+        "key": "call_logs.email",
+        "value": "Email"
+    },
+    {
+        "key": "call_logs.flow",
+        "value": "Flow"
+    },
+    {
+        "key": "call_logs.flow_name",
+        "value": "Flow Name"
+    },
+    {
+        "key": "call_logs.notes",
+        "value": "Notes"
+    },
+    {
+        "key": "call_logs.notes_placeholder",
+        "value": "Add notes about this call..."
+    },
+    {
+        "key": "call_logs.download",
+        "value": "Download"
+    },
+    {
+        "key": "call_logs.copy",
+        "value": "Copy"
+    },
+    {
+        "key": "call_logs.user",
+        "value": "User"
+    },
+    {
+        "key": "call_logs.ai",
+        "value": "AI"
+    },
+    {
+        "key": "call_logs.no_transcript",
+        "value": "No transcript available."
+    },
+    {
+        "key": "call_logs.no_recording",
+        "value": "No recording available."
+    },
+    {
+        "key": "call_logs.audio_not_supported",
+        "value": "Your browser does not support the audio element."
+    },
+    {
+        "key": "call_logs.transcript_copied",
+        "value": "Transcript copied to clipboard."
+    },
+    {
+        "key": "call_logs.updated",
+        "value": "Call log updated successfully."
+    },
+    {
+        "key": "call_logs.no_calls_message",
+        "value": "No call logs match your filters."
+    },
+    {
+        "key": "call_logs.status.completed",
+        "value": "Completed"
+    },
+    {
+        "key": "call_logs.status.failed",
+        "value": "Failed"
+    },
+    {
+        "key": "call_logs.status.in_progress",
+        "value": "In Progress"
+    },
+    {
+        "key": "call_logs.status.ringing",
+        "value": "Ringing"
+    },
+    {
+        "key": "call_screen.active_call",
+        "value": "Active Call"
+    },
+    {
+        "key": "call_screen.queued",
+        "value": "Queuing..."
+    },
+    {
+        "key": "call_screen.initiated",
+        "value": "Initiating..."
+    },
+    {
+        "key": "call_screen.ringing",
+        "value": "Ringing..."
+    },
+    {
+        "key": "call_screen.in_progress",
+        "value": "In Progress"
+    },
+    {
+        "key": "call_screen.connected",
+        "value": "Connected"
+    },
+    {
+        "key": "call_screen.call_ended",
+        "value": "Call Ended"
+    },
+    {
+        "key": "call_screen.call_failed",
+        "value": "Call Failed"
+    },
+    {
+        "key": "call_screen.line_busy",
+        "value": "Line Busy"
+    },
+    {
+        "key": "call_screen.no_answer",
+        "value": "No Answer"
+    },
+    {
+        "key": "call_screen.mute",
+        "value": "Mute"
+    },
+    {
+        "key": "call_screen.unmute",
+        "value": "Unmute"
+    },
+    {
+        "key": "call_screen.speaker",
+        "value": "Speaker"
+    },
+    {
+        "key": "call_screen.hang_up",
+        "value": "Hang Up"
+    },
+    {
+        "key": "call_screen.duration",
+        "value": "Duration"
+    },
+    {
+        "key": "call_screen.ending_call",
+        "value": "Ending call..."
+    },
+    {
+        "key": "call_screen.calling",
+        "value": "Calling..."
+    },
+    {
+        "key": "call_screen.error.authentication",
+        "value": "Unable to connect to call service - please check your credentials"
+    },
+    {
+        "key": "call_screen.error.network",
+        "value": "Network connection lost - please check your internet connection"
+    },
+    {
+        "key": "call_screen.error.rate_limit",
+        "value": "Too many calls - please try again in a few minutes"
+    },
+    {
+        "key": "call_screen.error.ai_unavailable",
+        "value": "AI agent unavailable - call will proceed without AI assistance"
+    },
+    {
+        "key": "call_screen.error.invalid_phone",
+        "value": "Invalid phone number format - please check and try again"
+    },
+    {
+        "key": "call_screen.error.insufficient_balance",
+        "value": "Insufficient account balance - please top up your account"
+    },
+    {
+        "key": "call_screen.error.service_unavailable",
+        "value": "Call service temporarily unavailable - please try again later"
+    },
+    {
+        "key": "call_screen.error.connection_failed",
+        "value": "Failed to establish connection - please try again"
+    },
+    {
+        "key": "call_screen.error.timeout",
+        "value": "Connection timed out - please try again"
+    },
+    {
+        "key": "call_screen.error.unknown",
+        "value": "An unexpected error occurred - please try again"
+    },
+    {
+        "key": "call_screen.retry_call",
+        "value": "Retry Call"
+    },
+    {
+        "key": "call_screen.switch_to_direct",
+        "value": "Switch to Direct Call"
+    },
+    {
+        "key": "call_screen.view_details",
+        "value": "View Details"
+    },
+    {
+        "key": "call_screen.contact_support",
+        "value": "Contact Support"
+    },
+    {
+        "key": "call_screen.error_details",
+        "value": "Error Details"
+    },
+    {
+        "key": "call_screen.error_code",
+        "value": "Error Code"
+    },
+    {
+        "key": "call_screen.error_timestamp",
+        "value": "Timestamp"
+    },
+    {
+        "key": "call_screen.retry_success",
+        "value": "Call retried successfully"
+    },
+    {
+        "key": "call_screen.fallback_success",
+        "value": "Switched to direct call successfully"
+    },
+    {
+        "key": "call_screen.retry_failed",
+        "value": "Retry failed - please try again later"
+    },
+    {
+        "key": "call_screen.fallback_failed",
+        "value": "Failed to switch to direct call"
+    },
+    {
+        "key": "call_screen.retrying",
+        "value": "Retrying"
+    },
+    {
+        "key": "call_screen.close",
+        "value": "Close"
+    },
+    {
+        "key": "call_logs.status.no_answer",
+        "value": "No Answer"
+    },
+    {
+        "key": "call_logs.status.busy",
+        "value": "Busy"
+    },
+    {
+        "key": "affiliate.application.page_title",
+        "value": "Become a Partner - {{appName}}"
+    },
+    {
+        "key": "affiliate.application.form.title",
+        "value": "Partner Application"
+    },
+    {
+        "key": "affiliate.application.form.description",
+        "value": "Fill out the form below to apply for our affiliate program. We'll review your application and get back to you within 2-3 business days."
+    },
+    {
+        "key": "affiliate.application.sections.personal_info",
+        "value": "Personal Information"
+    },
+    {
+        "key": "affiliate.application.sections.business_info",
+        "value": "Business Information"
+    },
+    {
+        "key": "affiliate.application.sections.marketing_info",
+        "value": "Marketing Information"
+    },
+    {
+        "key": "affiliate.application.fields.first_name",
+        "value": "First Name"
+    },
+    {
+        "key": "affiliate.application.fields.last_name",
+        "value": "Last Name"
+    },
+    {
+        "key": "affiliate.application.fields.email",
+        "value": "Email Address"
+    },
+    {
+        "key": "affiliate.application.fields.phone",
+        "value": "Phone Number"
+    },
+    {
+        "key": "affiliate.application.fields.company",
+        "value": "Company/Organization"
+    },
+    {
+        "key": "affiliate.application.fields.website",
+        "value": "Website"
+    },
+    {
+        "key": "affiliate.application.fields.country",
+        "value": "Country"
+    },
+    {
+        "key": "affiliate.application.fields.marketing_channels",
+        "value": "Marketing Channels"
+    },
+    {
+        "key": "affiliate.application.fields.expected_referrals",
+        "value": "Expected Monthly Referrals"
+    },
+    {
+        "key": "affiliate.application.fields.experience",
+        "value": "Marketing Experience"
+    },
+    {
+        "key": "affiliate.application.fields.motivation",
+        "value": "Why do you want to become a partner?"
+    },
+    {
+        "key": "affiliate.application.fields.agree_to_terms",
+        "value": "I agree to the terms and conditions"
+    },
+    {
+        "key": "affiliate.application.placeholders.first_name",
+        "value": "John"
+    },
+    {
+        "key": "affiliate.application.placeholders.last_name",
+        "value": "Doe"
+    },
+    {
+        "key": "affiliate.application.placeholders.email",
+        "value": "john@example.com"
+    },
+    {
+        "key": "affiliate.application.placeholders.phone",
+        "value": "+1 (555) 123-4567"
+    },
+    {
+        "key": "affiliate.application.placeholders.company",
+        "value": "Your Company Name"
+    },
+    {
+        "key": "affiliate.application.placeholders.website",
+        "value": "https://yourwebsite.com"
+    },
+    {
+        "key": "affiliate.application.placeholders.country",
+        "value": "Select your country"
+    },
+    {
+        "key": "affiliate.application.placeholders.expected_referrals",
+        "value": "Select expected monthly referrals"
+    },
+    {
+        "key": "affiliate.application.placeholders.experience",
+        "value": "Describe your marketing experience, audience size, and relevant achievements..."
+    },
+    {
+        "key": "affiliate.application.placeholders.motivation",
+        "value": "Tell us why you're interested in partnering with {{appName}}..."
+    },
+    {
+        "key": "affiliate.application.descriptions.marketing_channels",
+        "value": "Select all marketing channels you plan to use (select at least one)"
+    },
+    {
+        "key": "affiliate.application.descriptions.experience",
+        "value": "Tell us about your marketing experience and how you plan to promote {{appName}} (minimum 50 characters)"
+    },
+    {
+        "key": "affiliate.application.descriptions.motivation",
+        "value": "Share your motivation for joining our affiliate program (minimum 50 characters)"
+    },
+    {
+        "key": "affiliate.application.descriptions.terms",
+        "value": "By checking this box, you agree to our affiliate program terms and conditions, privacy policy, and marketing guidelines."
+    },
+    {
+        "key": "affiliate.application.marketing_channels.social_media",
+        "value": "Social Media (Facebook, Instagram, Twitter)"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.content_marketing",
+        "value": "Content Marketing (Blog, YouTube, Podcast)"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.email_marketing",
+        "value": "Email Marketing"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.paid_advertising",
+        "value": "Paid Advertising (Google Ads, Facebook Ads)"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.seo",
+        "value": "SEO & Organic Search"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.influencer",
+        "value": "Influencer Marketing"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.networking",
+        "value": "Networking & Events"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.referrals",
+        "value": "Word of Mouth & Referrals"
+    },
+    {
+        "key": "affiliate.application.marketing_channels.other",
+        "value": "Other"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.1_5",
+        "value": "1-5 referrals per month"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.6_15",
+        "value": "6-15 referrals per month"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.16_30",
+        "value": "16-30 referrals per month"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.31_50",
+        "value": "31-50 referrals per month"
+    },
+    {
+        "key": "affiliate.application.expected_referrals.50_plus",
+        "value": "50+ referrals per month"
+    },
+    {
+        "key": "affiliate.application.validation.first_name_min",
+        "value": "First name must be at least 2 characters"
+    },
+    {
+        "key": "affiliate.application.validation.last_name_min",
+        "value": "Last name must be at least 2 characters"
+    },
+    {
+        "key": "affiliate.application.validation.email_invalid",
+        "value": "Please enter a valid email address"
+    },
+    {
+        "key": "affiliate.application.validation.website_invalid",
+        "value": "Please enter a valid website URL"
+    },
+    {
+        "key": "affiliate.application.validation.country_required",
+        "value": "Please select your country"
+    },
+    {
+        "key": "affiliate.application.validation.marketing_channels_required",
+        "value": "Please select at least one marketing channel"
+    },
+    {
+        "key": "affiliate.application.validation.expected_referrals_required",
+        "value": "Please select expected monthly referrals"
+    },
+    {
+        "key": "affiliate.application.validation.experience_min",
+        "value": "Please provide at least 50 characters describing your experience"
+    },
+    {
+        "key": "affiliate.application.validation.motivation_min",
+        "value": "Please provide at least 50 characters describing your motivation"
+    },
+    {
+        "key": "affiliate.application.validation.terms_required",
+        "value": "You must agree to the terms and conditions"
+    },
+    {
+        "key": "affiliate.application.toast.submitted_title",
+        "value": "Application Submitted!"
+    },
+    {
+        "key": "affiliate.application.toast.submitted_description",
+        "value": "Thank you for your interest. We'll review your application and get back to you soon."
+    },
+    {
+        "key": "affiliate.application.toast.failed_title",
+        "value": "Submission Failed"
+    },
+    {
+        "key": "affiliate.application.toast.failed_description",
+        "value": "There was an error submitting your application. Please try again."
+    },
+    {
+        "key": "affiliate.application.submitted.title",
+        "value": "Application Submitted!"
+    },
+    {
+        "key": "affiliate.application.submitted.message",
+        "value": "Thank you for your interest in becoming a {{appName}} partner. We've received your application and will review it within 2-3 business days."
+    },
+    {
+        "key": "affiliate.application.submitted.follow_up",
+        "value": "You'll receive an email confirmation shortly, and we'll contact you once your application has been reviewed."
+    },
+    {
+        "key": "affiliate.application.submitted.continue_button",
+        "value": "Continue to Registration"
+    },
+    {
+        "key": "affiliate.application.buttons.back",
+        "value": "Back to Registration"
+    },
+    {
+        "key": "affiliate.application.buttons.submitting",
+        "value": "Submitting..."
+    },
+    {
+        "key": "affiliate.application.buttons.submit",
+        "value": "Submit Application"
+    },
+    {
+        "key": "affiliate.application.toast.submit_failed_error",
+        "value": "Failed to submit application"
+    },
+    {
+        "key": "affiliate.application.countries.united_states",
+        "value": "United States"
+    },
+    {
+        "key": "affiliate.application.countries.canada",
+        "value": "Canada"
+    },
+    {
+        "key": "affiliate.application.countries.united_kingdom",
+        "value": "United Kingdom"
+    },
+    {
+        "key": "affiliate.application.countries.australia",
+        "value": "Australia"
+    },
+    {
+        "key": "affiliate.application.countries.germany",
+        "value": "Germany"
+    },
+    {
+        "key": "affiliate.application.countries.france",
+        "value": "France"
+    },
+    {
+        "key": "affiliate.application.countries.spain",
+        "value": "Spain"
+    },
+    {
+        "key": "affiliate.application.countries.italy",
+        "value": "Italy"
+    },
+    {
+        "key": "affiliate.application.countries.netherlands",
+        "value": "Netherlands"
+    },
+    {
+        "key": "affiliate.application.countries.sweden",
+        "value": "Sweden"
+    },
+    {
+        "key": "affiliate.application.countries.norway",
+        "value": "Norway"
+    },
+    {
+        "key": "affiliate.application.countries.denmark",
+        "value": "Denmark"
+    },
+    {
+        "key": "affiliate.application.countries.finland",
+        "value": "Finland"
+    },
+    {
+        "key": "affiliate.application.countries.switzerland",
+        "value": "Switzerland"
+    },
+    {
+        "key": "affiliate.application.countries.austria",
+        "value": "Austria"
+    },
+    {
+        "key": "affiliate.application.countries.belgium",
+        "value": "Belgium"
+    },
+    {
+        "key": "affiliate.application.countries.portugal",
+        "value": "Portugal"
+    },
+    {
+        "key": "affiliate.application.countries.ireland",
+        "value": "Ireland"
+    },
+    {
+        "key": "affiliate.application.countries.new_zealand",
+        "value": "New Zealand"
+    },
+    {
+        "key": "affiliate.application.countries.japan",
+        "value": "Japan"
+    },
+    {
+        "key": "affiliate.application.countries.south_korea",
+        "value": "South Korea"
+    },
+    {
+        "key": "affiliate.application.countries.singapore",
+        "value": "Singapore"
+    },
+    {
+        "key": "affiliate.application.countries.hong_kong",
+        "value": "Hong Kong"
+    },
+    {
+        "key": "affiliate.application.countries.india",
+        "value": "India"
+    },
+    {
+        "key": "affiliate.application.countries.brazil",
+        "value": "Brazil"
+    },
+    {
+        "key": "affiliate.application.countries.mexico",
+        "value": "Mexico"
+    },
+    {
+        "key": "affiliate.application.countries.argentina",
+        "value": "Argentina"
+    },
+    {
+        "key": "affiliate.application.countries.chile",
+        "value": "Chile"
+    },
+    {
+        "key": "affiliate.application.countries.colombia",
+        "value": "Colombia"
+    },
+    {
+        "key": "affiliate.application.countries.south_africa",
+        "value": "South Africa"
+    },
+    {
+        "key": "affiliate.application.countries.other",
+        "value": "Other"
+    },
+    {
+        "key": "admin.affiliate.create.success_description",
+        "value": "The new affiliate has been added to the system."
+    },
+    {
+        "key": "admin.affiliate.update.success_description",
+        "value": "The affiliate information has been updated."
+    },
+    {
+        "key": "admin.affiliate.delete.success_description",
+        "value": "The affiliate has been removed from the system."
+    },
+    {
+        "key": "admin.affiliate.delete.confirm_message",
+        "value": "Are you sure you want to delete the affiliate \"{{name}}\"? This action cannot be undone and will remove all associated data."
+    },
+    {
+        "key": "admin.affiliate.delete.bulk_confirm_message",
+        "value": "Are you sure you want to delete {{count}} selected affiliate{{plural}}? This action cannot be undone and will remove all associated data."
+    },
+    {
+        "key": "admin.affiliate.approve.success_description",
+        "value": "The affiliate has been activated and can now start earning commissions."
+    },
+    {
+        "key": "admin.affiliate.suspend.success_description",
+        "value": "The affiliate has been suspended and cannot earn new commissions."
+    },
+    {
+        "key": "admin.affiliate.refresh",
+        "value": "Refresh"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_7_days",
+        "value": "Last 7 days"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_30_days",
+        "value": "Last 30 days"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_90_days",
+        "value": "Last 90 days"
+    },
+    {
+        "key": "admin.affiliate.time_range.last_year",
+        "value": "Last year"
+    },
+    {
+        "key": "admin.affiliate.charts.performance_trends_description",
+        "value": "Track revenue, conversions, and sign-ups over time"
+    },
+    {
+        "key": "admin.affiliate.charts.loading",
+        "value": "Loading chart data..."
+    },
+    {
+        "key": "admin.affiliate.charts.series.revenue",
+        "value": "Revenue"
+    },
+    {
+        "key": "admin.affiliate.charts.series.conversions",
+        "value": "Conversions"
+    },
+    {
+        "key": "admin.affiliate.charts.series.sign_ups",
+        "value": "Sign-ups"
+    },
+    {
+        "key": "admin.affiliate.export.description",
+        "value": "Download affiliate performance data and reports"
+    },
+    {
+        "key": "admin.affiliate.export.csv",
+        "value": "Export CSV"
+    },
+    {
+        "key": "admin.affiliate.export.pdf",
+        "value": "Export PDF Report"
+    },
+    {
+        "key": "admin.affiliate.export.chart_data",
+        "value": "Export Chart Data"
+    },
+    {
+        "key": "admin.affiliate.applications.description",
+        "value": "Review and manage affiliate partner applications"
+    },
+    {
+        "key": "admin.affiliate.applications.count",
+        "value": "{{count}} application{{plural}} found"
+    },
+    {
+        "key": "admin.affiliate.applications.table.applicant",
+        "value": "Applicant"
+    },
+    {
+        "key": "admin.affiliate.applications.table.email",
+        "value": "Email"
+    },
+    {
+        "key": "admin.affiliate.applications.table.status",
+        "value": "Status"
+    },
+    {
+        "key": "admin.affiliate.applications.table.marketing_channels",
+        "value": "Marketing Channels"
+    },
+    {
+        "key": "admin.affiliate.applications.table.expected_referrals",
+        "value": "Expected Referrals"
+    },
+    {
+        "key": "admin.affiliate.applications.table.submitted",
+        "value": "Submitted"
+    },
+    {
+        "key": "admin.affiliate.applications.table.actions",
+        "value": "Actions"
+    },
+    {
+        "key": "admin.affiliate.applications.status.pending",
+        "value": "Pending"
+    },
+    {
+        "key": "admin.affiliate.applications.status.approved",
+        "value": "Approved"
+    },
+    {
+        "key": "admin.affiliate.applications.status.rejected",
+        "value": "Rejected"
+    },
+    {
+        "key": "admin.affiliate.applications.status.under_review",
+        "value": "Under Review"
+    },
+    {
+        "key": "admin.affiliate.applications.more_channels",
+        "value": " +{{count}} more"
+    },
+    {
+        "key": "admin.affiliate.applications.actions.view_details",
+        "value": "View Details"
+    },
+    {
+        "key": "admin.affiliate.applications.actions.approve",
+        "value": "Approve"
+    },
+    {
+        "key": "admin.affiliate.applications.actions.reject",
+        "value": "Reject"
+    },
+    {
+        "key": "admin.affiliate.applications.approve.success_title",
+        "value": "Success"
+    },
+    {
+        "key": "admin.affiliate.applications.approve.success_description",
+        "value": "Application approved successfully"
+    },
+    {
+        "key": "admin.affiliate.applications.reject.success_title",
+        "value": "Success"
+    },
+    {
+        "key": "admin.affiliate.applications.reject.success_description",
+        "value": "Application rejected successfully"
+    },
+    {
+        "key": "admin.affiliate.applications.reject.prompt",
+        "value": "Please provide a reason for rejection:"
+    },
+    {
+        "key": "admin.affiliate.applications.details.title",
+        "value": "Application Details"
+    },
+    {
+        "key": "admin.affiliate.applications.details.description",
+        "value": "Complete information for this affiliate application"
+    },
+    {
+        "key": "admin.affiliate.applications.details.personal_info",
+        "value": "Personal Information"
+    },
+    {
+        "key": "admin.affiliate.applications.details.full_name",
+        "value": "Full Name"
+    },
+    {
+        "key": "admin.affiliate.applications.details.email",
+        "value": "Email"
+    },
+    {
+        "key": "admin.affiliate.applications.details.phone",
+        "value": "Phone"
+    },
+    {
+        "key": "admin.affiliate.applications.details.country",
+        "value": "Country"
+    },
+    {
+        "key": "admin.affiliate.applications.details.business_info",
+        "value": "Business Information"
+    },
+    {
+        "key": "admin.affiliate.applications.details.company",
+        "value": "Company"
+    },
+    {
+        "key": "admin.affiliate.applications.details.website",
+        "value": "Website"
+    },
+    {
+        "key": "admin.affiliate.applications.details.status",
+        "value": "Status"
+    },
+    {
+        "key": "admin.affiliate.applications.details.submitted",
+        "value": "Submitted"
+    },
+    {
+        "key": "admin.affiliate.applications.details.marketing_info",
+        "value": "Marketing Information"
+    },
+    {
+        "key": "admin.affiliate.applications.details.marketing_channels",
+        "value": "Marketing Channels"
+    },
+    {
+        "key": "admin.affiliate.applications.details.expected_referrals",
+        "value": "Expected Monthly Referrals"
+    },
+    {
+        "key": "admin.affiliate.applications.details.experience_motivation",
+        "value": "Experience & Motivation"
+    },
+    {
+        "key": "admin.affiliate.applications.details.experience",
+        "value": "Experience"
+    },
+    {
+        "key": "admin.affiliate.applications.details.motivation",
+        "value": "Motivation"
+    },
+    {
+        "key": "admin.affiliate.applications.details.agreement",
+        "value": "Agreement"
+    },
+    {
+        "key": "admin.affiliate.applications.details.agreed_to_terms",
+        "value": "Agreed to Terms and Conditions"
+    },
+    {
+        "key": "admin.affiliate.applications.details.rejection_reason",
+        "value": "Rejection Reason"
+    },
+    {
+        "key": "admin.affiliate.affiliates.description",
+        "value": "Manage affiliate partners and their commission structures"
+    },
+    {
+        "key": "admin.affiliate.affiliates.more_filters",
+        "value": "More Filters"
+    },
+    {
+        "key": "admin.affiliate.affiliates.selected_count",
+        "value": "{{count}} affiliate{{plural}} selected"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.approve",
+        "value": "Approve Selected"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.send_email",
+        "value": "Send Email"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.export",
+        "value": "Export Selected"
+    },
+    {
+        "key": "admin.affiliate.affiliates.bulk_actions.delete",
+        "value": "Delete Selected"
+    },
+    {
+        "key": "admin.affiliate.affiliates.converted_count",
+        "value": "{{count}} converted"
+    },
+    {
+        "key": "admin.affiliate.affiliates.pending_earnings",
+        "value": "{{amount}} pending"
+    },
+    {
+        "key": "admin.affiliate.referrals.description",
+        "value": "Track and manage all affiliate referrals and conversions"
+    },
+    {
+        "key": "admin.affiliate.referrals.empty",
+        "value": "No referrals found"
+    },
+    {
+        "key": "admin.affiliate.payouts.description",
+        "value": "Manage affiliate commission payouts and payment processing"
+    },
+    {
+        "key": "admin.affiliate.payouts.not_specified",
+        "value": "Not specified"
+    },
+    {
+        "key": "admin.affiliate.payouts.to",
+        "value": "to"
+    },
+    {
+        "key": "admin.affiliate.payouts.empty",
+        "value": "No payouts found"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.name",
+        "value": "Enter full name"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.email",
+        "value": "Enter email address"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.phone",
+        "value": "Enter phone number"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.business_name",
+        "value": "Enter business name"
+    },
+    {
+        "key": "admin.affiliate.form.placeholders.notes",
+        "value": "Additional notes about this affiliate"
+    },
+    {
+        "key": "admin.affiliate.view.name",
+        "value": "Name"
+    },
+    {
+        "key": "admin.affiliate.view.email",
+        "value": "Email"
+    },
+    {
+        "key": "admin.affiliate.view.phone",
+        "value": "Phone"
+    },
+    {
+        "key": "admin.affiliate.view.website",
+        "value": "Website"
+    },
+    {
+        "key": "admin.affiliate.view.business",
+        "value": "Business"
+    },
+    {
+        "key": "admin.affiliate.view.total_referrals",
+        "value": "Total Referrals"
+    },
+    {
+        "key": "admin.affiliate.view.successful",
+        "value": "Successful"
+    },
+    {
+        "key": "admin.affiliate.view.total_earnings",
+        "value": "Total Earnings"
+    },
+    {
+        "key": "admin.affiliate.view.pending",
+        "value": "Pending"
+    },
+    {
+        "key": "admin.affiliate.view.paid",
+        "value": "Paid"
+    },
+    {
+        "key": "admin.affiliate.view.commission_rate",
+        "value": "Commission Rate"
+    },
+    {
+        "key": "admin.affiliate.view.commission_type",
+        "value": "Commission Type"
+    },
+    {
+        "key": "admin.affiliate.view.status",
+        "value": "Status"
+    },
+    {
+        "key": "admin.affiliate.view.joined",
+        "value": "Joined"
+    },
+    {
+        "key": "admin.affiliate.view.referral_url_description",
+        "value": "Share this URL with potential customers. When they sign up using this link, the affiliate will receive commission for successful conversions."
+    },
+    {
+        "key": "admin.affiliate.copied_title",
+        "value": "Copied!"
+    },
+    {
+        "key": "admin.affiliate.copied_description",
+        "value": "Referral URL copied to clipboard"
+    },
+    {
+        "key": "admin.affiliate.copy_url_tooltip",
+        "value": "Copy referral URL"
+    },
+    {
+        "key": "admin.affiliate.open_url_tooltip",
+        "value": "Open referral URL"
+    },
+    {
+        "key": "admin.affiliate.actions.view_details",
+        "value": "View Details"
+    },
+    {
+        "key": "admin.affiliate.actions.edit",
+        "value": "Edit Affiliate"
+    },
+    {
+        "key": "admin.affiliate.actions.send_email",
+        "value": "Send Email"
+    },
+    {
+        "key": "admin.affiliate.actions.export_data",
+        "value": "Export Data"
+    },
+    {
+        "key": "admin.affiliate.actions.approve",
+        "value": "Approve"
+    },
+    {
+        "key": "admin.affiliate.actions.suspend",
+        "value": "Suspend"
+    },
+    {
+        "key": "admin.affiliate.actions.reactivate",
+        "value": "Reactivate"
+    },
+    {
+        "key": "admin.affiliate.actions.delete",
+        "value": "Delete Affiliate"
+    },
+    {
+        "key": "admin.affiliate.metrics.points_suffix",
+        "value": " pts"
+    },
+    {
+        "key": "admin.affiliate.metrics.no_data",
+        "value": "-"
+    },
+    {
+        "key": "admin.affiliate.title",
+        "value": "Affiliate Management"
+    },
+    {
+        "key": "admin.affiliate.description",
+        "value": "Manage affiliate partners, track referrals, and process payouts"
+    },
+    {
+        "key": "admin.affiliate.export.title",
+        "value": "Export Data"
+    },
+    {
+        "key": "admin.affiliate.export.button",
+        "value": "Export Data"
+    },
+    {
+        "key": "admin.affiliate.export.short",
+        "value": "Export"
+    },
+    {
+        "key": "admin.affiliate.create.success",
+        "value": "Affiliate created successfully"
+    },
+    {
+        "key": "admin.affiliate.update.success",
+        "value": "Affiliate updated successfully"
+    },
+    {
+        "key": "admin.affiliate.delete.success",
+        "value": "Affiliate deleted successfully"
+    },
+    {
+        "key": "admin.affiliate.approve.success",
+        "value": "Affiliate approved successfully"
+    },
+    {
+        "key": "admin.affiliate.suspend.success",
+        "value": "Affiliate suspended successfully"
+    },
+    {
+        "key": "admin.affiliate.create.button",
+        "value": "Add Affiliate"
+    },
+    {
+        "key": "admin.affiliate.create.short",
+        "value": "Add"
+    },
+    {
+        "key": "admin.affiliate.create.title",
+        "value": "Add New Affiliate"
+    },
+    {
+        "key": "admin.affiliate.create.description",
+        "value": "Create a new affiliate partner account"
+    },
+    {
+        "key": "admin.affiliate.create.submit",
+        "value": "Create Affiliate"
+    },
+    {
+        "key": "admin.affiliate.edit.title",
+        "value": "Edit Affiliate"
+    },
+    {
+        "key": "admin.affiliate.edit.description",
+        "value": "Update affiliate partner information"
+    },
+    {
+        "key": "admin.affiliate.edit.submit",
+        "value": "Update Affiliate"
+    },
+    {
+        "key": "admin.affiliate.dashboard.title",
+        "value": "Dashboard"
+    },
+    {
+        "key": "admin.affiliate.dashboard.short",
+        "value": "Dashboard"
+    },
+    {
+        "key": "admin.affiliate.applications.title",
+        "value": "Applications"
+    },
+    {
+        "key": "admin.affiliate.applications.short",
+        "value": "Apps"
+    },
+    {
+        "key": "admin.affiliate.applications.empty.title",
+        "value": "No Applications Yet"
+    },
+    {
+        "key": "admin.affiliate.applications.empty.description",
+        "value": "Affiliate applications will appear here when people apply to become partners."
+    },
+    {
+        "key": "admin.affiliate.applications.preview_form",
+        "value": "Preview Application Form"
+    },
+    {
+        "key": "admin.affiliate.affiliates.title",
+        "value": "Affiliates"
+    },
+    {
+        "key": "admin.affiliate.affiliates.short",
+        "value": "Affiliates"
+    },
+    {
+        "key": "admin.affiliate.affiliates.search_placeholder",
+        "value": "Search affiliates..."
+    },
+    {
+        "key": "admin.affiliate.affiliates.filter.all_statuses",
+        "value": "All Statuses"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.code",
+        "value": "Code"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.name",
+        "value": "Name"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.email",
+        "value": "Email"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.status",
+        "value": "Status"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.referrals",
+        "value": "Referrals"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.earnings",
+        "value": "Earnings"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.commission",
+        "value": "Commission"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.referral_url",
+        "value": "Referral URL"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.joined",
+        "value": "Joined"
+    },
+    {
+        "key": "admin.affiliate.affiliates.table.actions",
+        "value": "Actions"
+    },
+    {
+        "key": "admin.affiliate.status.active",
+        "value": "Active"
+    },
+    {
+        "key": "admin.affiliate.status.pending",
+        "value": "Pending"
+    },
+    {
+        "key": "admin.affiliate.status.suspended",
+        "value": "Suspended"
+    },
+    {
+        "key": "admin.affiliate.status.rejected",
+        "value": "Rejected"
+    },
+    {
+        "key": "admin.affiliate.analytics.title",
+        "value": "Performance Analytics"
+    },
+    {
+        "key": "admin.affiliate.charts.performance_trends",
+        "value": "Performance Trends"
+    },
+    {
+        "key": "admin.affiliate.charts.status_distribution",
+        "value": "Affiliate Status"
+    },
+    {
+        "key": "admin.affiliate.charts.top_performers",
+        "value": "Top Performers"
+    },
+    {
+        "key": "admin.affiliate.charts.conversion_funnel",
+        "value": "Conversion Funnel"
+    },
+    {
+        "key": "admin.affiliate.metrics.total_affiliates",
+        "value": "Total Affiliates"
+    },
+    {
+        "key": "admin.affiliate.metrics.active",
+        "value": "Active"
+    },
+    {
+        "key": "admin.affiliate.metrics.total_referrals",
+        "value": "Total Referrals"
+    },
+    {
+        "key": "admin.affiliate.metrics.conversion_rate",
+        "value": "Conversion Rate"
+    },
+    {
+        "key": "admin.affiliate.metrics.total_commission",
+        "value": "Total Commission"
+    },
+    {
+        "key": "admin.affiliate.metrics.from_conversions",
+        "value": "From {{count}} conversions"
+    },
+    {
+        "key": "admin.affiliate.metrics.conversions",
+        "value": "conversions"
+    },
+    {
+        "key": "admin.affiliate.metrics.avg_commission",
+        "value": "Avg Commission"
+    },
+    {
+        "key": "admin.affiliate.metrics.per_affiliate",
+        "value": "per affiliate"
+    },
+    {
+        "key": "admin.affiliate.metrics.pending_payouts",
+        "value": "Pending Payouts"
+    },
+    {
+        "key": "admin.affiliate.metrics.pending_requests",
+        "value": "pending requests"
+    },
+    {
+        "key": "admin.affiliate.pagination.showing",
+        "value": "Showing"
+    },
+    {
+        "key": "admin.affiliate.pagination.to",
+        "value": "to"
+    },
+    {
+        "key": "admin.affiliate.pagination.of",
+        "value": "of"
+    },
+    {
+        "key": "admin.affiliate.pagination.records",
+        "value": "records"
+    },
+    {
+        "key": "admin.affiliate.pagination.previous",
+        "value": "Previous"
+    },
+    {
+        "key": "admin.affiliate.pagination.page",
+        "value": "Page"
+    },
+    {
+        "key": "admin.affiliate.pagination.next",
+        "value": "Next"
+    },
+    {
+        "key": "admin.affiliate.referrals.title",
+        "value": "Referrals"
+    },
+    {
+        "key": "admin.affiliate.referrals.short",
+        "value": "Referrals"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.code",
+        "value": "Referral Code"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.affiliate",
+        "value": "Affiliate"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.referred_email",
+        "value": "Referred Email"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.status",
+        "value": "Status"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.value",
+        "value": "Value"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.commission",
+        "value": "Commission"
+    },
+    {
+        "key": "admin.affiliate.referrals.table.date",
+        "value": "Date"
+    },
+    {
+        "key": "admin.affiliate.referrals.status.converted",
+        "value": "Converted"
+    },
+    {
+        "key": "admin.affiliate.referrals.status.pending",
+        "value": "Pending"
+    },
+    {
+        "key": "admin.affiliate.referrals.status.expired",
+        "value": "Expired"
+    },
+    {
+        "key": "admin.affiliate.payouts.title",
+        "value": "Payouts"
+    },
+    {
+        "key": "admin.affiliate.payouts.short",
+        "value": "Payouts"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.affiliate",
+        "value": "Affiliate"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.amount",
+        "value": "Amount"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.status",
+        "value": "Status"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.method",
+        "value": "Method"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.period",
+        "value": "Period"
+    },
+    {
+        "key": "admin.affiliate.payouts.table.processed",
+        "value": "Processed"
+    },
+    {
+        "key": "admin.affiliate.payouts.status.completed",
+        "value": "Completed"
+    },
+    {
+        "key": "admin.affiliate.payouts.status.processing",
+        "value": "Processing"
+    },
+    {
+        "key": "admin.affiliate.payouts.status.failed",
+        "value": "Failed"
+    },
+    {
+        "key": "admin.affiliate.view.title",
+        "value": "Affiliate Details"
+    },
+    {
+        "key": "admin.affiliate.view.basic_info",
+        "value": "Basic Information"
+    },
+    {
+        "key": "admin.affiliate.view.performance",
+        "value": "Performance"
+    },
+    {
+        "key": "admin.affiliate.view.commission_settings",
+        "value": "Commission Settings"
+    },
+    {
+        "key": "admin.affiliate.view.referral_url",
+        "value": "Referral URL"
+    },
+    {
+        "key": "admin.affiliate.delete.confirm_title",
+        "value": "Delete Affiliate"
+    },
+    {
+        "key": "admin.affiliate.delete.confirm_button",
+        "value": "Delete"
+    },
+    {
+        "key": "admin.affiliate.form.name",
+        "value": "Full Name"
+    },
+    {
+        "key": "admin.affiliate.form.email",
+        "value": "Email Address"
+    },
+    {
+        "key": "admin.affiliate.form.phone",
+        "value": "Phone Number"
+    },
+    {
+        "key": "admin.affiliate.form.website",
+        "value": "Website"
+    },
+    {
+        "key": "admin.affiliate.form.business_name",
+        "value": "Business Name"
+    },
+    {
+        "key": "admin.affiliate.form.commission_rate",
+        "value": "Commission Rate"
+    },
+    {
+        "key": "admin.affiliate.form.commission_type",
+        "value": "Commission Type"
+    },
+    {
+        "key": "admin.affiliate.form.notes",
+        "value": "Notes"
+    },
+    {
+        "key": "admin.affiliate.commission_type.percentage",
+        "value": "Percentage"
+    },
+    {
+        "key": "admin.affiliate.commission_type.fixed",
+        "value": "Fixed Amount"
+    },
+    {
+        "key": "admin.affiliate.commission_type.tiered",
+        "value": "Tiered"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.earned",
+        "value": "Earned"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.applied_to_plan",
+        "value": "Applied to Plan"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.payout",
+        "value": "Payout"
+    },
+    {
+        "key": "settings.affiliate_earnings.transaction_types.adjustment",
+        "value": "Adjustment"
+    },
+    {
+        "key": "settings.affiliate_earnings.balance_after",
+        "value": "Balance After"
+    },
+    {
+        "key": "common.error",
+        "value": "Error"
+    },
+    {
+        "key": "common.close",
+        "value": "Close"
+    },
+    {
+        "key": "common.confirm",
+        "value": "Confirm"
+    },
+    {
+        "key": "common.cancel",
+        "value": "Cancel"
     }
 ]

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { useTranslation } from '@/hooks/use-translation';
 import { useBranding } from '@/contexts/branding-context';
 import { useCurrency } from '@/contexts/currency-context';
+import { useAuthBackgroundStyles } from '@/hooks/use-branding-styles';
+import { useTheme } from 'next-themes';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,9 +69,12 @@ export default function CompanyRegistrationPage() {
   const { t } = useTranslation();
   const { branding } = useBranding();
   const { formatCurrency } = useCurrency();
+  const { theme } = useTheme();
   const [isSlugChecking, setIsSlugChecking] = useState(false);
   const [isSlugAvailable, setIsSlugAvailable] = useState<boolean | null>(null);
   const currentSlugRef = useRef<string>('');
+  const [backgroundImageError, setBackgroundImageError] = useState(false);
+  const authBackgroundStyles = useAuthBackgroundStyles('user');
 
 
   const [referralCode, setReferralCode] = useState<string | null>(null);
@@ -115,6 +120,82 @@ export default function CompanyRegistrationPage() {
     },
   });
 
+
+  useEffect(() => {
+    if (branding.userAuthBackgroundUrl) {
+      const img = new Image();
+      img.src = branding.userAuthBackgroundUrl;
+      img.onerror = () => setBackgroundImageError(true);
+      img.onload = () => setBackgroundImageError(false);
+    }
+  }, [branding.userAuthBackgroundUrl]);
+
+  const finalBackgroundStyles = useMemo(() => {
+
+    if (backgroundImageError) {
+
+      const config = branding.authBackgroundConfig?.userAuthBackground;
+      if (!config) {
+        return { background: 'linear-gradient(to bottom right, rgb(248, 250, 252), rgb(239, 246, 255))' };
+      }
+
+
+      const gradientCss = config.gradientConfig
+        ? (config.gradientConfig.mode === 'simple'
+          ? (() => {
+              const { startColor, endColor, direction } = config.gradientConfig!.simple;
+              const directionMap: Record<string, string> = {
+                'to-right': 'to right',
+                'to-left': 'to left',
+                'to-top': 'to top',
+                'to-bottom': 'to bottom',
+                'to-br': 'to bottom right',
+                'to-bl': 'to bottom left',
+                'to-tr': 'to top right',
+                'to-tl': 'to top left'
+              };
+              const cssDirection = directionMap[direction] || 'to bottom';
+              return `linear-gradient(${cssDirection}, ${startColor}, ${endColor})`;
+            })()
+          : (() => {
+              const { stops, angle } = config.gradientConfig!.advanced;
+              const stopsCss = stops
+                .map(stop => `${stop.color} ${stop.position}%`)
+                .join(', ');
+              return `linear-gradient(${angle}deg, ${stopsCss})`;
+            })())
+        : undefined;
+
+
+      switch (config.priority) {
+        case 'image':
+        case 'layer':
+
+          return {
+            backgroundImage: gradientCss || undefined,
+            backgroundColor: !gradientCss ? config.backgroundColor : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          };
+        
+        case 'color':
+
+          return {
+            backgroundImage: gradientCss || undefined,
+            backgroundColor: !gradientCss ? config.backgroundColor : undefined
+          };
+        
+        default:
+          return { background: 'linear-gradient(to bottom right, rgb(248, 250, 252), rgb(239, 246, 255))' };
+      }
+    }
+    
+
+    return Object.keys(authBackgroundStyles).length > 0
+      ? authBackgroundStyles
+      : { background: 'linear-gradient(to bottom right, rgb(248, 250, 252), rgb(239, 246, 255))' };
+  }, [authBackgroundStyles, backgroundImageError, branding.authBackgroundConfig]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -246,37 +327,40 @@ export default function CompanyRegistrationPage() {
 
   if (!registrationStatus?.enabled) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+      <div className="relative min-h-screen flex items-center justify-center p-4 dark:bg-gray-900" style={finalBackgroundStyles}>
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-100/30 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-100/30 rounded-full blur-3xl"></div>
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-100/30 dark:bg-blue-900/20 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-100/30 dark:bg-indigo-900/20 rounded-full blur-3xl"></div>
         </div>
 
+        {/* Dark overlay for custom backgrounds in dark mode - only show overlay, don't override background */}
+        {theme === 'dark' && <div className="absolute inset-0 bg-black/40 z-0"></div>}
+
         <div className="relative z-10 w-full max-w-md">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
+          <div className="bg-card/80 backdrop-blur-sm rounded-2xl shadow-xl border border-border/20 p-8">
             <div className="flex justify-center mb-6">
               <div className="w-16 h-16 flex items-center justify-center">
                 {branding.logoUrl ? (
                   <img src={branding.logoUrl} alt={branding.appName} className="h-10 w-auto max-w-10" />
                 ) : (
-                  <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">{branding.appName.charAt(0)}</span>
+                  <div className="w-10 h-10  rounded-lg flex items-center justify-center">
+                    <span className="text-secondary-foreground font-bold text-lg">{branding.appName.charAt(0)}</span>
                   </div>
                 )}
               </div>
             </div>
 
             <div className="flex justify-center mb-6">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-red-600" />
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
             </div>
 
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+              <h1 className="text-2xl font-semibold text-foreground mb-2">
                 {t('registration.unavailable_title', 'Registration Unavailable')}
               </h1>
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
                 {t('registration.unavailable_desc', 'Company registration is currently disabled. Please contact the administrator for more information.')}
               </p>
             </div>
@@ -295,36 +379,39 @@ export default function CompanyRegistrationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="relative min-h-screen flex items-center justify-center p-4 dark:bg-gray-900" style={finalBackgroundStyles}>
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-100/30 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-100/30 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-100/30 dark:bg-blue-900/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-100/30 dark:bg-indigo-900/20 rounded-full blur-3xl"></div>
       </div>
 
+      {/* Dark overlay for custom backgrounds in dark mode - only show overlay, don't override background */}
+      {theme === 'dark' && <div className="absolute inset-0 bg-black/40 z-0"></div>}
+
       <div className="relative z-10 w-full max-w-2xl">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
+        <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/50 p-8">
           <div className="flex justify-center mb-6">
             <div className="w-auto h-12 flex items-center justify-center">
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt={branding.appName} className="h-12 w-auto" />
               ) : (
-                <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">{branding.appName.charAt(0)}</span>
+                <div className="w-10 h-10 bg-gray-800 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                  <span className="text-white dark:text-gray-100 font-bold text-lg">{branding.appName.charAt(0)}</span>
                 </div>
               )}
             </div>
           </div>
 
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
               {t('registration.page_title', 'Register Your Company')}
             </h1>
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
               {t('registration.page_subtitle', 'Create your company account and manage all your channels in one place!')}
             </p>
           </div>
           {registrationStatus?.requireApproval && (
-            <Alert className="mb-6">
+            <Alert className="mb-6 dark:bg-gray-800 dark:border-gray-700">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 {t('registration.approval_notice', 'New registrations require admin approval. You will receive an email once your registration is approved.')}
@@ -333,11 +420,10 @@ export default function CompanyRegistrationPage() {
           )}
 
           {referralCode && (
-            <Alert className="mb-6 border-green-200 bg-green-50">
-              <Check className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                {t('registration.referral_detected', 'Great! You\'re signing up through a referral from affiliate')} <strong>{referralCode}</strong>.
-                {t('registration.referral_benefit', ' You may be eligible for special benefits or discounts.')}
+            <Alert className="mb-6 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+              <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-300">
+                {t('registration.referral_detected', 'Great! You\'re signing up through a referral from affiliate {{code}}.', { code: referralCode })} {t('registration.referral_benefit', 'You may be eligible for special benefits or discounts.')}
               </AlertDescription>
             </Alert>
           )}
@@ -345,7 +431,7 @@ export default function CompanyRegistrationPage() {
           <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 border-b pb-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
                       <Building className="h-4 w-4" />
                       {t('registration.company_info', 'Company Information')}
                     </div>
@@ -360,7 +446,7 @@ export default function CompanyRegistrationPage() {
                             <FormControl>
                               <Input
                                 placeholder={t('registration.company_name_placeholder', 'Your Company Name')}
-                                className="h-12 bg-gray-50 border-gray-200 rounded-lg"
+                                className="h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                 {...field}
                               />
                             </FormControl>
@@ -379,17 +465,17 @@ export default function CompanyRegistrationPage() {
                               <div className="relative">
                                 <Input
                                   placeholder={t('registration.company_slug_placeholder', 'your-company')}
-                                  className="h-12 bg-gray-50 border-gray-200 rounded-lg"
+                                  className="h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                   {...field}
                                 />
                                 {isSlugChecking && (
-                                  <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-gray-400" />
+                                  <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-gray-400 dark:text-gray-500" />
                                 )}
                                 {!isSlugChecking && isSlugAvailable === true && field.value && field.value.length >= 3 && (
-                                  <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                  <Check className="absolute right-3 top-3 h-4 w-4 text-green-500 dark:text-green-400" />
                                 )}
                                 {!isSlugChecking && isSlugAvailable === false && field.value && field.value.length >= 3 && (
-                                  <AlertCircle className="absolute right-3 top-3 h-4 w-4 text-red-500" />
+                                  <AlertCircle className="absolute right-3 top-3 h-4 w-4 text-red-500 dark:text-red-400" />
                                 )}
                               </div>
                             </FormControl>
@@ -529,7 +615,7 @@ export default function CompanyRegistrationPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 border-b pb-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
                       <User className="h-4 w-4" />
                       {t('registration.admin_details', 'Admin User Details')}
                     </div>
@@ -544,7 +630,7 @@ export default function CompanyRegistrationPage() {
                             <FormControl>
                               <Input
                                 placeholder={t('registration.admin_full_name_placeholder', 'John Doe')}
-                                className="h-12 bg-gray-50 border-gray-200 rounded-lg"
+                                className="h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                 {...field}
                               />
                             </FormControl>
@@ -563,7 +649,7 @@ export default function CompanyRegistrationPage() {
                               <Input
                                 type="email"
                                 placeholder={t('registration.admin_email_placeholder', 'john@yourcompany.com')}
-                                className="h-12 bg-gray-50 border-gray-200 rounded-lg"
+                                className="h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                 {...field}
                               />
                             </FormControl>
@@ -582,7 +668,7 @@ export default function CompanyRegistrationPage() {
                           <FormControl>
                             <Input
                               placeholder={t('registration.admin_username_placeholder', 'johndoe')}
-                              className="h-12 bg-gray-50 border-gray-200 rounded-lg"
+                              className="h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                               {...field}
                             />
                           </FormControl>
@@ -605,7 +691,7 @@ export default function CompanyRegistrationPage() {
                               <Input
                                 type="password"
                                 placeholder={t('registration.admin_password_placeholder', 'Create a strong password')}
-                                className="h-12 bg-gray-50 border-gray-200 rounded-lg"
+                                className="h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                 {...field}
                               />
                             </FormControl>
@@ -624,7 +710,7 @@ export default function CompanyRegistrationPage() {
                               <Input
                                 type="password"
                                 placeholder={t('registration.admin_confirm_password_placeholder', 'Confirm your password')}
-                                className="h-12 bg-gray-50 border-gray-200 rounded-lg"
+                                className="h-12 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 rounded-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                 {...field}
                               />
                             </FormControl>
@@ -637,7 +723,7 @@ export default function CompanyRegistrationPage() {
 
                   {plans && plans.length > 0 && (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700 border-b pb-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
                         <CreditCard className="h-4 w-4" />
                         {t('registration.plan_selection', 'Plan Selection')}
                       </div>
@@ -662,17 +748,17 @@ export default function CompanyRegistrationPage() {
                                         <span>{plan.name}</span>
                                         {plan.hasTrialPeriod && plan.trialDays > 0 && (
                                           <span className="text-xs text-blue-600">
-                                            {plan.trialDays} day trial
+                                            {t('registration.plan.trial_days', '{{days}} day trial', { days: plan.trialDays })}
                                           </span>
                                         )}
                                         {plan.isFree && (
                                           <span className="text-xs text-green-600">
-                                            Free plan
+                                            {t('registration.plan.free_plan', 'Free plan')}
                                           </span>
                                         )}
                                       </div>
-                                      <span className="text-sm text-gray-500 ml-2">
-                                        {formatCurrency(plan.price)}/month
+                                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                                        {formatCurrency(plan.price)}{t('registration.plan.monthly_suffix', '/month')}
                                       </span>
                                     </div>
                                   </SelectItem>
@@ -717,7 +803,7 @@ export default function CompanyRegistrationPage() {
               </Form>
               {/* For Kaif Ahmad */}
               {/* Become a Partner Section */}
-              {/* <div className="mt-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200">
+              <div className="mt-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200">
                 <div className="text-center">
                   <div className="flex items-center justify-center mb-3">
                     <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
@@ -725,10 +811,10 @@ export default function CompanyRegistrationPage() {
                     </div>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Interested in Earning Commissions?
+                    {t('registration.affiliate.cta_title', 'Interested in Earning Commissions?')}
                   </h3>
                   <p className="text-sm text-gray-600 mb-4">
-                    Join our affiliate program and earn up to 30% commission by referring businesses to {branding.appName}
+                    {t('registration.affiliate.cta_description', 'Join our affiliate program and earn up to 30% commission by referring businesses to {{appName}}', { appName: branding.appName })}
                   </p>
                   <Button
                     type="button"
@@ -737,17 +823,17 @@ export default function CompanyRegistrationPage() {
                     onClick={() => window.location.href = '/become-partner'}
                   >
                     <User className="mr-2 h-4 w-4" />
-                    Become a Partner & Earn Commissions
+                    {t('registration.affiliate.button_text', 'Become a Partner & Earn Commissions')}
                   </Button>
                 </div>
-              </div> */}
+              </div>
 
               <div className="mt-6 text-center">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
                   {t('registration.already_have_account', 'Already have an account?')}{' '}
                   <a
                     href="/auth"
-                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
                   >
                     {t('registration.sign_in', 'Sign in')}
                   </a>

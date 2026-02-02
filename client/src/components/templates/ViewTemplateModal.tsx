@@ -166,7 +166,7 @@ export function ViewTemplateModal({ isOpen, onClose, template }: ViewTemplateMod
                     />
                   )}
                   {template.mediaUrls[0].match(/\.pdf$/i) && (
-                    <div className="flex items-center gap-2 p-3 bg-white rounded border">
+                    <div className="flex items-center gap-2 p-3 bg-card rounded border">
                       <FileText className="h-5 w-5 text-red-500" />
                       <span className="text-sm font-medium">{t('templates.document_attached', 'Document Attached')}</span>
                     </div>

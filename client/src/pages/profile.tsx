@@ -476,11 +476,11 @@ export default function ProfilePage() {
 
   if (isLoadingUser) {
     return (
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <Header />
-          <main className="flex-1 overflow-auto p-6">
+      <div className="min-h-screen flex flex-col font-sans text-foreground">
+        <Header />
+        <div className="flex flex-1">
+          <Sidebar />
+          <main className="flex-1 p-6">
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
@@ -495,11 +495,11 @@ export default function ProfilePage() {
 
   if (userError) {
     return (
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <Header />
-          <main className="flex-1 overflow-auto p-6">
+      <div className="min-h-screen flex flex-col font-sans text-foreground">
+        <Header />
+        <div className="flex flex-1">
+          <Sidebar />
+          <main className="flex-1 p-6">
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <h2 className="text-xl font-semibold mb-2">Error loading profile</h2>
@@ -516,14 +516,14 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center mb-6">
-              <h1 className="text-2xl ">Account Settings</h1>
+    <div className="min-h-screen flex flex-col font-sans text-foreground">
+      <Header />
+      <div className="flex flex-1">
+        <Sidebar />
+        <main className="flex-1 p-6">
+          <div className="space-y-6">
+            <div className="flex items-center">
+              <h1 className="text-2xl font-semibold">Account Settings</h1>
             </div>
             
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -585,23 +585,23 @@ export default function ProfilePage() {
                     </div>
 
                     {/* Account Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-muted/30 rounded-lg">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Account Created</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">Account Created</Label>
                         <p className="text-sm">{formatDate(user?.createdAt)}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Last Updated</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
                         <p className="text-sm">{formatDate(user?.updatedAt)}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">User ID</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">User ID</Label>
                         <p className="text-sm font-mono">{user?.id}</p>
                       </div>
                       {user?.isSuperAdmin && (
                         <div>
-                          <Label className="text-sm font-medium text-gray-600">Admin Status</Label>
-                          <p className="text-sm text-blue-600 font-medium">Super Administrator</p>
+                          <Label className="text-sm font-medium text-muted-foreground">Admin Status</Label>
+                          <p className="text-sm text-primary font-medium">Super Administrator</p>
                         </div>
                       )}
                     </div>
@@ -730,17 +730,17 @@ export default function ProfilePage() {
                   </CardHeader>
                   <CardContent>
                     {/* Company Overview - Read Only Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-muted/30 rounded-lg">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Company Slug</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">Company Slug</Label>
                         <p className="text-sm font-mono">{user?.company?.slug}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Plan</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">Plan</Label>
                         <p className="text-sm capitalize">{user?.company?.plan || 'Free'}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Company Created</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">Company Created</Label>
                         <p className="text-sm">{formatDate(user?.company?.createdAt)}</p>
                       </div>
                     </div>

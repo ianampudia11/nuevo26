@@ -40,6 +40,7 @@ import {
   cleanupTempAudioFiles
 } from '../../utils/audio-converter';
 import { isWhatsAppGroupChatId } from '../../utils/whatsapp-group-filter';
+import mimeTypes from 'mime-types';
 
 /**
  * Helper function to determine the correct identifier type based on connection type
@@ -134,12 +135,11 @@ interface ConnectionState {
   averageLatency: number | null;
   latencyHistory: number[];
   lastHealthCheck: Date | null;
-  qrInterval: NodeJS.Timeout | null;
-  qrTimeout: NodeJS.Timeout | null;
   qrGenerationTimeout: NodeJS.Timeout | null;
   lastQr: string | null; // Cache last QR string for deduplication (Comment 1)
   lastQrAt: Date | null; // Timestamp of last QR emission (Comment 1)
   nextAttemptIn: number | null; // Store computed backoff delay for observability (Comment 5)
+  companyId?: number; // Company ID for filtering events
   rateLimitInfo: {
     messagesSent: number;
     lastReset: Date;
@@ -628,8 +628,6 @@ function initializeConnectionState(connectionId: number): ConnectionState {
     averageLatency: null,
     latencyHistory: [],
     lastHealthCheck: null,
-    qrInterval: null,
-    qrTimeout: null,
     qrGenerationTimeout: null,
     lastQr: null,
     lastQrAt: null,
@@ -800,7 +798,6 @@ function startHealthMonitoring(connectionId: number): void {
 
         if (!sock.authState?.keys || !sock.user?.id) {
           updateHealthScore(connectionId, 'error');
-          console.warn(`Session validation failed for connection ${connectionId}: missing keys or user ID`);
         }
 
       } catch (pingError) {
@@ -835,7 +832,8 @@ function startHealthMonitoring(connectionId: number): void {
         averageLatency: state.averageLatency,
         lastHealthCheck: state.lastHealthCheck,
         errorCount: state.errorCount,
-        reconnectAttempts: state.reconnectAttempts
+        reconnectAttempts: state.reconnectAttempts,
+        companyId: state.companyId,
       });
 
 
@@ -914,7 +912,8 @@ async function scheduleReconnection(connectionId: number, connection: any): Prom
     attempt: state.reconnectAttempts,
     maxAttempts: RECONNECTION_CONFIG.maxAttempts,
     nextAttemptIn: delay,
-    healthScore: state.healthScore
+    healthScore: state.healthScore,
+    companyId: state.companyId,
   });
 
   const timeout = setTimeout(async () => {
@@ -933,7 +932,13 @@ async function scheduleReconnection(connectionId: number, connection: any): Prom
         await updateConnectionStatus(connectionId, 'qr_code');
         state.reconnectAttempts = 0;
 
-        await connectToWhatsApp(connectionId, connection.userId);
+        emitWhatsAppEvent('qrCodeRequired', {
+          connectionId,
+          message: 'Session corrupted. Please scan QR code manually.',
+          companyId: state.companyId,
+        });
+
+        await cleanupConnection(connectionId);
         return;
       }
 
@@ -966,7 +971,8 @@ async function scheduleReconnection(connectionId: number, connection: any): Prom
         emitWhatsAppEvent('connectionFailed', {
           connectionId,
           error: 'Max reconnection attempts exceeded',
-          totalAttempts: state.reconnectAttempts
+          totalAttempts: state.reconnectAttempts,
+          companyId: state.companyId,
         });
       }
     }
@@ -988,6 +994,7 @@ async function updateConnectionStatus(connectionId: number, status: string): Pro
     emitWhatsAppEvent('connectionStatusUpdate', {
       connectionId,
       status,
+      companyId: state.companyId,
     });
   } catch (error) {
 
@@ -1155,16 +1162,6 @@ function broadcastWhatsAppEvent(eventType: string, data: any, options: {
 function clearQRIntervals(connectionId: number): void {
   const state = getConnectionState(connectionId);
   
-  if (state.qrInterval) {
-    clearInterval(state.qrInterval);
-    state.qrInterval = null;
-  }
-  
-  if (state.qrTimeout) {
-    clearTimeout(state.qrTimeout);
-    state.qrTimeout = null;
-  }
-  
   if (state.qrGenerationTimeout) {
     clearTimeout(state.qrGenerationTimeout);
     state.qrGenerationTimeout = null;
@@ -1277,7 +1274,6 @@ async function validateSessionIntegrity(connectionId: number): Promise<boolean> 
     try {
       await fsPromises.access(credsPath);
     } catch {
-      console.warn(`Session validation failed: creds.json not found for connection ${connectionId}`);
       return false;
     }
 
@@ -1285,14 +1281,12 @@ async function validateSessionIntegrity(connectionId: number): Promise<boolean> 
     const creds = JSON.parse(credsData);
 
     if (!creds.me || !creds.signedIdentityKey || !creds.signedPreKey) {
-      console.warn(`Session validation failed: missing required fields in creds.json for connection ${connectionId}`);
       return false;
     }
 
 
     return true;
   } catch (error) {
-    console.warn(`Session validation failed due to error for connection ${connectionId}:`, error);
     return false;
   }
 }
@@ -1988,28 +1982,17 @@ async function processMessageThroughFlowExecutor(
 ): Promise<void> {
   try {
     if (!contact || !contact.phone) {
-
       return;
     }
 
     const cleanPhone = contact.phone.replace(/[^\d]/g, '');
 
 
-    console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [msg:${message.id || 'unknown'}] Processing through flow executor:`, {
-      contactPhone: contact.phone,
-      cleanPhone: cleanPhone,
-      messageCanonicalId: message.metadata ? (typeof message.metadata === 'string' ? JSON.parse(message.metadata)?.canonicalIdentifier : message.metadata?.canonicalIdentifier) : '',
-      messageRemoteJid: message.metadata ? (typeof message.metadata === 'string' ? JSON.parse(message.metadata)?.remoteJid : message.metadata?.remoteJid) : '',
-      conversationId: conversation?.id
-    });
-
     if (isWhatsAppGroupChatId(contact.phone)) {
-
       return;
     }
 
     if (conversation && (conversation.isGroup === true || conversation.is_group === true)) {
-
       return;
     }
 
@@ -2020,7 +2003,6 @@ async function processMessageThroughFlowExecutor(
       await flowExecutor.processIncomingMessage(message, conversation, contact, channelConnection);
     }
   } catch (error) {
-    console.error(`[WhatsApp Routing] [${new Date().toISOString()}] [msg:${message.id || 'unknown'}] Error in processMessageThroughFlowExecutor:`, error);
     throw error;
   }
 }
@@ -2497,7 +2479,6 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
       if (fs.existsSync(sessionDir)) {
         const sessionValid = await validateSessionIntegrity(connectionId);
         if (!sessionValid) {
-          console.warn(`Existing session validation failed for connection ${connectionId}, proceeding with caution`);
           await backupSession(connectionId);
         }
       } else {
@@ -2576,6 +2557,12 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
       const connState = getConnectionState(connectionId);
       connState.socket = sock;
       connState.status = 'connecting';
+      
+
+      const connection = await storage.getChannelConnection(connectionId);
+      if (connection) {
+        connState.companyId = connection.companyId ?? undefined;
+      }
 
 
       const qrTimeout = setTimeout(() => {
@@ -2590,10 +2577,11 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
           emitWhatsAppEvent('connectionStatusUpdate', {
             connectionId,
             status: 'error',
-            error: 'QR generation timeout'
+            error: 'QR generation timeout',
+            companyId: connState.companyId,
           });
         }
-      }, 45000); // 45 second timeout for QR generation
+      }, 30000); // 30 second timeout for QR generation
 
 
       connState.qrGenerationTimeout = qrTimeout;
@@ -2629,32 +2617,8 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
               emitWhatsAppEvent('qrCode', {
                 connectionId,
                 qrCode: qr,
+                companyId: connState.companyId,
               });
-
-
-              connState.qrInterval = setInterval(() => {
-                if (activeConnections.has(connectionId) && connState.status === 'qr_code') {
-
-                  const timeSinceLastEmit = connState.lastQrAt ? 
-                    Date.now() - connState.lastQrAt.getTime() : Infinity;
-                  
-                  if (timeSinceLastEmit > 15000) {
-                    connState.lastQrAt = new Date();
-                    emitWhatsAppEvent('qrCode', {
-                      connectionId,
-                      qrCode: qr,
-                    });
-                  }
-                } else {
-
-                  clearQRIntervals(connectionId);
-                }
-              }, 12000); // Check every 12s instead of fixed 10s
-
-
-              connState.qrTimeout = setTimeout(() => {
-                clearQRIntervals(connectionId);
-              }, 30000);
             }
           }
 
@@ -2720,6 +2684,7 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
           emitWhatsAppEvent('connectionStatusUpdate', {
             connectionId,
             status: 'connected',
+            companyId: connState.companyId,
           });
         }
         } catch (error) {
@@ -2761,7 +2726,8 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
                     identifier: phoneNumber,
                     identifierType: 'whatsapp',
                     source: 'whatsapp',
-                    notes: null
+                    notes: null,
+                    createdBy: userId
                   };
 
                   contact = await storage.getOrCreateContact(contactData);
@@ -2808,10 +2774,12 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
           }
 
 
+          const connState = getConnectionState(connectionId);
           emitWhatsAppEvent('whatsappHistorySyncComplete', {
             connectionId,
             contactsCount: chats.length,
-            messagesCount: 0
+            messagesCount: 0,
+            companyId: connState.companyId,
           });
         } catch (error) {
           console.error('Error processing chats:', error);
@@ -2975,9 +2943,11 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
       console.error('Error connecting to WhatsApp:', error);
       await storage.updateChannelConnectionStatus(connectionId, 'error');
 
+      const connState = getConnectionState(connectionId);
       emitWhatsAppEvent('connectionError', {
         connectionId,
         error: error.message || 'Unknown error connecting to WhatsApp',
+        companyId: connState.companyId,
       });
 
       throw error;
@@ -2990,13 +2960,57 @@ export async function connectToWhatsApp(connectionId: number, userId: number): P
 
     console.error(`Error in connectToWhatsApp setup for connection ${connectionId}:`, error);
     await storage.updateChannelConnectionStatus(connectionId, 'error');
+    const connState = getConnectionState(connectionId);
     emitWhatsAppEvent('connectionError', {
       connectionId,
       error: (error as any).message || 'Unknown error during connection setup',
+      companyId: connState.companyId,
     });
 
     connectionAttempts.delete(connectionId);
     throw error;
+  }
+}
+
+/**
+ * Extract externalAdReply from WhatsApp message structure
+ * Checks extendedTextMessage.contextInfo, viewOnceMessage, and quoted context
+ */
+function extractExternalAdReply(waMsg: WAMessage): any | null {
+  try {
+    const msgAny: any = waMsg.message as any;
+    if (!msgAny) return null;
+
+
+    if (msgAny.extendedTextMessage?.contextInfo?.externalAdReply) {
+      return msgAny.extendedTextMessage.contextInfo.externalAdReply;
+    }
+
+
+    if (msgAny.viewOnceMessage?.message?.extendedTextMessage?.contextInfo?.externalAdReply) {
+      return msgAny.viewOnceMessage.message.extendedTextMessage.contextInfo.externalAdReply;
+    }
+
+
+    if (msgAny.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage?.contextInfo?.externalAdReply) {
+      return msgAny.extendedTextMessage.contextInfo.quotedMessage.extendedTextMessage.contextInfo.externalAdReply;
+    }
+
+
+    if (msgAny.extendedTextMessage?.contextInfo?.quotedMessage) {
+      const quotedMsg = msgAny.extendedTextMessage.contextInfo.quotedMessage;
+
+      for (const key of Object.keys(quotedMsg)) {
+        if (quotedMsg[key]?.contextInfo?.externalAdReply) {
+          return quotedMsg[key].contextInfo.externalAdReply;
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error extracting externalAdReply:', error);
+    return null;
   }
 }
 
@@ -3015,12 +3029,10 @@ async function handleIncomingMessage(
   
   try {
     if (!waMsg.key || !waMsg.key.remoteJid || !waMsg.key.id) {
-
       return;
     }
 
     if (waMsg.key.remoteJid.includes('@broadcast') || waMsg.key.remoteJid === 'status@broadcast') {
-
       return;
     }
 
@@ -3041,25 +3053,7 @@ async function handleIncomingMessage(
 
     const remoteJidAlt = (waMsg.key as any).remoteJidAlt || null;
     const participantAlt = (waMsg.key as any).participantAlt || null;
-    
-    console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Initial message receipt:`, {
-      rawRemoteJid: rawRemoteJidBeforeNormalization,
-      normalizedRemoteJid: remoteJid,
-      remoteJidAlt: remoteJidAlt, // Baileys v6.8.0+ alternate JID (phone number format)
-      participantAlt: participantAlt, // Baileys v6.8.0+ alternate participant JID
-      fromMe: isFromMe,
-      id: messageId,
-      participant: waMsg.key.participant || null,
-      userId: userId,
-      connectionId: connectionId,
-      pushName: waMsg.pushName || null,
-      messageType: waMsg.message ? Object.keys(waMsg.message)[0] : 'unknown'
-    });
-
-
-
-
-
+   
     if (isFromMe && !isHistorySync) {
 
 
@@ -3106,7 +3100,6 @@ async function handleIncomingMessage(
     const isGroupChat = remoteJid.endsWith('@g.us');
     
     if (isGroupChat) {
-
       return;
     }
 
@@ -3120,17 +3113,11 @@ async function handleIncomingMessage(
     let resolvedRemoteJid = remoteJid;
     
     if (rawRemoteJidBeforeNormalization.endsWith('@lid')) {
-
       
 
       if (remoteJidAlt && remoteJidAlt.includes('@s.whatsapp.net')) {
         resolvedRemoteJid = remoteJidAlt;
         actualPhoneNumber = remoteJidAlt.split('@')[0];
-        console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Resolved @lid via remoteJidAlt (Baileys official):`, {
-          originalLidJid: rawRemoteJidBeforeNormalization,
-          resolvedJid: resolvedRemoteJid,
-          actualPhoneNumber: actualPhoneNumber
-        });
       }
       
 
@@ -3143,26 +3130,15 @@ async function handleIncomingMessage(
             if ((sock as any).store && (sock as any).store.contacts) {
               const contactInfo = (sock as any).store.contacts[rawRemoteJidBeforeNormalization];
               if (contactInfo) {
-
                 
 
                 if (contactInfo.phoneNumber) {
                   const phoneJid = `${contactInfo.phoneNumber}@s.whatsapp.net`;
                   resolvedRemoteJid = phoneJid;
                   actualPhoneNumber = contactInfo.phoneNumber.replace(/[^\d]/g, '');
-                  console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Resolved @lid via contact store phoneNumber:`, {
-                    originalLidJid: rawRemoteJidBeforeNormalization,
-                    resolvedJid: resolvedRemoteJid,
-                    actualPhoneNumber: actualPhoneNumber
-                  });
                 } else if (contactInfo.jid && contactInfo.jid.includes('@s.whatsapp.net')) {
                   resolvedRemoteJid = contactInfo.jid;
                   actualPhoneNumber = contactInfo.jid.split('@')[0];
-                  console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Resolved @lid via contact store jid:`, {
-                    originalLidJid: rawRemoteJidBeforeNormalization,
-                    resolvedJid: resolvedRemoteJid,
-                    actualPhoneNumber: actualPhoneNumber
-                  });
                 }
               }
             }
@@ -3174,21 +3150,14 @@ async function handleIncomingMessage(
                 if (normalizedJid && normalizedJid.includes('@s.whatsapp.net') && normalizedJid !== rawRemoteJidBeforeNormalization) {
                   resolvedRemoteJid = normalizedJid;
                   actualPhoneNumber = normalizedJid.split('@')[0];
-                  console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Resolved @lid via jidNormalizedUser:`, {
-                    originalLidJid: rawRemoteJidBeforeNormalization,
-                    resolvedJid: resolvedRemoteJid,
-                    actualPhoneNumber: actualPhoneNumber
-                  });
+                 
                 }
               } catch (normalizeError) {
-                console.warn(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] jidNormalizedUser failed:`, normalizeError);
               }
             }
           } else {
-            console.warn(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] No active socket connection to resolve @lid JID`);
           }
         } catch (error) {
-          console.error(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Error in socket-based resolution:`, error);
         }
       }
       
@@ -3235,22 +3204,13 @@ async function handleIncomingMessage(
               existingContact.phone.replace(/[^\d]/g, '').length >= 10) {
             actualPhoneNumber = existingContact.phone.replace(/[^\d]/g, '');
             resolvedRemoteJid = `${actualPhoneNumber}@s.whatsapp.net`;
-            console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Resolved @lid via existing contact:`, {
-              originalLidJid: rawRemoteJidBeforeNormalization,
-              resolvedJid: resolvedRemoteJid,
-              actualPhoneNumber: actualPhoneNumber,
-              contactId: existingContact.id
-            });
           }
         } catch (dbError) {
-          console.warn(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Database lookup failed:`, dbError);
         }
       }
       
 
       if (!actualPhoneNumber) {
-        console.warn(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Could not resolve @lid to actual phone number. Will use @lid JID for replies (WhatsApp will route correctly).`);
-
         resolvedRemoteJid = rawRemoteJidBeforeNormalization;
       }
     }
@@ -3260,33 +3220,9 @@ async function handleIncomingMessage(
     const cleanPhoneNumber = phoneNumber.replace(/[^\d]/g, '');
     
 
-    console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Sender identification:`, {
-      isGroupChat: false,
-      groupJid: null,
-      participantJid: null,
-      participantName: null,
-      extractedPhoneNumber: cleanPhoneNumber,
-      resolvedRemoteJid: resolvedRemoteJid,
-      normalizedRemoteJid: remoteJid,
-      rawRemoteJid: rawRemoteJidBeforeNormalization,
-      wasLidResolved: actualPhoneNumber !== null
-    });
-
-
-    console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Phone number normalization:`, {
-      rawPhoneNumber: phoneNumber,
-      cleanPhoneNumber: cleanPhoneNumber,
-      canonicalIdentifier: cleanPhoneNumber,
-      remoteJid: remoteJid,
-      originalRemoteJid: rawRemoteJidBeforeNormalization
-    });
-
     if (isWhatsAppGroupChatId(cleanPhoneNumber)) {
-
       return;
     }
-
-
 
     let contactDisplayName: string | null = null;
     if (waMsg.pushName && waMsg.pushName.trim()) {
@@ -3776,6 +3712,7 @@ async function handleIncomingMessage(
           identifierType: identifierType,
           source: 'whatsapp',
           notes: null,
+          createdBy: userId,
           ...(isHistorySync && {
             isHistorySync: true,
             historySyncBatchId: historySyncBatchId
@@ -3784,15 +3721,7 @@ async function handleIncomingMessage(
 
         contact = await storage.getOrCreateContact(contactData);
         
-        console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Contact created:`, {
-          contactId: contact.id,
-          phone: contact.phone,
-          name: contact.name,
-          identifier: contact.identifier,
-          resolvedRemoteJid: resolvedRemoteJid,
-          normalizedRemoteJid: remoteJid,
-          wasLidResolved: actualPhoneNumber !== null
-        });
+       
 
       } else if (contactDisplayName && contact.name === contact.phone) {
 
@@ -3833,7 +3762,6 @@ async function handleIncomingMessage(
         conversation = await storage.createConversation(conversationData);
         
 
-
         broadcastNewConversation({
           ...conversation,
           contact
@@ -3843,12 +3771,7 @@ async function handleIncomingMessage(
           lastMessageAt: new Date()
         });
         
-        console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${messageId}] Conversation found:`, {
-          conversationId: conversation.id,
-          contactId: contact.id,
-          channelId: connectionId,
-          isGroup: false
-        });
+       
       }
 
     if (conversation) {
@@ -3885,7 +3808,48 @@ async function handleIncomingMessage(
     }
 
 
+    let externalAdReply: any | null = null;
+    try {
+      const rawExternalAdReply = extractExternalAdReply(waMsg);
+      if (rawExternalAdReply) {
+        externalAdReply = {
+          title: rawExternalAdReply.title || null,
+          body: rawExternalAdReply.body || null,
+          thumbnail: null, // Will be processed below
+          mediaUrl: rawExternalAdReply.mediaUrl || null,
+          sourceUrl: rawExternalAdReply.sourceUrl || null,
+          renderLargerThumbnail: rawExternalAdReply.renderLargerThumbnail || false,
+          showAdAttribution: rawExternalAdReply.showAdAttribution || false
+        };
 
+
+        if (rawExternalAdReply.thumbnail) {
+          const thumbnail = rawExternalAdReply.thumbnail;
+          
+
+          if (typeof thumbnail === 'string' && thumbnail.startsWith('data:')) {
+            externalAdReply.thumbnail = thumbnail;
+          }
+
+          else if (typeof thumbnail === 'string' && (thumbnail.startsWith('http://') || thumbnail.startsWith('https://'))) {
+            externalAdReply.thumbnail = thumbnail;
+          }
+
+
+          else if (thumbnail && typeof thumbnail === 'object') {
+
+            if (thumbnail.url) {
+              externalAdReply.thumbnail = thumbnail.url;
+            } else if (thumbnail.directPath) {
+
+              externalAdReply.thumbnail = thumbnail.directPath;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error processing externalAdReply:', error);
+    }
 
     if (isFromMe && !isHistorySync && waMsg.key?.id) {
       try {
@@ -3926,6 +3890,7 @@ async function handleIncomingMessage(
         wasLidResolved: actualPhoneNumber !== null,
         ...(mediaUrl && { mediaUrl }),
         ...(quotedStanzaId ? { isQuotedMessage: true, quotedMessageId: quotedStanzaId } : {}),
+        ...(externalAdReply ? { externalAdReply } : {}),
 
         ...(messageType === 'reaction' && (waMsg as any).reactionMetadata ? (waMsg as any).reactionMetadata : {}),
         ...(messageType === 'poll' && (waMsg.message.pollCreationMessage || waMsg.message.pollCreationMessageV3) && (() => {
@@ -3992,6 +3957,7 @@ async function handleIncomingMessage(
         message,
         conversation,
         contact,
+        companyId: conversation?.companyId,
       });
     } else {
 
@@ -3999,6 +3965,7 @@ async function handleIncomingMessage(
         message,
         conversation,
         contact,
+        companyId: conversation?.companyId,
       });
     }
 
@@ -4010,25 +3977,10 @@ async function handleIncomingMessage(
 
         if (channelConnection && contact) {
 
-          console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${message.id}] Before scheduling processing:`, {
-            remoteJid: resolvedRemoteJid, // Use resolved JID (actual phone number)
-            canonicalIdentifier: cleanPhoneNumber,
-            debounceKey: `${connectionId}_${cleanPhoneNumber}`,
-            messageId: message.id,
-            conversationId: conversation.id,
-            contactId: contact.id,
-            debouncingEnabled: MESSAGE_DEBOUNCING_CONFIG.enabled,
-            wasLidResolved: actualPhoneNumber !== null
-          });
+          
           
           if (MESSAGE_DEBOUNCING_CONFIG.enabled) {
-            console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] [msg:${message.id}] Scheduling debounced processing:`, {
-              remoteJid: resolvedRemoteJid, // Use resolved JID (actual phone number)
-              canonicalIdentifier: cleanPhoneNumber,
-              debounceKey: `${connectionId}_${cleanPhoneNumber}`,
-              conversationId: conversation.id,
-              contactId: contact.id
-            });
+            
             scheduleDebounceProcessing(message, conversation, contact, channelConnection, resolvedRemoteJid, connectionId);
           } else {
             await processMessageThroughFlowExecutor(message, conversation, contact, channelConnection);
@@ -4142,6 +4094,7 @@ export async function disconnectWhatsApp(connectionId: number, userId: number): 
       emitWhatsAppEvent('connectionStatusUpdate', {
         connectionId,
         status: 'disconnected',
+        companyId: connState.companyId,
       });
 
       return true;
@@ -4165,6 +4118,7 @@ export async function disconnectWhatsApp(connectionId: number, userId: number): 
     emitWhatsAppEvent('connectionStatusUpdate', {
       connectionId,
       status: 'disconnected',
+      companyId: connState.companyId,
     });
 
 
@@ -4318,18 +4272,36 @@ export async function sendWhatsAppAudioMessage(
         finalAudioPath = convertedAudioPath;
         audioBuffer = await fsPromises.readFile(convertedAudioPath);
         finalMimeType = conversionResult.mimeType;
+        
+
+        if (finalMimeType.includes(';')) {
+          finalMimeType = finalMimeType.split(';')[0].trim();
+        }
       } catch (conversionError) {
+        console.error('Audio conversion failed, using original file:', conversionError);
 
         audioBuffer = originalBuffer;
-        finalMimeType = 'audio/mpeg';
+        finalMimeType = mimeType;
+
+        if (finalMimeType.includes(';')) {
+          finalMimeType = finalMimeType.split(';')[0].trim();
+        }
       }
     } else {
       finalMimeType = getWhatsAppMimeType(fileExtension.substring(1));
+
+      if (finalMimeType.includes(';')) {
+        finalMimeType = finalMimeType.split(';')[0].trim();
+      }
     }
+
+
+    
 
     let sentMessageInfo;
     try {
       await simulateRecording(sock, phoneNumber);
+
 
       sentMessageInfo = await sock.sendMessage(phoneNumber, {
         audio: audioBuffer,
@@ -4512,6 +4484,7 @@ export async function sendWhatsAppAudioMessage(
       message: savedMessage,
       conversation,
       contact,
+      companyId: conversation?.companyId,
     });
 
     return savedMessage;
@@ -4632,7 +4605,6 @@ export async function sendWhatsAppMessage(
 
     const isGroupChat = to.endsWith('@g.us');
     if (isGroupChat) {
-
       throw new Error('Group chat messaging is disabled for unofficial WhatsApp integration');
     }
 
@@ -4645,20 +4617,10 @@ export async function sendWhatsAppMessage(
 
 
       if (phoneNumber.endsWith('@lid')) {
-
-
       } else {
         phoneNumber = normalizeWhatsAppJid(phoneNumber);
       }
     }
-
-
-    console.log(`[WhatsApp Routing] [${new Date().toISOString()}] [conn:${connectionId}] Final reply target assignment:`, {
-      originalTo: to,
-      normalizedPhoneNumber: phoneNumber,
-      extractedPhoneNumber: phoneNumber.split('@')[0],
-      isGroupChat: false
-    });
 
     let sentMessageInfo;
     try {
@@ -4784,7 +4746,8 @@ export async function sendWhatsAppMessage(
           identifier,
           identifierType: identifierType,
           source: 'whatsapp',
-          notes: null
+          notes: null,
+          createdBy: userId
         };
 
         contact = await storage.getOrCreateContact(contactData);
@@ -4901,6 +4864,7 @@ export async function sendWhatsAppMessage(
       message: savedMessage,
       conversation,
       contact,
+      companyId: conversation?.companyId,
     });
 
 
@@ -5304,6 +5268,7 @@ export async function sendQuotedMessage(
       message: savedMessage,
       conversation,
       contact,
+      companyId: conversation?.companyId,
     });
 
     return savedMessage;
@@ -5494,14 +5459,34 @@ export async function sendWhatsAppMediaMessage(
           isFromBot,
           conversationId
         );
-      case 'document':
+      case 'document': {
+
+        let finalFileName = fileName || path.basename(resolvedFilePath);
+        
+
+        const fileExt = path.extname(finalFileName).toLowerCase();
+        const pathExt = path.extname(resolvedFilePath).toLowerCase();
+        
+
+        let detectedMimetype = mimeTypes.lookup(finalFileName) || mimeTypes.lookup(resolvedFilePath) || 'application/octet-stream';
+        
+
+        if (detectedMimetype === 'application/pdf' || fileExt === '.pdf' || pathExt === '.pdf') {
+          detectedMimetype = 'application/pdf';
+
+          if (fileExt !== '.pdf') {
+            finalFileName = finalFileName.replace(/\.[^/.]+$/, '') + '.pdf';
+          }
+        }
+        
         messageContent = {
           document: fileContent,
-          mimetype: 'application/octet-stream',
-          fileName: fileName || path.basename(resolvedFilePath),
+          mimetype: detectedMimetype,
+          fileName: finalFileName,
           caption: caption || '',
         };
         break;
+      }
       default:
         throw new Error(`Unsupported media type: ${mediaType}`);
     }
@@ -5736,6 +5721,7 @@ export async function sendWhatsAppMediaMessage(
       message: savedMessage,
       conversation,
       contact,
+      companyId: conversation?.companyId,
     });
 
     return savedMessage;

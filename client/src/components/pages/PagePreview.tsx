@@ -35,21 +35,28 @@ export function PagePreview({ page, onClose }: PagePreviewProps) {
   const { company } = useAuth();
 
   const getPublicUrl = () => {
-    const subdomain = (company as any)?.subdomain || company?.slug || 'company';
-    const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:9000';
-    const port = import.meta.env.VITE_PORT || '9000';
+
+    if (typeof window === 'undefined') {
+      return '';
+    }
 
 
-    const url = new URL(baseUrl);
-    const protocol = url.protocol;
-    const hostname = url.hostname;
+    const subdomain = (company as any)?.subdomain || company?.slug;
+    if (!subdomain) {
+      return '';
+    }
 
-
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    const port = window.location.port;
 
     if (hostname === 'localhost') {
-      return `${protocol}//${subdomain}.localhost:${port}/${page.slug}`;
+
+      return `${protocol}//${hostname}${port ? `:${port}` : ''}/${page.slug}`;
     } else {
-      return `${protocol}//${subdomain}.${hostname}/${page.slug}`;
+
+      const portSuffix = port && port !== '80' && port !== '443' ? `:${port}` : '';
+      return `${protocol}//${subdomain}.${hostname}${portSuffix}/${page.slug}`;
     }
   };
 
@@ -57,9 +64,9 @@ export function PagePreview({ page, onClose }: PagePreviewProps) {
     switch (page.template) {
       case 'legal':
         return {
-          container: 'max-w-4xl mx-auto px-6 py-12 bg-white',
-          title: 'text-4xl font-bold text-gray-900 mb-8 text-center',
-          content: 'prose prose-lg max-w-none text-gray-700 leading-relaxed'
+          container: 'max-w-4xl mx-auto px-6 py-12 bg-background',
+          title: 'text-4xl font-bold text-foreground mb-8 text-center',
+          content: 'prose prose-lg max-w-none text-foreground leading-relaxed'
         };
       case 'marketing':
         return {
@@ -106,7 +113,7 @@ export function PagePreview({ page, onClose }: PagePreviewProps) {
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          {page.isPublished && (
+          {page.isPublished && getPublicUrl() && (
             <Button
               variant="outline"
               onClick={() => window.open(getPublicUrl(), '_blank')}
@@ -163,9 +170,11 @@ export function PagePreview({ page, onClose }: PagePreviewProps) {
                   <div className="text-blue-600 text-lg hover:underline cursor-pointer">
                     {page.metaTitle || page.title}
                   </div>
-                  <div className="text-green-700 text-sm">
-                    {getPublicUrl()}
-                  </div>
+                  {getPublicUrl() && (
+                    <div className="text-green-700 text-sm">
+                      {getPublicUrl()}
+                    </div>
+                  )}
                   {page.metaDescription && (
                     <div className="text-gray-600 text-sm mt-1">
                       {page.metaDescription}
@@ -273,7 +282,7 @@ export function PagePreview({ page, onClose }: PagePreviewProps) {
                 {page.metaKeywords || t('common.not_set', 'Not set')}
               </span>
             </div>
-            {page.isPublished && (
+            {page.isPublished && getPublicUrl() && (
               <div>
                 <span className="text-gray-600 block">{t('pages.public_url', 'Public URL')}:</span>
                 <a

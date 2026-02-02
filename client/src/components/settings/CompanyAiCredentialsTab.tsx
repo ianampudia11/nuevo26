@@ -346,7 +346,7 @@ export default function CompanyAiCredentialsTab() {
   const getStatusBadge = (credential: CompanyAiCredential) => {
     switch (credential.validationStatus) {
       case 'valid':
-        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Valid</Badge>;
+        return <Badge variant="default" className="bg-primary/10 text-primary border-primary/20"><CheckCircle className="w-3 h-3 mr-1" />Valid</Badge>;
       case 'invalid':
         return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Invalid</Badge>;
       case 'expired':
@@ -432,7 +432,7 @@ export default function CompanyAiCredentialsTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
+                <Settings className="w-5 h-5 text-foreground" />
                 {t('settings.ai_credentials.preferences_title', 'AI Preferences')}
               </CardTitle>
               <CardDescription>
@@ -440,7 +440,7 @@ export default function CompanyAiCredentialsTab() {
               </CardDescription>
             </div>
             <Button variant="outline" onClick={() => setIsPreferencesModalOpen(true)}>
-              <Settings className="w-4 h-4 mr-2" />
+              <Settings className="w-4 h-4 mr-2 text-foreground" />
               {t('settings.ai_credentials.configure', 'Configure')}
             </Button>
           </div>
@@ -449,34 +449,34 @@ export default function CompanyAiCredentialsTab() {
           {preferences ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium text-foreground">
                   {t('settings.ai_credentials.default_provider', 'Default Provider')}
                 </Label>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {getProviderInfo(preferences.defaultProvider).name}
                 </p>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium text-foreground">
                   {t('settings.ai_credentials.credential_preference', 'Credential Preference')}
                 </Label>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {getCredentialPreferenceLabel(preferences.credentialPreference)}
                 </p>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium text-foreground">
                   {t('settings.ai_credentials.fallback_enabled', 'Fallback Enabled')}
                 </Label>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {preferences.fallbackEnabled ? t('common.yes', 'Yes') : t('common.no', 'No')}
                 </p>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium text-foreground">
                   {t('settings.ai_credentials.usage_alerts', 'Usage Alerts')}
                 </Label>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {preferences.usageAlertsEnabled
                     ? `${t('common.enabled', 'Enabled')} (${preferences.usageAlertThreshold}%)`
                     : t('common.disabled', 'Disabled')
@@ -485,7 +485,7 @@ export default function CompanyAiCredentialsTab() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500">
+            <div className="text-center py-4 text-muted-foreground">
               {t('settings.ai_credentials.loading_preferences', 'Loading preferences...')}
             </div>
           )}
@@ -498,7 +498,7 @@ export default function CompanyAiCredentialsTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Building className="w-5 h-5" />
+                <Building className="w-5 h-5 text-foreground" />
                 {t('settings.ai_credentials.company_title', 'Company AI Credentials')}
               </CardTitle>
               <CardDescription>
@@ -514,11 +514,11 @@ export default function CompanyAiCredentialsTab() {
         <CardContent>
           {!credentials || credentials.length === 0 ? (
             <div className="text-center py-8">
-              <Key className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <Key className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 {t('settings.ai_credentials.no_credentials', 'No company credentials configured')}
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-muted-foreground mb-4">
                 {t('settings.ai_credentials.no_credentials_desc', 'Add your own OpenAI or OpenRouter credentials for better control and billing')}
               </p>
               <Button onClick={() => setIsCreateModalOpen(true)}>
@@ -531,15 +531,15 @@ export default function CompanyAiCredentialsTab() {
               {credentials.map((credential) => {
                 const providerInfo = getProviderInfo(credential.provider);
                 return (
-                  <div key={credential.id} className="border rounded-lg p-4">
+                  <div key={credential.id} className="border border-border rounded-lg p-4 bg-card">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{providerInfo.icon}</span>
                         <div>
-                          <h4 className="font-medium">
+                          <h4 className="font-medium text-foreground">
                             {credential.displayName || providerInfo.name}
                           </h4>
-                          <p className="text-sm text-gray-500">{credential.apiKeyPreview}</p>
+                          <p className="text-sm text-muted-foreground">{credential.apiKeyPreview}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -549,10 +549,10 @@ export default function CompanyAiCredentialsTab() {
                     </div>
                     
                     {credential.description && (
-                      <p className="text-sm text-gray-600 mb-3">{credential.description}</p>
+                      <p className="text-sm text-muted-foreground mb-3">{credential.description}</p>
                     )}
                     
-                    <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center gap-4">
                         {credential.usageLimitMonthly && (
                           <span>
@@ -567,7 +567,7 @@ export default function CompanyAiCredentialsTab() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(credential)}>
-                          <Edit className="w-3 h-3 mr-1" />
+                          <Edit className="w-3 h-3 mr-1 text-foreground" />
                           Edit
                         </Button>
                         <Button
@@ -576,11 +576,11 @@ export default function CompanyAiCredentialsTab() {
                           onClick={() => handleTest(credential)}
                           disabled={isTestingCredential === credential.id}
                         >
-                          <RefreshCw className={`w-3 h-3 mr-1 ${isTestingCredential === credential.id ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`w-3 h-3 mr-1 text-foreground ${isTestingCredential === credential.id ? 'animate-spin' : ''}`} />
                           Test
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDelete(credential)}>
-                          <Trash2 className="w-3 h-3 mr-1" />
+                          <Trash2 className="w-3 h-3 mr-1 text-foreground" />
                           Delete
                         </Button>
                       </div>
@@ -639,7 +639,7 @@ export default function CompanyAiCredentialsTab() {
                   className="absolute right-0 top-0 h-full px-3"
                   onClick={() => setShowApiKey(!showApiKey)}
                 >
-                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showApiKey ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
                 </Button>
               </div>
               <div className="flex gap-2 mt-2">
@@ -651,9 +651,9 @@ export default function CompanyAiCredentialsTab() {
                   disabled={validateMutation.isPending}
                 >
                   {validateMutation.isPending ? (
-                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                    <RefreshCw className="w-3 h-3 mr-1 animate-spin text-foreground" />
                   ) : (
-                    <CheckCircle className="w-3 h-3 mr-1" />
+                    <CheckCircle className="w-3 h-3 mr-1 text-foreground" />
                   )}
                   {t('settings.ai_credentials.validate', 'Validate')}
                 </Button>
@@ -854,7 +854,7 @@ export default function CompanyAiCredentialsTab() {
                   <SelectItem value="auto">{t('settings.ai_credentials.preference_auto', 'Company first, fallback to system')}</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {t('settings.ai_credentials.preference_help', 'Choose how to prioritize credential sources')}
               </p>
             </div>
@@ -862,7 +862,7 @@ export default function CompanyAiCredentialsTab() {
             <div className="flex items-center justify-between">
               <div>
                 <Label>{t('settings.ai_credentials.fallback_enabled', 'Enable Fallback')}</Label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {t('settings.ai_credentials.fallback_help', 'Allow fallback to system credentials if company credentials fail')}
                 </p>
               </div>
@@ -875,7 +875,7 @@ export default function CompanyAiCredentialsTab() {
             <div className="flex items-center justify-between">
               <div>
                 <Label>{t('settings.ai_credentials.usage_alerts', 'Usage Alerts')}</Label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {t('settings.ai_credentials.usage_alerts_help', 'Get notified when approaching usage limits')}
                 </p>
               </div>
@@ -923,10 +923,10 @@ export default function CompanyAiCredentialsTab() {
             <AlertDialogDescription>
               {t('settings.ai_credentials.delete_desc', 'Are you sure you want to delete this AI credential? This action cannot be undone.')}
               {selectedCredential && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
-                  <strong>{selectedCredential.displayName || getProviderInfo(selectedCredential.provider).name}</strong>
+                <div className="mt-2 p-2 bg-muted rounded text-sm">
+                  <strong className="text-foreground">{selectedCredential.displayName || getProviderInfo(selectedCredential.provider).name}</strong>
                   <br />
-                  <span className="text-gray-500">{selectedCredential.apiKeyPreview}</span>
+                  <span className="text-muted-foreground">{selectedCredential.apiKeyPreview}</span>
                 </div>
               )}
             </AlertDialogDescription>
@@ -934,12 +934,12 @@ export default function CompanyAiCredentialsTab() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               onClick={confirmDelete}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin text-destructive-foreground" />
               ) : null}
               {t('common.delete', 'Delete')}
             </AlertDialogAction>

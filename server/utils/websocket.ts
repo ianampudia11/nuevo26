@@ -158,3 +158,142 @@ export class CampaignEventEmitter {
     });
   }
 }
+
+/**
+ * Call Logs Event Emitter
+ */
+export class CallLogsEventEmitter {
+  /**
+   * Emit a call status update event
+   */
+  static emitCallStatusUpdate(
+    callId: number,
+    companyId: number,
+    status: string,
+    data: any
+  ): void {
+    const event: WebSocketEvent = {
+      type: 'callStatusUpdate',
+      data: {
+        callId,
+        status,
+        ...data
+      }
+    };
+
+    broadcastToCompany(event, companyId);
+  }
+
+  /**
+   * Emit a call completed event
+   */
+  static emitCallCompleted(
+    callId: number,
+    companyId: number,
+    callData: any
+  ): void {
+    const event: WebSocketEvent = {
+      type: 'callCompleted',
+      data: {
+        callId,
+        completedAt: new Date(),
+        ...callData
+      }
+    };
+
+    broadcastToCompany(event, companyId);
+  }
+
+  /**
+   * Emit a call failed event
+   */
+  static emitCallFailed(
+    callId: number,
+    companyId: number,
+    error: string
+  ): void {
+    const event: WebSocketEvent = {
+      type: 'callFailed',
+      data: {
+        callId,
+        error,
+        failedAt: new Date()
+      }
+    };
+
+    broadcastToCompany(event, companyId);
+  }
+
+  /**
+   * Emit a call error event with detailed error information
+   */
+  static emitCallError(
+    callId: number,
+    companyId: number,
+    error: {
+      type: string;
+      details: string;
+    }
+  ): void {
+    const event: WebSocketEvent = {
+      type: 'callError',
+      data: {
+        callId,
+        error,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    broadcastToCompany(event, companyId);
+  }
+
+  /**
+   * Emit a conference participant joined event
+   */
+  static emitConferenceParticipantJoined(
+    callId: number,
+    companyId: number,
+    participantData: {
+      participantLabel?: string;
+      conferenceSid: string;
+      timestamp: Date;
+    }
+  ): void {
+    const event: WebSocketEvent = {
+      type: 'conferenceParticipantJoined',
+      data: {
+        callId,
+        participantLabel: participantData.participantLabel,
+        conferenceSid: participantData.conferenceSid,
+        timestamp: participantData.timestamp.toISOString()
+      }
+    };
+
+    broadcastToCompany(event, companyId);
+  }
+
+  /**
+   * Emit a conference participant left event
+   */
+  static emitConferenceParticipantLeft(
+    callId: number,
+    companyId: number,
+    participantData: {
+      participantLabel?: string;
+      conferenceSid: string;
+      timestamp: Date;
+    }
+  ): void {
+    const event: WebSocketEvent = {
+      type: 'conferenceParticipantLeft',
+      data: {
+        callId,
+        participantLabel: participantData.participantLabel,
+        conferenceSid: participantData.conferenceSid,
+        timestamp: participantData.timestamp.toISOString()
+      }
+    };
+
+    broadcastToCompany(event, companyId);
+  }
+}

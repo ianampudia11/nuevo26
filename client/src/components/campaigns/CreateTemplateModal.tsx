@@ -426,7 +426,7 @@ export function CreateTemplateModal({ isOpen, onClose, onTemplateCreated, whatsa
                         {mediaFile.type} • {(mediaFile.file.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                       {uploadProgress[index] !== undefined && (
-                        <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                        <div className="w-full bg-muted rounded-full h-1 mt-1">
                           <div
                             className="bg-primary h-1 rounded-full transition-all"
                             style={{ width: `${uploadProgress[index]}%` }}

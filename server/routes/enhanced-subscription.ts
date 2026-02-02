@@ -18,10 +18,32 @@ import { usageTrackingService } from '../services/usage-tracking-service';
 import { dunningService } from '../services/dunning-service';
 import { subscriptionPausingService } from '../services/subscription-pausing-service';
 import { planDowngradeService } from '../services/plan-downgrade-service';
+
+/**
+ * Validates that the originUrl is safe to use
+ * Ensures it's a valid URL with http/https protocol and prevents open redirects
+ */
+function validateOriginUrl(originUrl: string): string | null {
+  try {
+    const url = new URL(originUrl);
+    
+
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return null;
+    }
+    
+
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
 import { ensureAuthenticated, ensureSuperAdmin } from '../middleware';
 import { logger } from '../utils/logger';
 
 const router = Router();
+
+const PAYSTACK_SUPPORTED_CURRENCIES = ['NGN', 'GHS', 'ZAR', 'USD'];
 
 
 const enableRenewalSchema = z.object({
@@ -146,7 +168,8 @@ router.post('/disable-renewal', ensureAuthenticated, async (req: any, res) => {
 const renewalSchema = z.object({
   paymentMethod: z.string().min(1, 'Payment method is required'),
   enableAutoRenewal: z.boolean().default(false),
-  planId: z.number().int().positive().optional()
+  planId: z.number().int().positive().optional(),
+  originUrl: z.string().optional()
 });
 
 /**
@@ -170,7 +193,7 @@ router.post('/initiate-renewal', ensureAuthenticated, async (req: any, res) => {
       });
     }
 
-    const { paymentMethod, enableAutoRenewal, planId } = validation.data;
+    const { paymentMethod, enableAutoRenewal, planId, originUrl } = validation.data;
 
 
     const generalSettings = await storage.getAppSetting('general_settings');
@@ -237,10 +260,13 @@ router.post('/initiate-renewal', ensureAuthenticated, async (req: any, res) => {
         paymentSession = await createMoyasarPaymentSession(company, plan, enableAutoRenewal);
         break;
       case 'paypal':
-        paymentSession = await createPayPalPaymentSession(company, plan, enableAutoRenewal);
+        paymentSession = await createPayPalPaymentSession(company, plan, enableAutoRenewal, originUrl);
         break;
       case 'mercadopago':
-        paymentSession = await createMercadoPagoPaymentSession(company, plan, enableAutoRenewal);
+        paymentSession = await createMercadoPagoPaymentSession(req, company, plan, enableAutoRenewal, originUrl);
+        break;
+      case 'paystack':
+        paymentSession = await createPaystackPaymentSession(company, plan, enableAutoRenewal, originUrl);
         break;
       case 'bank-transfer':
 
@@ -1451,7 +1477,7 @@ async function createMoyasarPaymentSession(company: any, plan: any, enableAutoRe
 /**
  * Create PayPal payment session for subscription renewal
  */
-async function createPayPalPaymentSession(company: any, plan: any, enableAutoRenewal: boolean = false): Promise<{ id: string; url: string }> {
+async function createPayPalPaymentSession(company: any, plan: any, enableAutoRenewal: boolean = false, originUrl?: string): Promise<{ id: string; url: string }> {
   const paypalSettings = await storage.getAppSetting('payment_paypal');
   if (!paypalSettings?.value) {
     throw new Error('PayPal not configured');
@@ -1467,16 +1493,32 @@ async function createPayPalPaymentSession(company: any, plan: any, enableAutoRen
 
   const paypalConfig = paypalSettings.value as any;
   
+
+  const clientId = (paypalConfig.clientId || '').trim();
+  const clientSecret = (paypalConfig.clientSecret || '').trim();
+
+
+  if (!clientId || !clientSecret) {
+    console.error('PayPal credentials validation failed in subscription renewal:', {
+      hasClientId: !!paypalConfig.clientId,
+      hasClientSecret: !!paypalConfig.clientSecret,
+      clientIdLength: clientId?.length || 0,
+      clientSecretLength: clientSecret?.length || 0,
+      testMode: paypalConfig.testMode
+    });
+    throw new Error('Invalid PayPal credentials. Please check your PayPal settings.');
+  }
+
   let environment;
   if (paypalConfig.testMode) {
     environment = new paypal.core.SandboxEnvironment(
-      paypalConfig.clientId,
-      paypalConfig.clientSecret
+      clientId,
+      clientSecret
     );
   } else {
     environment = new paypal.core.LiveEnvironment(
-      paypalConfig.clientId,
-      paypalConfig.clientSecret
+      clientId,
+      clientSecret
     );
   }
 
@@ -1513,8 +1555,26 @@ async function createPayPalPaymentSession(company: any, plan: any, enableAutoRen
       brand_name: 'PowerChatPlus',
       landing_page: 'BILLING',
       user_action: 'PAY_NOW',
-      return_url: `${process.env.BASE_URL || 'http://localhost:5000'}/payment/success?source=paypal&transaction_id=${transaction.id}&renewal=true`,
-      cancel_url: `${process.env.BASE_URL || 'http://localhost:5000'}/payment/cancelled`
+      return_url: `${(() => {
+        let baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+        if (originUrl) {
+          const validatedUrl = validateOriginUrl(originUrl);
+          if (validatedUrl) {
+            baseUrl = validatedUrl;
+          }
+        }
+        return baseUrl;
+      })()}/payment/success?source=paypal&transaction_id=${transaction.id}&renewal=true`,
+      cancel_url: `${(() => {
+        let baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+        if (originUrl) {
+          const validatedUrl = validateOriginUrl(originUrl);
+          if (validatedUrl) {
+            baseUrl = validatedUrl;
+          }
+        }
+        return baseUrl;
+      })()}/payment/cancelled`
     }
   });
 
@@ -1534,7 +1594,7 @@ async function createPayPalPaymentSession(company: any, plan: any, enableAutoRen
 /**
  * Create Mercado Pago payment session for subscription renewal
  */
-async function createMercadoPagoPaymentSession(company: any, plan: any, enableAutoRenewal: boolean = false): Promise<{ id: string; url: string }> {
+async function createMercadoPagoPaymentSession(req: any, company: any, plan: any, enableAutoRenewal: boolean = false, originUrl?: string): Promise<{ id: string; url: string }> {
   const mercadoPagoSettings = await storage.getAppSetting('payment_mercadopago');
   if (!mercadoPagoSettings?.value) {
     throw new Error('Mercado Pago not configured');
@@ -1569,7 +1629,20 @@ async function createMercadoPagoPaymentSession(company: any, plan: any, enableAu
     }
   });
 
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+
+  let baseUrl = `${req.protocol}://${req.get('host')}`;
+  if (originUrl) {
+    const validatedUrl = validateOriginUrl(originUrl);
+    if (validatedUrl) {
+      baseUrl = validatedUrl;
+    } else {
+      console.warn('Invalid originUrl provided for Mercado Pago renewal, falling back to request URL');
+    }
+  }
+  
+
+
+  
   const preferenceData = {
     items: [
       {
@@ -1577,7 +1650,7 @@ async function createMercadoPagoPaymentSession(company: any, plan: any, enableAu
         description: `Renewal for ${company.name}`,
         quantity: 1,
         currency_id: defaultCurrency.toUpperCase(),
-        unit_price: plan.price
+        unit_price: Number(plan.price)
       }
     ],
     back_urls: {
@@ -1585,10 +1658,13 @@ async function createMercadoPagoPaymentSession(company: any, plan: any, enableAu
       failure: `${baseUrl}/payment/cancel?source=mercadopago&transaction_id=${transaction.id}`,
       pending: `${baseUrl}/payment/pending?source=mercadopago&transaction_id=${transaction.id}`
     },
-    auto_return: 'approved',
+    auto_return: 'all',
     external_reference: transaction.id.toString(),
     notification_url: `${baseUrl}/api/webhooks/mercadopago`
   };
+  
+
+
 
   const apiUrl = 'https://api.mercadopago.com/checkout/preferences';
   const response = await fetch(apiUrl, {
@@ -1614,6 +1690,88 @@ async function createMercadoPagoPaymentSession(company: any, plan: any, enableAu
   return {
     id: transaction.id.toString(),
     url: responseData.init_point
+  };
+}
+
+/**
+ * Create Paystack payment session for subscription renewal
+ */
+async function createPaystackPaymentSession(company: any, plan: any, enableAutoRenewal: boolean = false, originUrl?: string): Promise<{ id: string; url: string }> {
+  const paystackSettings = await storage.getAppSetting('payment_paystack');
+  if (!paystackSettings?.value || !(paystackSettings.value as any).enabled) {
+    throw new Error('Paystack not configured');
+  }
+
+  const paystackConfig = paystackSettings.value as any;
+  const defaultCurrency = (await getDefaultCurrency()).toUpperCase();
+
+  if (!PAYSTACK_SUPPORTED_CURRENCIES.includes(defaultCurrency)) {
+    throw new Error(`Currency ${defaultCurrency} is not supported by Paystack. Supported: ${PAYSTACK_SUPPORTED_CURRENCIES.join(', ')}`);
+  }
+
+  const transaction = await storage.createPaymentTransaction({
+    companyId: company.id,
+    planId: plan.id,
+    amount: plan.price,
+    currency: defaultCurrency,
+    status: 'pending',
+    paymentMethod: 'paystack',
+    metadata: {
+      renewalType: 'subscription_renewal',
+      enableAutoRenewal: enableAutoRenewal.toString(),
+      isPlanChange: (plan.id !== company.planId).toString()
+    }
+  });
+
+  const reference = `PC-REN-${transaction.id}-${Date.now()}`;
+  
+
+  let baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+  if (originUrl) {
+    const validatedUrl = validateOriginUrl(originUrl);
+    if (validatedUrl) {
+      baseUrl = validatedUrl;
+    } else {
+      console.warn('Invalid originUrl provided for Paystack renewal, falling back to default URL');
+    }
+  }
+  const callbackUrl = `${baseUrl}/payment/success?source=paystack&transaction_id=${transaction.id}&renewed=true&from_renewal=true`;
+
+  const initResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${paystackConfig.secretKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      email: company.companyEmail || company.email || 'no-email@powerchatplus.local',
+      amount: Math.round(Number(plan.price) * 100),
+      currency: defaultCurrency,
+      reference,
+      callback_url: callbackUrl,
+      metadata: {
+        transactionId: transaction.id,
+        planId: plan.id,
+        companyId: company.id,
+        renewal: true
+      }
+    })
+  });
+
+  const initData = await initResponse.json().catch(() => ({}));
+  if (!initResponse.ok || !initData?.data?.authorization_url) {
+    const apiMessage = initData?.message || initResponse.statusText;
+    throw new Error(`Failed to initialize Paystack payment: ${apiMessage}`);
+  }
+
+  await storage.updatePaymentTransaction(transaction.id, {
+    paymentIntentId: reference,
+    externalTransactionId: initData.data.reference
+  });
+
+  return {
+    id: transaction.id.toString(),
+    url: initData.data.authorization_url
   };
 }
 

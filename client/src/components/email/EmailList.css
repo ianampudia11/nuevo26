@@ -52,6 +52,26 @@
   background: #d1d5db !important;
 }
 
+.dark .email-list-container::-webkit-scrollbar-track {
+  background: #111b21;
+}
+
+.dark .email-list-container::-webkit-scrollbar-thumb {
+  background: #2a3942;
+}
+
+.dark .email-list-container::-webkit-scrollbar-thumb:hover {
+  background: #374955;
+}
+
+.dark .email-list-container {
+  scrollbar-color: #2a3942 #111b21;
+}
+
+.dark .email-item:hover {
+  background-color: #2a3942;
+}
+
 /* Mobile - hide scrollbars */
 @media (max-width: 767px) {
   .email-list-container {

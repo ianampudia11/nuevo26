@@ -10,11 +10,9 @@ class SecureEnvironment {
   private sensitiveKeys = [
     'DATABASE_URL',
     'SESSION_SECRET',
-    'XAI_API_KEY',
     'GOOGLE_CLIENT_SECRET',
     'SENDGRID_API_KEY',
-    'SMTP_PASS',
-    'GOOGLE_CLOUD_STORAGE_BUCKET'
+    'SMTP_PASS'
   ];
 
   private constructor() {

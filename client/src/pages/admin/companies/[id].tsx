@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlans } from "@/hooks/use-plans";
+import { useTranslation } from "@/hooks/use-translation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,14 +157,6 @@ const validateIBAN = (iban: string): boolean => {
   }
 };
 
-const companySchema = z.object({
-  name: z.string().min(1, "Company name is required"),
-  slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Slug can only contain lowercase letters, numbers, and hyphens"),
-  logo: z.string().optional(),
-  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color"),
-  active: z.boolean(),
-  planId: z.number().int().min(1, "Plan is required"),
-  maxUsers: z.number().int().min(1, "Must have at least 1 user"),
 
 
 
@@ -178,18 +171,28 @@ const companySchema = z.object({
 
 
 
-
-});
-
-type CompanyFormValues = z.infer<typeof companySchema>;
 
 export default function CompanyDetailPage() {
   const { user, isLoading: isLoadingAuth, impersonateCompanyMutation } = useAuth();
   const { plans, isLoading: isLoadingPlans } = usePlans();
   const { formatCurrency } = useCurrency();
+  const { t } = useTranslation();
   const [_, navigate] = useLocation();
   const [match, params] = useRoute<{ id: string }>("/admin/companies/:id");
   const { toast } = useToast();
+  
+  const companySchema = z.object({
+    name: z.string().min(1, t('admin.companies.detail.validation.company_name_required', 'Company name is required')),
+    slug: z.string().min(1, t('admin.companies.detail.validation.slug_required', 'Slug is required')).regex(/^[a-z0-9-]+$/, t('admin.companies.detail.validation.slug_invalid', 'Slug can only contain lowercase letters, numbers, and hyphens')),
+    logo: z.string().optional(),
+    primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, t('admin.companies.detail.validation.color_invalid', 'Must be a valid hex color')),
+    active: z.boolean(),
+    planId: z.number().int().min(1, t('admin.companies.detail.validation.plan_required', 'Plan is required')),
+    maxUsers: z.number().int().min(1, t('admin.companies.detail.validation.max_users_required', 'Must have at least 1 user')),
+  });
+
+  type CompanyFormValues = z.infer<typeof companySchema>;
+  
   const [activeTab, setActiveTab] = useState("details");
   const [isImpersonateDialogOpen, setIsImpersonateDialogOpen] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -215,7 +218,7 @@ export default function CompanyDetailPage() {
     queryKey: [`/api/admin/companies/${companyId}`],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/admin/companies/${companyId}`);
-      if (!res.ok) throw new Error("Failed to fetch company");
+      if (!res.ok) throw new Error(t('admin.companies.detail.error.fetch_company', 'Failed to fetch company'));
       return res.json();
     },
     enabled: !!companyId && !!user?.isSuperAdmin
@@ -225,7 +228,7 @@ export default function CompanyDetailPage() {
     queryKey: [`/api/admin/companies/${companyId}/users`],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/admin/companies/${companyId}/users`);
-      if (!res.ok) throw new Error("Failed to fetch company users");
+      if (!res.ok) throw new Error(t('admin.companies.detail.error.fetch_users', 'Failed to fetch company users'));
       return res.json();
     },
     enabled: !!companyId && !!user?.isSuperAdmin
@@ -290,21 +293,21 @@ export default function CompanyDetailPage() {
       const res = await apiRequest("PUT", `/api/admin/companies/${companyId}`, data);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to update company");
+        throw new Error(errorData.message || t('admin.companies.detail.error.update_failed', 'Failed to update company'));
       }
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Company updated",
-        description: "The company has been updated successfully",
+        title: t('admin.companies.detail.toast.update_success_title', 'Company updated'),
+        description: t('admin.companies.detail.toast.update_success_description', 'The company has been updated successfully'),
       });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/companies'] });
     },
     onError: (error: Error) => {
       toast({
-        title: "Update failed",
+        title: t('admin.companies.detail.toast.update_failed_title', 'Update failed'),
         description: error.message,
         variant: "destructive",
       });
@@ -316,20 +319,20 @@ export default function CompanyDetailPage() {
       const res = await apiRequest("DELETE", `/api/admin/companies/${companyId}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to deactivate company");
+        throw new Error(errorData.message || t('admin.companies.detail.error.deactivate_failed', 'Failed to deactivate company'));
       }
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Company deactivated",
-        description: "The company has been deactivated successfully",
+        title: t('admin.companies.detail.toast.deactivate_success_title', 'Company deactivated'),
+        description: t('admin.companies.detail.toast.deactivate_success_description', 'The company has been deactivated successfully'),
       });
       navigate("/admin/dashboard");
     },
     onError: (error: Error) => {
       toast({
-        title: "Deactivation failed",
+        title: t('admin.companies.detail.toast.deactivate_failed_title', 'Deactivation failed'),
         description: error.message,
         variant: "destructive",
       });
@@ -349,14 +352,14 @@ export default function CompanyDetailPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload logo');
+        throw new Error(errorData.message || t('admin.companies.detail.error.upload_logo_failed', 'Failed to upload logo'));
       }
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Logo Updated",
-        description: "Company logo has been updated successfully.",
+        title: t('admin.companies.detail.toast.logo_updated_title', 'Logo Updated'),
+        description: t('admin.companies.detail.toast.logo_updated_description', 'Company logo has been updated successfully.'),
       });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/companies'] });
@@ -364,8 +367,8 @@ export default function CompanyDetailPage() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: `Failed to upload logo: ${error.message}`,
+        title: t('admin.companies.detail.toast.error_title', 'Error'),
+        description: t('admin.companies.detail.toast.upload_logo_error', 'Failed to upload logo: {{error}}', { error: error.message }),
         variant: "destructive",
       });
       setIsUploadingLogo(false);
@@ -377,14 +380,14 @@ export default function CompanyDetailPage() {
       const res = await apiRequest("PUT", `/api/admin/users/${userId}`, userData);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to update user");
+        throw new Error(errorData.message || t('admin.companies.detail.error.update_user_failed', 'Failed to update user'));
       }
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "User Updated",
-        description: "User has been updated successfully.",
+        title: t('admin.companies.detail.toast.user_updated_title', 'User Updated'),
+        description: t('admin.companies.detail.toast.user_updated_description', 'User has been updated successfully.'),
       });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}/users`] });
       setIsEditUserDialogOpen(false);
@@ -392,7 +395,7 @@ export default function CompanyDetailPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Update Failed",
+        title: t('admin.companies.detail.toast.update_user_failed_title', 'Update Failed'),
         description: error.message,
         variant: "destructive",
       });
@@ -422,8 +425,8 @@ export default function CompanyDetailPage() {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       toast({
-        title: "Invalid file type",
-        description: "Please select a valid image file (JPEG, PNG, GIF, or WebP).",
+        title: t('admin.companies.detail.toast.invalid_file_type_title', 'Invalid file type'),
+        description: t('admin.companies.detail.toast.invalid_file_type_description', 'Please select a valid image file (JPEG, PNG, GIF, or WebP).'),
         variant: "destructive",
       });
       event.target.value = '';
@@ -434,8 +437,8 @@ export default function CompanyDetailPage() {
     const maxSize = 5 * 1024 * 1024; // 5MB in bytes
     if (file.size > maxSize) {
       toast({
-        title: "File too large",
-        description: "Please select an image smaller than 5MB.",
+        title: t('admin.companies.detail.toast.file_too_large_title', 'File too large'),
+        description: t('admin.companies.detail.toast.file_too_large_description', 'Please select an image smaller than 5MB.'),
         variant: "destructive",
       });
       event.target.value = '';
@@ -497,10 +500,10 @@ export default function CompanyDetailPage() {
           <div className="flex items-center">
             <Button variant="ghost" onClick={() => navigate("/admin/dashboard")} className="mr-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              {t('common.back', 'Back')}
             </Button>
             <h1 className="text-2xl">
-              {isLoadingCompany ? "Loading..." : `Company: ${company?.name}`}
+              {isLoadingCompany ? t('common.loading', 'Loading...') : t('admin.companies.detail.title', 'Company: {{name}}', { name: company?.name || '' })}
             </h1>
           </div>
 
@@ -509,29 +512,28 @@ export default function CompanyDetailPage() {
               <AlertDialogTrigger asChild>
                 <Button className="ml-auto btn-brand-primary">
                   <LogIn className="h-4 w-4 mr-2" />
-                  Impersonate Company
+                  {t('admin.companies.impersonate_title', 'Impersonate Company')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent className="max-w-md max-h-[90vh]">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Impersonate Company</AlertDialogTitle>
+                  <AlertDialogTitle>{t('admin.companies.impersonate_title', 'Impersonate Company')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    You are about to log in as an admin user for {company.name}.
-                    This will allow you to access the company dashboard and perform actions as a company admin.
+                    {t('admin.companies.impersonate_description', 'You are about to log in as an admin user for {{name}}. This will allow you to access the company dashboard and perform actions as a company admin.', { name: company.name })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-4">
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
                   <AlertDialogAction className="btn-brand-primary" onClick={handleImpersonateCompany}>
                     {impersonateCompanyMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Impersonating...
+                        {t('admin.companies.impersonating', 'Impersonating...')}
                       </>
                     ) : (
                       <>
                         <UserCog className="h-4 w-4 mr-2" />
-                        Impersonate
+                        {t('admin.companies.detail.impersonate_button', 'Impersonate')}
                       </>
                     )}
                   </AlertDialogAction>
@@ -543,17 +545,17 @@ export default function CompanyDetailPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
-            <TabsTrigger value="details">Company Details</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="data">Data & Usage</TabsTrigger>
+            <TabsTrigger value="details">{t('admin.companies.detail.tabs.details', 'Company Details')}</TabsTrigger>
+            <TabsTrigger value="users">{t('admin.companies.detail.tabs.users', 'Users')}</TabsTrigger>
+            <TabsTrigger value="data">{t('admin.companies.detail.tabs.data_usage', 'Data & Usage')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details">
             <Card>
               <CardHeader>
-                <CardTitle>Company Information</CardTitle>
+                <CardTitle>{t('admin.companies.detail.card.title', 'Company Information')}</CardTitle>
                 <CardDescription>
-                  Manage company details and settings
+                  {t('admin.companies.detail.card.description', 'Manage company details and settings')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -589,12 +591,12 @@ export default function CompanyDetailPage() {
                             {isUploadingLogo ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Uploading...
+                                {t('admin.companies.detail.uploading', 'Uploading...')}
                               </>
                             ) : (
                               <>
                                 <Upload className="mr-2 h-4 w-4" />
-                                Change Logo
+                                {t('admin.companies.detail.change_logo', 'Change Logo')}
                               </>
                             )}
                           </Button>
@@ -619,7 +621,7 @@ export default function CompanyDetailPage() {
                           name="name"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Company Name</FormLabel>
+                              <FormLabel>{t('admin.companies.detail.form.company_name', 'Company Name')}</FormLabel>
                               <FormControl>
                                 <Input {...field} />
                               </FormControl>
@@ -633,12 +635,12 @@ export default function CompanyDetailPage() {
                           name="slug"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Slug</FormLabel>
+                              <FormLabel>{t('admin.companies.detail.form.slug', 'Slug')}</FormLabel>
                               <FormControl>
                                 <Input {...field} />
                               </FormControl>
                               <FormDescription>
-                                Used for URL and identification
+                                {t('admin.companies.detail.form.slug_description', 'Used for URL and identification')}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -650,7 +652,7 @@ export default function CompanyDetailPage() {
                           name="logo"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Logo URL</FormLabel>
+                              <FormLabel>{t('admin.companies.detail.form.logo_url', 'Logo URL')}</FormLabel>
                               <FormControl>
                                 <Input {...field} />
                               </FormControl>
@@ -664,7 +666,7 @@ export default function CompanyDetailPage() {
                           name="primaryColor"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Primary Color</FormLabel>
+                              <FormLabel>{t('admin.companies.detail.form.primary_color', 'Primary Color')}</FormLabel>
                               <div className="flex items-center space-x-2">
                                 <div
                                   className="w-6 h-6 rounded-full border cursor-pointer"
@@ -685,7 +687,7 @@ export default function CompanyDetailPage() {
                                 <FormControl>
                                   <Input
                                     {...field}
-                                    placeholder="#333235"
+                                    placeholder={t('admin.companies.detail.form.color_placeholder', '#333235')}
                                     className="flex-1"
                                   />
                                 </FormControl>
@@ -700,7 +702,7 @@ export default function CompanyDetailPage() {
                           name="planId"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Plan</FormLabel>
+                              <FormLabel>{t('admin.companies.detail.form.plan', 'Plan')}</FormLabel>
                               <Select
                                 onValueChange={(value) => {
                                   field.onChange(parseInt(value));
@@ -714,7 +716,7 @@ export default function CompanyDetailPage() {
                               >
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Select a plan" />
+                                    <SelectValue placeholder={t('admin.companies.detail.form.select_plan_placeholder', 'Select a plan')} />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
@@ -722,11 +724,11 @@ export default function CompanyDetailPage() {
                                     <SelectItem value="loading" disabled>
                                       <div className="flex items-center">
                                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                        Loading plans...
+                                        {t('admin.companies.detail.form.loading_plans', 'Loading plans...')}
                                       </div>
                                     </SelectItem>
                                   ) : plans.length === 0 ? (
-                                    <SelectItem value="none" disabled>No plans available</SelectItem>
+                                    <SelectItem value="none" disabled>{t('admin.companies.detail.form.no_plans_available', 'No plans available')}</SelectItem>
                                   ) : (
                                     plans.map((plan) => (
                                       <SelectItem key={plan.id} value={plan.id.toString()}>
@@ -741,7 +743,7 @@ export default function CompanyDetailPage() {
                                   <>
                                     {plans.find(p => p.id === field.value)?.description || ""}
                                   </>
-                                ) : "Select a subscription plan for this company"}
+                                ) : t('admin.companies.detail.form.plan_description', 'Select a subscription plan for this company')}
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -753,7 +755,7 @@ export default function CompanyDetailPage() {
                           name="maxUsers"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Max Users</FormLabel>
+                              <FormLabel>{t('admin.companies.detail.form.max_users', 'Max Users')}</FormLabel>
                               <FormControl>
                                 <Input
                                   type="number"
@@ -902,9 +904,9 @@ export default function CompanyDetailPage() {
                         render={({ field }) => (
                           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
-                              <FormLabel className="text-base">Active Status</FormLabel>
+                              <FormLabel className="text-base">{t('admin.companies.detail.form.active_status', 'Active Status')}</FormLabel>
                               <FormDescription>
-                                When inactive, users cannot access the platform
+                                {t('admin.companies.detail.form.active_status_description', 'When inactive, users cannot access the platform')}
                               </FormDescription>
                             </div>
                             <FormControl>
@@ -922,7 +924,7 @@ export default function CompanyDetailPage() {
                           type="button"
                           variant="destructive"
                           onClick={() => {
-                            if (confirm("Are you sure you want to deactivate this company? This will prevent all users from accessing the platform.")) {
+                            if (confirm(t('admin.companies.detail.confirm.deactivate', 'Are you sure you want to deactivate this company? This will prevent all users from accessing the platform.'))) {
                               deactivateMutation.mutate();
                             }
                           }}
@@ -931,12 +933,12 @@ export default function CompanyDetailPage() {
                           {deactivateMutation.isPending ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Deactivating...
+                              {t('admin.companies.detail.deactivating', 'Deactivating...')}
                             </>
                           ) : (
                             <>
                               <Trash className="mr-2 h-4 w-4" />
-                              Deactivate Company
+                              {t('admin.companies.detail.deactivate_company', 'Deactivate Company')}
                             </>
                           )}
                         </Button>
@@ -950,12 +952,12 @@ export default function CompanyDetailPage() {
                           {updateMutation.isPending ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Saving...
+                              {t('common.saving', 'Saving...')}
                             </>
                           ) : (
                             <>
                               <Save className="mr-2 h-4 w-4" />
-                              Save Changes
+                              {t('common.save_changes', 'Save Changes')}
                             </>
                           )}
                         </Button>
@@ -970,9 +972,9 @@ export default function CompanyDetailPage() {
           <TabsContent value="users">
             <Card>
               <CardHeader>
-                <CardTitle>Company Users</CardTitle>
+                <CardTitle>{t('admin.companies.detail.users.title', 'Company Users')}</CardTitle>
                 <CardDescription>
-                  Manage users for this company
+                  {t('admin.companies.detail.users.description', 'Manage users for this company')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -982,15 +984,15 @@ export default function CompanyDetailPage() {
                   </div>
                 ) : !companyUsers || companyUsers.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    No users found for this company.
+                    {t('admin.companies.detail.users.no_users', 'No users found for this company.')}
                   </div>
                 ) : (
                   <div className="rounded-md border">
                     <div className="grid grid-cols-4 p-4 font-medium border-b">
-                      <div>User</div>
-                      <div>Email</div>
-                      <div>Role</div>
-                      <div>Actions</div>
+                      <div>{t('admin.companies.detail.users.table.user', 'User')}</div>
+                      <div>{t('admin.companies.detail.users.table.email', 'Email')}</div>
+                      <div>{t('admin.companies.detail.users.table.role', 'Role')}</div>
+                      <div>{t('admin.companies.detail.users.table.actions', 'Actions')}</div>
                     </div>
                     <div className="divide-y">
                       {companyUsers.map((user) => (
@@ -1017,7 +1019,7 @@ export default function CompanyDetailPage() {
                               onClick={() => handleEditUser(user)}
                             >
                               <Edit className="mr-2 h-4 w-4" />
-                              Edit
+                              {t('common.edit', 'Edit')}
                             </Button>
                           </div>
                         </div>
@@ -1038,15 +1040,15 @@ export default function CompanyDetailPage() {
         <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
+              <DialogTitle>{t('admin.companies.detail.edit_user.title', 'Edit User')}</DialogTitle>
               <DialogDescription>
-                Update user information and permissions.
+                {t('admin.companies.detail.edit_user.description', 'Update user information and permissions.')}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="fullName" className="text-right">
-                  Full Name
+                  {t('admin.companies.detail.edit_user.full_name', 'Full Name')}
                 </Label>
                 <Input
                   id="fullName"
@@ -1057,7 +1059,7 @@ export default function CompanyDetailPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email" className="text-right">
-                  Email
+                  {t('admin.companies.detail.edit_user.email', 'Email')}
                 </Label>
                 <Input
                   id="email"
@@ -1069,25 +1071,25 @@ export default function CompanyDetailPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="role" className="text-right">
-                  Role
+                  {t('admin.companies.detail.edit_user.role', 'Role')}
                 </Label>
                 <Select
                   value={editUserForm.role}
                   onValueChange={(value) => setEditUserForm({ ...editUserForm, role: value })}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select role" />
+                    <SelectValue placeholder={t('admin.companies.detail.edit_user.select_role_placeholder', 'Select role')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="superadmin">Super Admin</SelectItem>
+                    <SelectItem value="user">{t('admin.companies.detail.edit_user.role_user', 'User')}</SelectItem>
+                    <SelectItem value="admin">{t('admin.companies.detail.edit_user.role_admin', 'Admin')}</SelectItem>
+                    <SelectItem value="superadmin">{t('admin.companies.detail.edit_user.role_superadmin', 'Super Admin')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="active" className="text-right">
-                  Active
+                  {t('common.active', 'Active')}
                 </Label>
                 <div className="col-span-3">
                   <Switch
@@ -1100,7 +1102,7 @@ export default function CompanyDetailPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={handleCancelEditUser}>
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </Button>
               <Button
                 onClick={handleSaveUser}
@@ -1109,12 +1111,12 @@ export default function CompanyDetailPage() {
                 {updateUserMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {t('common.saving', 'Saving...')}
                   </>
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Save Changes
+                    {t('common.save_changes', 'Save Changes')}
                   </>
                 )}
               </Button>

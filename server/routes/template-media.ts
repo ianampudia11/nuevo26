@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { ensureAuthenticated, requirePermission } from '../middleware';
 import { User as SelectUser } from '@shared/schema';
+import { dataUsageTracker } from '../services/data-usage-tracker';
 
 const router = express.Router();
 
@@ -133,6 +134,13 @@ router.post('/upload-media',
         }
       };
 
+
+      if (user.companyId) {
+        dataUsageTracker.trackFileUpload(user.companyId, file.size).catch(err => {
+          console.error('Failed to track template media upload:', err);
+        });
+      }
+
       res.json({
         success: true,
         data: mediaInfo,
@@ -212,6 +220,14 @@ router.post('/upload-multiple-media',
         uploadedFiles.push(mediaInfo);
       }
 
+
+      if (user.companyId) {
+        const totalSize = uploadedFiles.reduce((sum, f) => sum + f.size, 0);
+        dataUsageTracker.trackFileUpload(user.companyId, totalSize).catch(err => {
+          console.error('Failed to track template media uploads:', err);
+        });
+      }
+
       res.json({
         success: true,
         data: uploadedFiles,
@@ -271,7 +287,18 @@ router.delete('/media/:filename',
       }
 
 
+      const stats = await fs.stat(filePath);
+      const fileSize = stats.size;
+
       await fs.unlink(filePath);
+
+
+      const user = req.user as SelectUser;
+      if (user?.companyId) {
+        dataUsageTracker.trackFileDelete(user.companyId, fileSize).catch(err => {
+          console.error('Failed to track template media deletion:', err);
+        });
+      }
 
       res.json({
         success: true,

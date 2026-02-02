@@ -41,7 +41,8 @@ import {
   Building,
   Hash,
   Type,
-  MessageSquare
+  MessageSquare,
+  RotateCcw
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -60,11 +61,14 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useFlowContext } from "@/pages/flow-builder";
-import { PipelineStage } from "@shared/schema";
+import { PipelineStage, Pipeline } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { standardHandleStyle } from './StyledHandle';
 import { useTranslation } from '@/hooks/use-translation';
+import { Layers, ArrowRightLeft } from "lucide-react";
+import { useMemo } from "react";
+import { apiRequest } from '@/lib/queryClient';
 
 
 interface VariableOption {
@@ -72,18 +76,10 @@ interface VariableOption {
   label: string;
   description: string;
   icon: React.ReactNode;
-  category: 'contact' | 'message' | 'system' | 'deal';
+  category: 'contact' | 'message' | 'system' | 'deal' | 'pipeline';
 }
 
 const AVAILABLE_VARIABLES: VariableOption[] = [
-
-  {
-    value: 'contact.id',
-    label: 'Contact ID',
-    description: 'Unique identifier for the contact',
-    icon: <Hash className="w-4 h-4" />,
-    category: 'contact'
-  },
   {
     value: 'contact.phone',
     label: 'Contact Phone',
@@ -134,6 +130,48 @@ const AVAILABLE_VARIABLES: VariableOption[] = [
     description: 'Current time',
     icon: <Calendar className="w-4 h-4" />,
     category: 'system'
+  },
+  { 
+    value: 'pipeline.currentPipelineId', 
+    label: 'Current Pipeline ID', 
+    description: 'Current pipeline ID', 
+    icon: <Layers className="w-4 h-4" />, 
+    category: 'deal' 
+  },
+  { 
+    value: 'pipeline.previousPipelineId', 
+    label: 'Previous Pipeline ID', 
+    description: 'Previous pipeline ID (if moved)', 
+    icon: <Layers className="w-4 h-4" />, 
+    category: 'deal' 
+  },
+  { 
+    value: 'pipeline.movedBetweenPipelines', 
+    label: 'Moved Between Pipelines', 
+    description: 'Whether deal moved between pipelines', 
+    icon: <ArrowRightLeft className="w-4 h-4" />, 
+    category: 'deal' 
+  },
+  { 
+    value: 'pipeline.currentPipelineId', 
+    label: 'Current Pipeline ID', 
+    description: 'Current pipeline ID', 
+    icon: <Layers className="w-4 h-4" />, 
+    category: 'deal' 
+  },
+  { 
+    value: 'pipeline.previousPipelineId', 
+    label: 'Previous Pipeline ID', 
+    description: 'Previous pipeline ID (if moved)', 
+    icon: <Layers className="w-4 h-4" />, 
+    category: 'deal' 
+  },
+  { 
+    value: 'pipeline.movedBetweenPipelines', 
+    label: 'Moved Between Pipelines', 
+    description: 'Whether deal moved between pipelines', 
+    icon: <ArrowRightLeft className="w-4 h-4" />, 
+    category: 'deal' 
   }
 ];
 
@@ -202,6 +240,7 @@ function VariablePicker({ value, onChange, placeholder, className }: VariablePic
       case 'message': return 'Message';
       case 'system': return 'System';
       case 'deal': return 'Deal';
+      case 'pipeline': return 'Pipeline';
       default: return category;
     }
   };
@@ -283,6 +322,9 @@ export type UpdatePipelineStageData = {
   stageName?: string;
   stageColor?: string;
 
+  pipelineId?: number | null;
+  targetPipelineId?: number | null; // For cross-pipeline moves
+
   dealIdVariable?: string;
   createDealIfNotExists?: boolean;
   dealTitle?: string;
@@ -303,6 +345,13 @@ export type UpdatePipelineStageData = {
   showAdvanced?: boolean;
   showTagManagement?: boolean;
   showDealCreation?: boolean;
+
+  enableStageRevert?: boolean;
+  revertTimeAmount?: number;
+  revertTimeUnit?: 'hours' | 'days';
+  revertToStageId?: string | null;
+  revertOnlyIfNoActivity?: boolean;
+  showStageRevert?: boolean;
 };
 
 function UpdatePipelineStageNode({
@@ -315,8 +364,37 @@ function UpdatePipelineStageNode({
   const { getNodes, setNodes } = useReactFlow();
   const [showToolbar, setShowToolbar] = useState(false);
 
-  const { data: pipelineStages, isLoading } = useQuery<PipelineStage[]>({
-    queryKey: ['/api/pipeline/stages'],
+  const { data: pipelines, isLoading: pipelinesLoading } = useQuery<Pipeline[]>({
+    queryKey: ['/api/pipelines'],
+    staleTime: 60 * 1000,
+  });
+
+
+  const effectivePipelineId = useMemo(() => {
+    if (data.pipelineId) {
+      return data.pipelineId;
+    }
+
+    if (pipelines && pipelines.length > 0) {
+      const defaultPipeline = pipelines.find((p: Pipeline) => p.isDefault) || pipelines[0];
+      return defaultPipeline?.id;
+    }
+    return null;
+  }, [data.pipelineId, pipelines]);
+
+
+  const { data: pipelineStages = [], isLoading } = useQuery<PipelineStage[]>({
+    queryKey: ['/api/pipeline/stages', effectivePipelineId],
+    queryFn: async () => {
+      if (!effectivePipelineId) {
+
+        const res = await apiRequest('GET', '/api/pipeline/stages');
+        return res.json();
+      }
+      const res = await apiRequest('GET', `/api/pipeline/stages?pipelineId=${effectivePipelineId}`);
+      return res.json();
+    },
+    enabled: effectivePipelineId !== null || (pipelines && pipelines.length > 0),
     staleTime: 60 * 1000,
   });
 
@@ -324,25 +402,6 @@ function UpdatePipelineStageNode({
     queryKey: ['/api/deals/tags'],
     staleTime: 60 * 1000,
   });
-
-  useEffect(() => {
-    if (data && (!data.operation || !data.dealIdVariable)) {
-      const updatedData = {
-        ...data,
-        operation: data.operation || 'update_stage',
-        dealIdVariable: data.dealIdVariable || "{{contact.phone}}",
-        dealPriority: data.dealPriority || 'medium',
-        errorHandling: data.errorHandling || 'continue',
-        tagsToAdd: data.tagsToAdd || [],
-        tagsToRemove: data.tagsToRemove || [],
-        enableAdvancedOptions: data.enableAdvancedOptions || false,
-        createDealIfNotExists: data.createDealIfNotExists || false,
-        createStageIfNotExists: data.createStageIfNotExists || false
-      };
-
-      updateNodeData(updatedData);
-    }
-  }, [data, id, getNodes, setNodes]);
 
   const updateNodeData = useCallback((updates: Partial<UpdatePipelineStageData>) => {
     const nodes = getNodes();
@@ -357,6 +416,30 @@ function UpdatePipelineStageNode({
     });
     setNodes(updatedNodes);
   }, [id, getNodes, setNodes]);
+
+  useEffect(() => {
+    if (data && (!data.operation || !data.dealIdVariable)) {
+      const updatedData = {
+        ...data,
+        operation: data.operation || 'update_stage',
+        dealIdVariable: data.dealIdVariable || "{{contact.phone}}",
+        dealPriority: data.dealPriority || 'medium',
+        errorHandling: data.errorHandling || 'continue',
+        tagsToAdd: data.tagsToAdd || [],
+        tagsToRemove: data.tagsToRemove || [],
+        enableAdvancedOptions: data.enableAdvancedOptions || false,
+        createDealIfNotExists: data.createDealIfNotExists || false,
+        createStageIfNotExists: data.createStageIfNotExists || false,
+        enableStageRevert: data.enableStageRevert || false,
+        revertTimeAmount: data.revertTimeAmount || 24,
+        revertTimeUnit: data.revertTimeUnit || 'hours',
+        revertToStageId: data.revertToStageId || null,
+        revertOnlyIfNoActivity: data.revertOnlyIfNoActivity || false
+      };
+
+      updateNodeData(updatedData);
+    }
+  }, [data, id, updateNodeData]);
 
   const handleDelete = useCallback(() => {
     onDeleteNode(id);
@@ -414,13 +497,29 @@ function UpdatePipelineStageNode({
     }
   }, [data.tagsToRemove, updateNodeData]);
 
+  const handleRevertTimeAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value) || 0;
+    if (value >= 1 && value <= 999) {
+      updateNodeData({ revertTimeAmount: value });
+    }
+  }, [updateNodeData]);
+
+  const handleRevertTimeUnitChange = useCallback((value: string) => {
+    updateNodeData({ revertTimeUnit: value as 'hours' | 'days' });
+  }, [updateNodeData]);
+
+  const handleRevertStageChange = useCallback((value: string) => {
+    const actualValue = value === 'none' ? null : value;
+    updateNodeData({ revertToStageId: actualValue });
+  }, [updateNodeData]);
+
   const getOperationIcon = () => {
     switch (data.operation) {
       case 'create_stage': return <Plus className="w-4 h-4" />;
       case 'create_deal': return <DollarSign className="w-4 h-4" />;
       case 'update_deal': return <Target className="w-4 h-4" />;
       case 'manage_tags': return <Tag className="w-4 h-4" />;
-      default: return <ArrowRightCircle className="w-4 h-4" />;
+      default: return <img src="https://cdn-icons-png.flaticon.com/128/10215/10215964.png" alt="Pipeline" className="w-4 h-4" />;
     }
   };
 
@@ -481,7 +580,7 @@ function UpdatePipelineStageNode({
 
         <Card className={cn(
           "min-w-[380px] max-w-[480px] transition-all duration-200",
-          selected ? 'border-primary border-2 shadow-lg' : 'border-border',
+          selected ? ' border-2 shadow-lg' : 'border-border',
           "bg-gradient-to-br from-background to-muted/20"
         )}>
           <CardHeader className="p-4 pb-2">
@@ -499,9 +598,26 @@ function UpdatePipelineStageNode({
                   </CardDescription>
                 </div>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                Pipeline
-              </Badge>
+              <div className="flex items-center gap-2">
+                {data.enableStageRevert && (!data.revertToStageId || !pipelineStages?.find(s => s.id.toString() === data.revertToStageId)) && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="destructive" className="text-xs">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          Invalid Config
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Stage revert is enabled but no target stage is selected</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                <Badge variant="secondary" className="text-xs">
+                  Pipeline
+                </Badge>
+              </div>
             </div>
           </CardHeader>
 
@@ -561,6 +677,46 @@ function UpdatePipelineStageNode({
               </Select>
             </div>
 
+            {(data.operation === 'update_stage' || data.operation === 'create_deal' || data.operation === 'update_deal') && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium flex items-center gap-1">
+                  <Layers className="w-3 h-3" />
+                  Pipeline
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Select pipeline to filter available stages. Deals can only be moved to stages within their pipeline. For cross-pipeline moves, use the "Move Deal to Pipeline" node.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <Select
+                  value={data.pipelineId?.toString() || 'default'}
+                  onValueChange={(value) => updateNodeData({ 
+                    pipelineId: value === 'default' ? null : parseInt(value),
+                    stageId: null // Reset stage when pipeline changes
+                  })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Select pipeline" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default Pipeline</SelectItem>
+                    {pipelinesLoading ? (
+                      <SelectItem value="loading" disabled>Loading pipelines...</SelectItem>
+                    ) : (
+                      pipelines?.map(pipeline => (
+                        <SelectItem key={pipeline.id} value={pipeline.id.toString()}>
+                          {pipeline.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {data.operation === 'update_stage' && (
               <div className="space-y-2">
                 <Label className="text-xs font-medium flex items-center gap-1">
@@ -578,20 +734,24 @@ function UpdatePipelineStageNode({
                     {isLoading ? (
                       <SelectItem value="loading">Loading stages...</SelectItem>
                     ) : (
-                      pipelineStages?.map((stage) => (
-                        <SelectItem
-                          key={stage.id}
-                          value={stage.id.toString()}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: stage.color }}
-                            />
-                            {stage.name}
-                          </div>
-                        </SelectItem>
-                      ))
+                      pipelineStages && pipelineStages.length > 0 ? (
+                        pipelineStages.map((stage) => (
+                          <SelectItem
+                            key={stage.id}
+                            value={stage.id.toString()}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: stage.color }}
+                              />
+                              {stage.name}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-stages" disabled>No stages available</SelectItem>
+                      )
                     )}
                   </SelectContent>
                 </Select>
@@ -624,8 +784,8 @@ function UpdatePipelineStageNode({
             {(data.operation === 'update_stage' || data.operation === 'update_deal' || data.operation === 'manage_tags') && (
               <div className="space-y-2">
                 <Label className="text-xs font-medium flex items-center gap-1">
-                  <User className="w-3 h-3" />
-                  Deal/Contact ID Variable
+                  <Phone className="w-3 h-3" />
+                  Contact Phone Variable
                 </Label>
                 <VariablePicker
                   value={data.dealIdVariable || ''}
@@ -634,7 +794,7 @@ function UpdatePipelineStageNode({
                   className="h-8"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Variable containing the deal ID or contact phone number
+                  Variable containing the contact phone number
                 </p>
               </div>
             )}
@@ -689,20 +849,24 @@ function UpdatePipelineStageNode({
                       <SelectValue placeholder="Select initial stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      {pipelineStages?.map((stage) => (
-                        <SelectItem
-                          key={stage.id}
-                          value={stage.id.toString()}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: stage.color }}
-                            />
-                            {stage.name}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {pipelineStages && pipelineStages.length > 0 ? (
+                        pipelineStages.map((stage) => (
+                          <SelectItem
+                            key={stage.id}
+                            value={stage.id.toString()}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: stage.color }}
+                              />
+                              {stage.name}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-stages" disabled>No stages available</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -788,20 +952,24 @@ function UpdatePipelineStageNode({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="keep_current">Keep current</SelectItem>
-                          {pipelineStages?.map((stage) => (
-                            <SelectItem
-                              key={stage.id}
-                              value={stage.id.toString()}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-full"
-                                  style={{ backgroundColor: stage.color }}
-                                />
-                                {stage.name}
-                              </div>
-                            </SelectItem>
-                          ))}
+                          {pipelineStages && pipelineStages.length > 0 ? (
+                            pipelineStages.map((stage) => (
+                              <SelectItem
+                                key={stage.id}
+                                value={stage.id.toString()}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: stage.color }}
+                                  />
+                                  {stage.name}
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-stages" disabled>No stages available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -996,8 +1164,166 @@ function UpdatePipelineStageNode({
                 </div>
               </CollapsibleContent>
             </Collapsible>
+
+            {(data.operation === 'update_stage' || data.operation === 'create_deal' || data.operation === 'update_deal') && (
+              <Collapsible
+                open={data.showStageRevert}
+                onOpenChange={(open) => updateNodeData({ showStageRevert: open })}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-muted-foreground">
+                    <span className="text-xs flex items-center gap-1">
+                      <RotateCcw className="w-3 h-3" />
+                      Stage Revert Settings
+                      {data.enableStageRevert && (
+                        <Badge variant="secondary" className="ml-1 text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/20">
+                          Active
+                        </Badge>
+                      )}
+                    </span>
+                    {data.showStageRevert ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 mt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-medium">Enable Stage Revert</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Automatically revert deal to a previous stage after a specified time if no action is taken</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Switch
+                      checked={data.enableStageRevert || false}
+                      onCheckedChange={handleSwitchChange('enableStageRevert')}
+                    />
+                  </div>
+
+                  {data.enableStageRevert && (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium">Time Amount</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="999"
+                            value={data.revertTimeAmount || 24}
+                            onChange={handleRevertTimeAmountChange}
+                            className={cn(
+                              "h-8",
+                              (data.revertTimeAmount || 0) < 1 || (data.revertTimeAmount || 0) > 999 ? "border-red-500" : ""
+                            )}
+                            placeholder="24"
+                          />
+                          {((data.revertTimeAmount || 0) < 1 || (data.revertTimeAmount || 0) > 999) && (
+                            <p className="text-xs text-red-500">Time amount must be between 1 and 999</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium">Time Unit</Label>
+                          <Select
+                            value={data.revertTimeUnit || 'hours'}
+                            onValueChange={handleRevertTimeUnitChange}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="hours">Hours</SelectItem>
+                              <SelectItem value="days">Days</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium flex items-center gap-1">
+                          Revert To Stage
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Select the stage to revert the deal to after the time period</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          {data.enableStageRevert && !data.revertToStageId && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
+                        </Label>
+                        <Select
+                          value={data.revertToStageId || 'none'}
+                          onValueChange={handleRevertStageChange}
+                        >
+                          <SelectTrigger className={cn(
+                            "h-8",
+                            data.enableStageRevert && !data.revertToStageId && "border-red-500"
+                          )}>
+                            <SelectValue placeholder="Select stage to revert to" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {pipelineStages && pipelineStages.length > 0 ? (
+                              pipelineStages.map((stage) => (
+                                <SelectItem
+                                  key={stage.id}
+                                  value={stage.id.toString()}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className="w-3 h-3 rounded-full"
+                                      style={{ backgroundColor: stage.color }}
+                                    />
+                                    {stage.name}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="no-stages" disabled>No stages available</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {data.enableStageRevert && !data.revertToStageId && (
+                          <p className="text-xs text-red-500">Please select a stage to revert to</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs font-medium">Only revert if no activity</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Only revert the deal if no activity occurred since the stage change</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Switch
+                          checked={data.revertOnlyIfNoActivity || false}
+                          onCheckedChange={handleSwitchChange('revertOnlyIfNoActivity')}
+                        />
+                      </div>
+                    </>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </CardContent>
         </Card>
+
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={standardHandleStyle}
+          isConnectable={isConnectable}
+        />
       </div>
     </TooltipProvider>
   );

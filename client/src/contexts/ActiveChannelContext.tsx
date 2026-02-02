@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useChannelConnections } from '@/hooks/useChannelConnections';
 import { useAuth } from '@/hooks/use-auth';
 
 interface ChannelConnection {
@@ -7,7 +7,7 @@ interface ChannelConnection {
   channelType: string;
   accountName?: string;
   accountId?: string;
-  status: 'active' | 'inactive' | 'error';
+  status: string | null;
   lastConnectedAt?: string;
   metadata?: any;
 }
@@ -34,21 +34,28 @@ export function ActiveChannelProvider({ children }: ActiveChannelProviderProps) 
   const { user } = useAuth();
 
 
-  const { data: channels = [], isLoading, error } = useQuery<ChannelConnection[]>({
-    queryKey: ['/api/channel-connections'],
-    queryFn: async () => {
-      const response = await fetch('/api/channel-connections');
-      if (!response.ok) {
-        throw new Error('Failed to fetch channel connections');
-      }
-      return response.json();
-    },
-    enabled: !!user, // Only run when user is authenticated
-    refetchInterval: 30000, // Refresh every 30 seconds
-  });
+  const { data: channels = [], isLoading, error } = useChannelConnections();
 
 
-  const availableChannels = channels.filter(channel => channel.status === 'active');
+  const normalizeStatus = (status: string | null): 'active' | 'inactive' | 'error' => {
+    if (status === null || status === 'connected' || status === 'pending') {
+      return 'active';
+    }
+    if (status === 'inactive' || status === 'error') {
+      return status;
+    }
+
+    return 'active';
+  };
+
+  const availableChannels = channels
+    .filter(channel => 
+      channel.status === 'active' || channel.status === 'connected' || channel.status === 'pending' || channel.status === null
+    )
+    .map(channel => ({
+      ...channel,
+      status: normalizeStatus(channel.status)
+    }));
   
 
   const activeChannel = availableChannels.find(channel => channel.id === activeChannelId) || null;
@@ -145,6 +152,12 @@ export function useChannelInfo() {
         return 'Messenger';
       case 'instagram':
         return 'Instagram';
+      case 'tiktok':
+        return 'TikTok Business';
+      case 'twilio_sms':
+        return 'Twilio SMS';
+      case 'twilio_voice':
+        return 'Twilio Calls';
       case 'telegram':
         return 'Telegram';
       case 'email':
@@ -167,6 +180,11 @@ export function useChannelInfo() {
         return <i className="ri-messenger-line" style={{ color: '#1877F2' }} />;
       case 'instagram':
         return <i className="ri-instagram-line" style={{ color: '#E4405F' }} />;
+      case 'tiktok':
+        return <i className="ri-tiktok-line text-black dark:text-white" />;
+      case 'twilio_sms':
+      case 'twilio_voice':
+        return <i className="ri-message-3-line text-red-500 dark:text-white" />;
       case 'telegram':
         return <i className="ri-telegram-line" style={{ color: '#0088CC' }} />;
       case 'email':
@@ -181,13 +199,13 @@ export function useChannelInfo() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400';
       case 'inactive':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
       case 'error':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 

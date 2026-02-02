@@ -146,7 +146,7 @@ class MCPClientService {
 
 
       connection.tools = tools;
-
+      
 
       return tools;
 
@@ -185,7 +185,7 @@ class MCPClientService {
         )
       ]);
 
-
+      
 
 
       if (result && typeof result === 'object' && 'content' in result) {
@@ -219,7 +219,7 @@ class MCPClientService {
     try {
       await connection.client.close();
       this.connections.delete(serverId);
-
+      
     } catch (error) {
       console.error(`[MCP] Error disconnecting from server ${serverId}:`, error);
       this.connections.delete(serverId);

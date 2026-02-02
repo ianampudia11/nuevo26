@@ -123,7 +123,7 @@ export async function authenticateApiKey(req: Request, res: Response, next: Next
 }
 
 /**
- * Check API permissions
+ * Check API permissions with hierarchical support
  */
 export function requirePermission(permission: string) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -136,14 +136,43 @@ export function requirePermission(permission: string) {
 
     const permissions = req.apiKey.permissions as string[] || [];
     
-    if (!permissions.includes(permission) && !permissions.includes('*')) {
-      return res.status(403).json({
-        error: 'INSUFFICIENT_PERMISSIONS',
-        message: `Permission '${permission}' is required for this operation`
-      });
-    }
 
-    next();
+    if (permissions.includes('*')) {
+      return next();
+    }
+    
+
+    if (permissions.includes(permission)) {
+      return next();
+    }
+    
+
+    const permissionParts = permission.split(':');
+    if (permissionParts.length >= 2) {
+      const wildcardPermission = `${permissionParts[0]}:*`;
+      if (permissions.includes(wildcardPermission)) {
+        return next();
+      }
+    }
+    
+
+    const permissionMappings: Record<string, string[]> = {
+      'messages:send:batch': ['messages:send', 'messages:*'],
+      'messages:send:template': ['messages:send', 'messages:*'],
+      'messages:send:interactive': ['messages:send', 'messages:*'],
+      'conversations:read': ['conversations:*'],
+      'contacts:read': ['contacts:*']
+    };
+    
+    const allowedAlternatives = permissionMappings[permission] || [];
+    if (allowedAlternatives.some(alt => permissions.includes(alt))) {
+      return next();
+    }
+    
+    return res.status(403).json({
+      error: 'INSUFFICIENT_PERMISSIONS',
+      message: `Permission '${permission}' is required for this operation`
+    });
   };
 }
 
@@ -191,6 +220,11 @@ export async function rateLimitMiddleware(req: Request, res: Response, next: Nex
         else if (check.window === 'hour') resetTime.setHours(resetTime.getHours() + 1);
         else if (check.window === 'day') resetTime.setDate(resetTime.getDate() + 1);
 
+
+        res.setHeader('X-RateLimit-Limit', check.limit.toString());
+        res.setHeader('X-RateLimit-Remaining', '0');
+        res.setHeader('X-RateLimit-Reset', Math.ceil(resetTime.getTime() / 1000).toString());
+        
         return res.status(429).json({
           error: 'RATE_LIMIT_EXCEEDED',
           message: `Rate limit exceeded for ${check.window}. Limit: ${check.limit} requests per ${check.window}`,
@@ -210,6 +244,16 @@ export async function rateLimitMiddleware(req: Request, res: Response, next: Nex
         requestCount: 0
       });
     }
+
+
+    const currentRateLimit = await storage.getRateLimit(req.apiKeyId, 'minute', checks[0].windowStart);
+    const remaining = currentRateLimit ? Math.max(0, checks[0].limit - currentRateLimit.requestCount) : checks[0].limit;
+    const resetTime = new Date(checks[0].windowStart);
+    resetTime.setMinutes(resetTime.getMinutes() + 1);
+    
+    res.setHeader('X-RateLimit-Limit', checks[0].limit.toString());
+    res.setHeader('X-RateLimit-Remaining', remaining.toString());
+    res.setHeader('X-RateLimit-Reset', Math.ceil(resetTime.getTime() / 1000).toString());
 
     next();
   } catch (error) {
@@ -267,8 +311,42 @@ export function logApiUsage(req: Request, res: Response, next: NextFunction) {
       console.error('Error logging API usage:', error);
     });
 
+
+    const apiKey = req.apiKey;
+    if (apiKey && apiKey.webhookUrl && 
+        (req.path.includes('/messages/send') || req.path.includes('/messages/send-media') || 
+         req.path.includes('/messages/send-batch') || req.path.includes('/messages/send-template') ||
+         req.path.includes('/messages/send-interactive'))) {
+
+      import('../services/webhook-notifier').then(webhookNotifier => {
+        webhookNotifier.default.queueNotification(
+          req.apiKeyId!,
+          apiKey.webhookUrl as string,
+          {
+            event: 'message.sent',
+            messageId: res.locals.messageId,
+            status: res.statusCode >= 200 && res.statusCode < 300 ? 'sent' : 'failed',
+            timestamp: new Date().toISOString(),
+            endpoint: req.path,
+            error: res.statusCode >= 400 ? res.statusMessage : undefined
+          }
+        ).catch(error => {
+          console.error('Error queueing webhook notification:', error);
+        });
+      }).catch(error => {
+        console.error('Error importing webhook notifier:', error);
+      });
+    }
+
     return (originalEnd as any).apply(this, args);
   };
 
   next();
+}
+
+/**
+ * Generate webhook signature using HMAC-SHA256
+ */
+export function generateWebhookSignature(payload: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }

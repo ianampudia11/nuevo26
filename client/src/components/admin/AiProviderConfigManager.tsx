@@ -50,8 +50,8 @@ interface AiProviderConfigManagerProps {
 }
 
 const AI_PROVIDERS = [
-  { value: 'openai', label: 'OpenAI', color: 'bg-green-100 text-green-800', icon: <OpenAIIcon className="w-4 h-4" /> },
-  { value: 'openrouter', label: 'OpenRouter', color: 'bg-blue-100 text-blue-800', icon: <Bot className="w-4 h-4" /> }
+  { value: 'openai', label: 'OpenAI', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300', icon: <OpenAIIcon className="w-4 h-4" /> },
+  { value: 'openrouter', label: 'OpenRouter', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300', icon: <Bot className="w-4 h-4" /> }
 ];
 
 export default function AiProviderConfigManager({ planId, planName }: AiProviderConfigManagerProps) {
@@ -208,7 +208,7 @@ export default function AiProviderConfigManager({ planId, planName }: AiProvider
   };
 
   const getProviderInfo = (provider: string) => {
-    return AI_PROVIDERS.find(p => p.value === provider) || { value: provider, label: provider, color: 'bg-gray-100 text-gray-800', icon: '🔧' };
+    return AI_PROVIDERS.find(p => p.value === provider) || { value: provider, label: provider, color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300', icon: '🔧' };
   };
 
   const getUsedProviders = () => {

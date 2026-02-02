@@ -53,8 +53,11 @@ const PERMISSION_GROUPS = {
   contacts: {
     title: 'Contact Management',
     permissions: {
-      view_contacts: 'View Contacts',
-      manage_contacts: 'Manage Contacts'
+      view_own_contacts: 'View Own Contacts',
+      view_assigned_contacts: 'View Assigned Contacts',
+      view_company_contacts: 'View Company Contacts',
+      manage_contacts: 'Manage Contacts',
+      view_contact_phone: 'View Contact Phone'
     }
   },
   campaigns: {
@@ -137,6 +140,15 @@ const PERMISSION_GROUPS = {
       view_pages: 'View Pages',
       manage_pages: 'Manage Pages'
     }
+  },
+  call_logs: {
+    title: 'Call Logs Management',
+    permissions: {
+      view_call_logs: 'View Call Logs',
+      manage_call_logs: 'Manage Call Logs',
+      export_call_logs: 'Export Call Logs',
+      delete_call_logs: 'Delete Call Logs'
+    }
   }
 };
 
@@ -162,8 +174,11 @@ export function RolesAndPermissions() {
     contacts: {
       title: t('roles.contact_management', 'Contact Management'),
       permissions: {
-        view_contacts: t('roles.view_contacts', 'View Contacts'),
-        manage_contacts: t('roles.manage_contacts', 'Manage Contacts')
+        view_own_contacts: t('roles.view_own_contacts', 'View Own Contacts'),
+        view_assigned_contacts: t('roles.view_assigned_contacts', 'View Assigned Contacts'),
+        view_company_contacts: t('roles.view_company_contacts', 'View Company Contacts'),
+        manage_contacts: t('roles.manage_contacts', 'Manage Contacts'),
+        view_contact_phone: t('roles.view_contact_phone', 'View Contact Phone')
       }
     },
     campaigns: {
@@ -245,6 +260,15 @@ export function RolesAndPermissions() {
       permissions: {
         view_pages: t('roles.view_pages', 'View Pages'),
         manage_pages: t('roles.manage_pages', 'Manage Pages')
+      }
+    },
+    call_logs: {
+      title: t('roles.call_logs_management', 'Call Logs Management'),
+      permissions: {
+        view_call_logs: t('roles.view_call_logs', 'View Call Logs'),
+        manage_call_logs: t('roles.manage_call_logs', 'Manage Call Logs'),
+        export_call_logs: t('roles.export_call_logs', 'Export Call Logs'),
+        delete_call_logs: t('roles.delete_call_logs', 'Delete Call Logs')
       }
     }
   });
@@ -332,7 +356,7 @@ export function RolesAndPermissions() {
             <div className="flex justify-between items-start">
               <div>
                 <CardTitle className="text-lg">{t('roles.administrator', 'Administrator')}</CardTitle>
-                <p className="text-sm text-gray-500">{t('roles.administrator_desc', 'Full access to all features and settings')}</p>
+                <p className="text-sm text-muted-foreground">{t('roles.administrator_desc', 'Full access to all features and settings')}</p>
               </div>
               <Button variant="outline" onClick={() => handleEditRole('admin')}>
                 {t('roles.edit_permissions', 'Edit Permissions')}
@@ -350,14 +374,14 @@ export function RolesAndPermissions() {
                 return (
                   <div
                     key={`admin-${groupKey}`}
-                    className={`flex items-center p-3 rounded-md border ${hasAnyPermission ? 'bg-green-50' : 'bg-red-50'}`}
+                    className={`flex items-center p-3 rounded-md border ${hasAnyPermission ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}
                   >
                     {hasAnyPermission ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mr-2" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
                     )}
-                    <span className={`text-sm ${hasAnyPermission ? 'text-green-800' : 'text-red-800'}`}>
+                    <span className={`text-sm ${hasAnyPermission ? 'text-green-800 dark:text-green-400' : 'text-red-800 dark:text-red-400'}`}>
                       {group.title}
                     </span>
                   </div>
@@ -373,7 +397,7 @@ export function RolesAndPermissions() {
             <div className="flex justify-between items-start">
               <div>
                 <CardTitle className="text-lg">{t('roles.agent', 'Agent')}</CardTitle>
-                <p className="text-sm text-gray-500">{t('roles.agent_desc', 'Limited access to core features')}</p>
+                <p className="text-sm text-muted-foreground">{t('roles.agent_desc', 'Limited access to core features')}</p>
               </div>
               <Button variant="outline" onClick={() => handleEditRole('agent')}>
                 {t('roles.edit_permissions', 'Edit Permissions')}
@@ -391,14 +415,14 @@ export function RolesAndPermissions() {
                 return (
                   <div
                     key={`agent-${groupKey}`}
-                    className={`flex items-center p-3 rounded-md border ${hasAnyPermission ? 'bg-green-50' : 'bg-red-50'}`}
+                    className={`flex items-center p-3 rounded-md border ${hasAnyPermission ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}
                   >
                     {hasAnyPermission ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mr-2" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
                     )}
-                    <span className={`text-sm ${hasAnyPermission ? 'text-green-800' : 'text-red-800'}`}>
+                    <span className={`text-sm ${hasAnyPermission ? 'text-green-800 dark:text-green-400' : 'text-red-800 dark:text-red-400'}`}>
                       {group.title}
                     </span>
                   </div>
@@ -410,7 +434,7 @@ export function RolesAndPermissions() {
       </div>
 
       <Dialog open={showEditRoleModal} onOpenChange={setShowEditRoleModal}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[900px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {currentRole === 'admin'
@@ -428,20 +452,22 @@ export function RolesAndPermissions() {
 
           <div className="py-4">
             <Tabs defaultValue={Object.keys(getPermissionGroups())[0]} className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                {Object.entries(getPermissionGroups()).slice(0, 5).map(([groupKey, group]) => (
-                  <TabsTrigger key={groupKey} value={groupKey} className="text-xs">
-                    {group.title.split(' ')[0]}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              <TabsList className="grid w-full grid-cols-4 mt-2">
-                {Object.entries(getPermissionGroups()).slice(5).map(([groupKey, group]) => (
-                  <TabsTrigger key={groupKey} value={groupKey} className="text-xs">
-                    {group.title.split(' ')[0]}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              <div className="space-y-2">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 h-auto">
+                  {Object.entries(getPermissionGroups()).slice(0, 5).map(([groupKey, group]) => (
+                    <TabsTrigger key={groupKey} value={groupKey} className="text-xs sm:text-sm px-2 sm:px-3 py-2 whitespace-nowrap">
+                      {group.title.split(' ')[0]}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1 h-auto">
+                  {Object.entries(getPermissionGroups()).slice(5).map(([groupKey, group]) => (
+                    <TabsTrigger key={groupKey} value={groupKey} className="text-xs sm:text-sm px-2 sm:px-3 py-2 whitespace-nowrap">
+                      {group.title.split(' ')[0]}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
 
               {Object.entries(getPermissionGroups()).map(([groupKey, group]) => (
                 <TabsContent key={groupKey} value={groupKey} className="space-y-4">

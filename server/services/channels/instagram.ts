@@ -1,4 +1,5 @@
 import { storage } from '../../storage';
+import { getCachedCompanySetting, getCachedInitialPipelineStage } from '../../utils/pipeline-cache';
 import {
   InsertMessage,
   InsertConversation,
@@ -7,6 +8,8 @@ import {
 import { EventEmitter } from 'events';
 import axios, { AxiosError } from 'axios';
 import crypto from 'crypto';
+import fsExtra from 'fs-extra';
+import path from 'path';
 import { logger } from '../../utils/logger';
 
 
@@ -677,7 +680,7 @@ export function getConnectionHealth(connectionId: number): {
   };
 }
 
-const INSTAGRAM_API_VERSION = 'v22.0';
+const INSTAGRAM_API_VERSION = 'v24.0';
 const INSTAGRAM_GRAPH_URL = 'https://graph.facebook.com';
 
 
@@ -1069,6 +1072,59 @@ export async function uploadInstagramMedia(
   }
 }
 
+export async function downloadInstagramMedia(
+  mediaUrl: string,
+  accessToken: string,
+  mediaType: string,
+  messageId: number
+): Promise<string | null> {
+  try {
+
+    const response = await axios.get(mediaUrl, {
+      responseType: 'arraybuffer',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      },
+      timeout: 30000
+    });
+
+    if (response.status !== 200) {
+      logger.error('instagram', `Failed to download media: HTTP ${response.status}`);
+      return null;
+    }
+
+
+    const contentType = response.headers['content-type'] || '';
+    let extension = '.jpg';
+    if (contentType.includes('png')) extension = '.png';
+    else if (contentType.includes('gif')) extension = '.gif';
+    else if (contentType.includes('webp')) extension = '.webp';
+    else if (contentType.includes('mp4')) extension = '.mp4';
+    else if (contentType.includes('mpeg')) extension = '.mp3';
+    else if (contentType.includes('ogg')) extension = '.ogg';
+    else if (mediaType === 'video') extension = '.mp4';
+    else if (mediaType === 'audio') extension = '.mp3';
+
+
+    const uploadDir = path.join(process.cwd(), 'uploads', 'instagram');
+    await fsExtra.ensureDir(uploadDir);
+
+
+    const uniqueId = crypto.randomBytes(16).toString('hex');
+    const filename = `${messageId}_${uniqueId}${extension}`;
+    const filePath = path.join(uploadDir, filename);
+
+
+    await fsExtra.writeFile(filePath, response.data);
+
+    logger.info('instagram', `Media downloaded successfully: ${filename}`);
+    return `/uploads/instagram/${filename}`;
+  } catch (error: any) {
+    logger.error('instagram', `Error downloading Instagram media: ${error.message}`);
+    return null;
+  }
+}
+
 export async function sendInstagramMediaMessage(
   connectionId: number,
   to: string,
@@ -1308,7 +1364,7 @@ export async function processWebhook(body: InstagramWebhookBody, signature?: str
         });
         
 
-        if (entry.changes && Array.isArray(entry.changes)) {
+        if (entry.changes && Array.isArray(entry.changes) && entry.changes.length > 0) {
 
           
           for (const change of entry.changes) {
@@ -1335,8 +1391,7 @@ export async function processWebhook(body: InstagramWebhookBody, signature?: str
 
           
           for (const messagingEvent of entry.messaging) {
-            
-            
+
             await handleIncomingInstagramMessage(messagingEvent, entry.id, companyId);
           }
         } else if (entry.messaging) {
@@ -1365,9 +1420,9 @@ export async function processWebhook(body: InstagramWebhookBody, signature?: str
 
 function captionForAttachment(attachment: InstagramWebhookMessageAttachment): string {
     if (attachment.type === 'story_mention') return '[Mentioned you in a story]';
-    if (attachment.type === 'image') return '[Image]';
-    if (attachment.type === 'video') return '[Video]';
-    if (attachment.type === 'audio') return '[Audio Message]';
+    if (attachment.type === 'image') return '';
+    if (attachment.type === 'video') return '';
+    if (attachment.type === 'audio') return '';
     if (attachment.type === 'share' && attachment.title) return `[Shared Post: ${attachment.title}]`;
     if (attachment.type === 'fallback') return '[Unsupported Attachment]';
     return `[${attachment.type.toUpperCase()}]`;
@@ -1444,11 +1499,19 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
 
   try {
 
-    
+    console.log('🔍 [INSTAGRAM HANDLER] Received event:', {
+      hasSender: !!messagingEvent.sender,
+      hasRecipient: !!messagingEvent.recipient,
+      hasMessage: !!messagingEvent.message,
+      hasPostback: !!messagingEvent.postback,
+      hasReaction: !!messagingEvent.reaction,
+      timestamp: messagingEvent.timestamp,
+      eventKeys: Object.keys(messagingEvent),
+      fullEvent: JSON.stringify(messagingEvent, null, 2)
+    });
     
     logger.debug('instagram', 'Processing incoming Instagram message event');
 
-    const senderIgSid = messagingEvent.sender?.id;
     const message = messagingEvent.message;
 
     if (messagingEvent.reaction) {
@@ -1457,20 +1520,27 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
         return;
     }
 
-    if (!senderIgSid || !message || !message.mid) {
+    if (!message || !message.mid) {
       console.warn('⚠️ [INSTAGRAM HANDLER] Missing required message data:', {
-        hasSender: !!senderIgSid,
         hasMessage: !!message,
         hasMessageId: !!message?.mid
       });
       logger.warn('instagram', 'Missing required message data in event');
       return;
     }
-    
-    if (message.is_echo) {
 
-        logger.debug('instagram', 'Skipping echo message');
-        return;
+
+    const isEcho = !!message.is_echo;
+    const counterpartyId = isEcho ? messagingEvent.recipient?.id : messagingEvent.sender?.id;
+
+    if (!counterpartyId) {
+      console.warn('⚠️ [INSTAGRAM HANDLER] Missing counterparty ID:', {
+        isEcho,
+        hasSender: !!messagingEvent.sender?.id,
+        hasRecipient: !!messagingEvent.recipient?.id
+      });
+      logger.warn('instagram', 'Missing counterparty ID in event');
+      return;
     }
 
 
@@ -1530,21 +1600,53 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
     }
 
 
-    let contact = await storage.getContactByPhone(senderIgSid, connection.companyId) as Contact | null;
+    let contact = await storage.getContactByPhone(counterpartyId, connection.companyId) as Contact | null;
     
     if (!contact) {
 
       const insertContactData: InsertContact = {
         companyId: connection.companyId,
-        phone: senderIgSid,
-        name: `Instagram User ${senderIgSid.substring(0, 6)}...`,
+        phone: counterpartyId,
+        name: `Instagram User ${counterpartyId.substring(0, 6)}...`,
         source: 'instagram',
-        identifier: senderIgSid,
+        identifier: counterpartyId,
         identifierType: 'instagram'
       };
       contact = await storage.getOrCreateContact(insertContactData);
       
-      logger.info('instagram', `Created new contact for Instagram user ${senderIgSid}`);
+      logger.info('instagram', `Created new contact for Instagram user ${counterpartyId}`);
+
+
+      try {
+        const autoAddEnabled = await getCachedCompanySetting(connection.companyId, 'autoAddContactToPipeline');
+        if (autoAddEnabled) {
+
+          const initialStage = await getCachedInitialPipelineStage(connection.companyId);
+          if (initialStage) {
+
+            const existingDeal = await storage.getActiveDealByContact(contact.id, connection.companyId, initialStage.pipelineId);
+            if (!existingDeal) {
+              const deal = await storage.createDeal({
+                companyId: connection.companyId,
+                contactId: contact.id,
+                title: `New Lead - ${contact.name}`,
+                pipelineId: initialStage.pipelineId,
+                stageId: initialStage.id,
+                stage: 'lead'
+              });
+              await storage.createDealActivity({
+                dealId: deal.id,
+                userId: connection.userId,
+                type: 'create',
+                content: 'Deal automatically created when contact was added'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-adding contact to pipeline:', error);
+
+      }
     } else {
       
     }
@@ -1563,10 +1665,10 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
 
         if (typeof timestampValue === 'string' && !isNaN(Number(timestampValue))) {
 
-          messageTimestamp = new Date(Number(timestampValue) * 1000);
+          messageTimestamp = new Date(Number(timestampValue));
         } else if (typeof timestampValue === 'number') {
 
-          messageTimestamp = new Date(timestampValue * 1000);
+          messageTimestamp = new Date(timestampValue);
         } else {
 
           messageTimestamp = new Date(timestampValue);
@@ -1628,9 +1730,35 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
     } else if (message.attachments && message.attachments.length > 0) {
       const attachment = message.attachments[0];
       messageType = attachment.type || 'media';
-      mediaUrl = attachment.payload?.url || attachment.url || null;
+      const cdnUrl = attachment.payload?.url || attachment.url || null;
       messageText = captionForAttachment(attachment);
       
+
+      if (cdnUrl && cdnUrl.includes('lookaside.fbsbx.com')) {
+        try {
+
+          const tempMessageId = Date.now();
+          const localUrl = await downloadInstagramMedia(
+            cdnUrl,
+            connection.accessToken || '',
+            messageType,
+            tempMessageId
+          );
+          
+          if (localUrl) {
+            mediaUrl = localUrl;
+            logger.info('instagram', `Media downloaded proactively: ${localUrl}`);
+          } else {
+            mediaUrl = cdnUrl; // Fallback to CDN URL
+            logger.warn('instagram', 'Proactive download failed, using CDN URL');
+          }
+        } catch (error) {
+          logger.error('instagram', 'Error downloading media:', error);
+          mediaUrl = cdnUrl; // Fallback to CDN URL
+        }
+      } else {
+        mediaUrl = cdnUrl;
+      }
     } else {
       messageText = '[Unsupported or Empty Message Content]';
 
@@ -1640,15 +1768,15 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
       conversationId: conversation.id,
       content: messageText,
       type: messageType,
-      direction: 'inbound',
-      status: 'delivered',
+      direction: isEcho ? 'outbound' : 'inbound',
+      status: isEcho ? 'sent' : 'delivered',
       externalId: message.mid,
       mediaUrl: mediaUrl,
       metadata: {
         channelType: 'instagram',
         timestamp: messageTimestamp.getTime(),
-        senderId: senderIgSid,
-        recipientId: recipientIgAccountId
+        senderId: messagingEvent.sender?.id,
+        recipientId: messagingEvent.recipient?.id
       }
     };
 
@@ -1656,8 +1784,9 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
       conversationId: conversation.id,
       content: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
       type: messageType,
-      direction: 'inbound',
-      externalId: message.mid
+      direction: isEcho ? 'outbound' : 'inbound',
+      externalId: message.mid,
+      isEcho
     });
 
     const savedMessage = await storage.createMessage(insertMessageData);
@@ -1690,7 +1819,7 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
       status: 'open'
     });
 
-    logger.info('instagram', `Message received from ${senderIgSid} via connection ${connection.id}`);
+    logger.info('instagram', `${isEcho ? 'Echo message' : 'Message received'} from ${counterpartyId} via connection ${connection.id}`);
 
     const eventPayload: MessageReceivedPayload = {
       message: savedMessage,
@@ -1714,15 +1843,20 @@ async function handleIncomingInstagramMessage(messagingEvent: InstagramWebhookMe
     }
 
 
-    try {
-      if (connection.companyId && !conversation.botDisabled) {
-        logger.debug('instagram', `Message eligible for flow processing: conversation ${conversation.id}`);
+
+    if (!isEcho) {
+      try {
+        if (connection.companyId && !conversation.botDisabled) {
+          logger.debug('instagram', `Message eligible for flow processing: conversation ${conversation.id}`);
 
 
-        await processMessageThroughFlowExecutor(savedMessage, updatedConversationDataForEvent, contact, connection);
+          await processMessageThroughFlowExecutor(savedMessage, updatedConversationDataForEvent, contact, connection);
+        }
+      } catch (flowError: any) {
+        logger.error('instagram', `Error processing message through flows:`, flowError.message);
       }
-    } catch (flowError: any) {
-      logger.error('instagram', `Error processing message through flows:`, flowError.message);
+    } else {
+      logger.debug('instagram', 'Skipping flow execution for echo message (outbound)');
     }
 
   } catch (error: unknown) {
@@ -1977,7 +2111,7 @@ export async function setupWebhookSubscription(
     const facebookAppId = (connection.connectionData as InstagramConnectionData)?.appId;
 
     if (!pageAccessToken) {
-      throw new Error('Page Access Token is missing for webhook setup.');
+      throw new Error('Access Token is missing for webhook setup.');
     }
     if (!facebookAppId) {
       throw new Error('Facebook App ID is missing from connectionData for webhook setup.');

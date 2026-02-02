@@ -25,7 +25,7 @@ export class SubscriptionWebhookHandler {
 
   constructor(config: WebhookConfig) {
     this.stripe = new Stripe(config.stripeSecretKey, {
-      apiVersion: '2025-08-27.basil'
+      apiVersion: '2025-09-30.clover' as any
     });
     this.webhookSecret = config.webhookSecret;
   }

@@ -167,7 +167,7 @@ export default function EmailViewer({
   return (
     <div className="flex flex-col h-full">
       {/* Email Header */}
-      <div className="border-b border-gray-200 bg-white">
+      <div className="border-b border-border bg-background">
         <div className="p-6">
           {/* Action Buttons */}
           <div className="flex items-center justify-between mb-4">

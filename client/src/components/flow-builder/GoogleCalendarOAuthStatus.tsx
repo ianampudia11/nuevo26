@@ -64,9 +64,7 @@ export function GoogleCalendarOAuthStatus({ onAuthSuccess, onDisconnect, classNa
       <div className={className}>
         <Alert className="bg-green-50 border-green-200">
           <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <AlertTitle className="text-green-700">Connected</AlertTitle>
           <AlertDescription className="text-green-600 space-y-3">
-            <p>Your Google Calendar is connected and ready to use.</p>
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={handleConnectClick}

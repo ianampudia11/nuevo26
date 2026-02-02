@@ -10,7 +10,6 @@ import {
   Loader2,
   Play,
   Trash2,
-  Workflow,
   X,
   HelpCircle,
   Copy,
@@ -84,7 +83,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
       description: t('flow_builder.n8n_description', 'Execute n8n chat AI workflow with multimedia support'),
       tooltip: t('flow_builder.n8n_tooltip', 'Execute an n8n workflow with AI chat capabilities. Supports text, images, videos, audio, and documents. Perfect for AI agents, chatbots, and conversational workflows.'),
       icon: '🤖',
-      color: 'text-green-600'
+      color: 'text-primary'
     }
   ];
   const [instanceUrl, setInstanceUrl] = useState(data.instanceUrl || '');
@@ -144,7 +143,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
 
   const getOperationColor = (op: string) => {
     const operationData = N8N_OPERATIONS.find(operation => operation.id === op);
-    return operationData?.color || 'text-gray-600';
+    return operationData?.color || 'text-muted-foreground';
   };
 
   const copyToClipboard = async (text: string, fieldName: string) => {
@@ -411,7 +410,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
 
 
   return (
-    <div className="node-n8n p-3 rounded-lg bg-white border border-orange-200 shadow-sm min-w-[380px] max-w-[480px] group">
+    <div className="node-n8n p-3 rounded-lg bg-card border border-border shadow-sm min-w-[380px] max-w-[480px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -436,14 +435,18 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
         type="target"
         position={Position.Left}
         isConnectable={isConnectable}
-        className="w-3 h-3 bg-orange-400 border-2 border-white"
+        className="w-3 h-3 bg-primary border-2 border-background"
       />
 
       <div className="font-medium flex items-center gap-2 mb-2">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Workflow className="h-4 w-4 text-orange-600" />
+              <img 
+                src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.75.0/files/dark/n8n-color.png" 
+                alt="n8n" 
+                className="h-4 w-4"
+              />
             </TooltipTrigger>
             <TooltipContent side="top">
               <p className="text-xs">{t('flow_builder.n8n_workflow_integration', 'n8n Workflow Automation Integration')}</p>
@@ -460,7 +463,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                 variant={configurationProgress >= 70 ? "default" : "secondary"}
                 className={cn(
                   "text-[10px] px-1.5 py-0.5",
-                  configurationProgress >= 70 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                  configurationProgress >= 70 ? "bg-primary/10 text-primary border border-primary/20" : "bg-secondary/10 text-secondary border border-secondary/20"
                 )}
               >
                 {configurationProgress}% configured
@@ -493,7 +496,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
         </TooltipProvider>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <TooltipProvider>
             <Tooltip>
@@ -519,9 +522,9 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1">
                   {workflowName || webhookUrl ? (
-                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <CheckCircle className="h-3 w-3 text-primary" />
                   ) : (
-                    <AlertCircle className="h-3 w-3 text-yellow-600" />
+                    <AlertCircle className="h-3 w-3 text-secondary" />
                   )}
                   <span className="text-xs text-muted-foreground truncate">
                     {workflowName || webhookUrl ? t('flow_builder.n8n_configured', 'Configured') : t('flow_builder.n8n_not_configured', 'Not configured')}
@@ -545,7 +548,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="text-[10px] bg-orange-100 text-orange-800 px-1 py-0.5 rounded cursor-help">
+                  <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded cursor-help">
                     {t('flow_builder.n8n_workflow_label', 'Workflow:')} {workflowName.length > 12 ? workflowName.slice(0, 12) + '...' : workflowName}
                   </Badge>
                 </TooltipTrigger>
@@ -560,7 +563,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded cursor-help">
+                  <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded cursor-help">
                     Webhook Connected
                   </Badge>
                 </TooltipTrigger>
@@ -579,7 +582,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className="text-[10px] bg-gray-100 text-gray-800 px-1 py-0.5 rounded cursor-help">
+                <Badge className="text-[10px] bg-muted text-muted-foreground border border-border px-1 py-0.5 rounded cursor-help">
                   Timeout: {timeout}s
                 </Badge>
               </TooltipTrigger>
@@ -594,7 +597,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="text-[10px] bg-green-100 text-green-800 px-1 py-0.5 rounded cursor-help">
+                  <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded cursor-help">
                     📎 {t('flow_builder.n8n_media_configuration', 'Media Support')}
                   </Badge>
                 </TooltipTrigger>
@@ -614,12 +617,12 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
       </div>
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border rounded p-2 ">
           {/* Removed Quick Templates section - not needed for simplified chat AI workflows */}
 
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center gap-2 mb-2">
-              <Settings className="h-3.5 w-3.5 text-orange-600" />
+              <Settings className="h-3.5 w-3.5 text-primary" />
               <Label className="font-medium">{t('flow_builder.n8n_api_configuration', 'n8n API Configuration')}</Label>
               <TooltipProvider>
                 <Tooltip>
@@ -663,8 +666,8 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                   }}
                   className={cn(
                     "text-xs h-7 pr-8",
-                    fieldValidation.instanceUrl?.isValid === false ? "border-red-500" :
-                    fieldValidation.instanceUrl?.isValid === true ? "border-green-500" : ""
+                    fieldValidation.instanceUrl?.isValid === false ? "border-destructive" :
+                    fieldValidation.instanceUrl?.isValid === true ? "border-primary" : ""
                   )}
                 />
                 {instanceUrl && (
@@ -678,7 +681,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                           onClick={() => copyToClipboard(instanceUrl, 'instanceUrl')}
                         >
                           {copiedField === 'instanceUrl' ? (
-                            <CheckCircle className="h-3 w-3 text-green-600" />
+                            <CheckCircle className="h-3 w-3 text-primary" />
                           ) : (
                             <Copy className="h-3 w-3 text-muted-foreground" />
                           )}
@@ -694,7 +697,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                 )}
               </div>
               {fieldValidation.instanceUrl?.message && (
-                <p className="text-[10px] text-red-600 mt-1">{fieldValidation.instanceUrl.message}</p>
+                <p className="text-[10px] text-destructive mt-1">{fieldValidation.instanceUrl.message}</p>
               )}
             </div>
 
@@ -714,7 +717,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                       <p className="text-xs text-muted-foreground">{t('flow_builder.n8n_api_key_step1', '1. Go to n8n Settings → API')}</p>
                       <p className="text-xs text-muted-foreground">{t('flow_builder.n8n_api_key_step2', '2. Create a new API key')}</p>
                       <p className="text-xs text-muted-foreground">{t('flow_builder.n8n_api_key_step3', '3. Copy and paste it here')}</p>
-                      <p className="text-xs text-yellow-600">{t('flow_builder.n8n_api_key_required_private', 'Required for private instances')}</p>
+                      <p className="text-xs text-secondary">{t('flow_builder.n8n_api_key_required_private', 'Required for private instances')}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -757,13 +760,13 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                 }}
                 className={cn(
                   "text-xs h-7",
-                  selectedWorkflowIndex !== null ? "border-orange-500 bg-orange-50" :
-                  fieldValidation.workflowName?.isValid === false ? "border-red-500" :
-                  fieldValidation.workflowName?.isValid === true ? "border-green-500" : ""
+                  selectedWorkflowIndex !== null ? "border-primary bg-primary/10" :
+                  fieldValidation.workflowName?.isValid === false ? "border-destructive" :
+                  fieldValidation.workflowName?.isValid === true ? "border-primary" : ""
                 )}
               />
               {fieldValidation.workflowName?.message && (
-                <p className="text-[10px] text-red-600 mt-1">{fieldValidation.workflowName.message}</p>
+                <p className="text-[10px] text-destructive mt-1">{fieldValidation.workflowName.message}</p>
               )}
             </div>
 
@@ -781,7 +784,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                       <p className="text-xs font-medium">{t('flow_builder.n8n_webhook_help_title', 'Direct URL to your n8n chat trigger webhook')}</p>
                       <p className="text-xs text-muted-foreground">{t('flow_builder.n8n_webhook_help_use', 'Use this if automatic webhook detection fails')}</p>
                       <p className="text-xs text-muted-foreground">{t('flow_builder.n8n_webhook_help_example', 'Example: https://n8n.com/webhook/your-webhook-id/chat')}</p>
-                      <p className="text-xs text-green-600">{t('flow_builder.n8n_webhook_help_priority', 'Takes priority over automatic detection')}</p>
+                      <p className="text-xs text-primary">{t('flow_builder.n8n_webhook_help_priority', 'Takes priority over automatic detection')}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -793,7 +796,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                 className="text-xs h-7"
               />
               {chatWebhookUrl && (
-                <p className="text-[10px] text-green-600 mt-1">{t('flow_builder.n8n_webhook_direct_url', '✓ Direct webhook URL will be used')}</p>
+                <p className="text-[10px] text-primary mt-1">{t('flow_builder.n8n_webhook_direct_url', '✓ Direct webhook URL will be used')}</p>
               )}
             </div>
 
@@ -826,12 +829,12 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                 fallbackValue={30}
                 className={cn(
                   "text-xs h-7",
-                  fieldValidation.timeout?.isValid === false ? "border-red-500" :
-                  fieldValidation.timeout?.isValid === true ? "border-green-500" : ""
+                  fieldValidation.timeout?.isValid === false ? "border-destructive" :
+                  fieldValidation.timeout?.isValid === true ? "border-primary" : ""
                 )}
               />
               {fieldValidation.timeout?.message && (
-                <p className="text-[10px] text-red-600 mt-1">{fieldValidation.timeout.message}</p>
+                <p className="text-[10px] text-destructive mt-1">{fieldValidation.timeout.message}</p>
               )}
             </div>
 
@@ -915,7 +918,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
             </div>
 
             {/* Media Configuration Section */}
-            <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="mt-3 pt-3 border-t border-border">
               <div className="flex items-center gap-2 mb-2">
                 <Button
                   variant="ghost"
@@ -941,11 +944,11 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                         {t('flow_builder.n8n_multimedia_support_help_description', 'Configure how your n8n workflow handles images, videos, audio, and documents from WhatsApp users.')}
                       </p>
                       <div className="text-xs space-y-1">
-                        <p className="font-medium text-blue-600">{t('flow_builder.n8n_input_support_title', '📥 Input Support:')}</p>
+                        <p className="font-medium text-primary">{t('flow_builder.n8n_input_support_title', '📥 Input Support:')}</p>
                         <p>{t('flow_builder.n8n_input_support_receive', '• Receive media files with URLs and metadata')}</p>
                         <p>{t('flow_builder.n8n_input_support_validation', '• File type validation and size limits')}</p>
                         <p>{t('flow_builder.n8n_input_support_enhanced', '• Enhanced message payload with media info')}</p>
-                        <p className="font-medium text-green-600 mt-2">{t('flow_builder.n8n_output_support_title', '📤 Output Support:')}</p>
+                        <p className="font-medium text-primary mt-2">{t('flow_builder.n8n_output_support_title', '📤 Output Support:')}</p>
                         <p>{t('flow_builder.n8n_output_support_return', '• Return media URLs in n8n response')}</p>
                         <p>{t('flow_builder.n8n_output_support_multiple', '• Support for multiple media attachments')}</p>
                         <p>{t('flow_builder.n8n_output_support_delivery', '• Automatic WhatsApp media delivery')}</p>
@@ -956,7 +959,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
               </div>
 
               {showMediaConfig && (
-                <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="space-y-3 p-3 bg-primary/10 border border-primary/20 rounded">
                   {/* Enable Media Support Toggle */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1000,7 +1003,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                                 }}
                                 className="h-3 w-3"
                               />
-                              <mediaType.icon className="h-3 w-3 text-blue-600" />
+                              <mediaType.icon className="h-3 w-3 text-primary" />
                               <span className="text-xs">{mediaType.name}</span>
                             </div>
                           ))}
@@ -1071,12 +1074,12 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
 
                   {/* Media Support Examples */}
                   {enableMediaSupport && (
-                    <div className="mt-3 p-2 bg-blue-100 border border-blue-300 rounded text-xs">
-                      <div className="font-medium text-blue-800 mb-2">{t('flow_builder.n8n_integration_examples', '📋 Integration Examples')}</div>
-                      <div className="space-y-2 text-blue-700">
+                    <div className="mt-3 p-2 bg-primary/10 border border-primary/20 rounded text-xs">
+                      <div className="font-medium text-primary mb-2">{t('flow_builder.n8n_integration_examples', '📋 Integration Examples')}</div>
+                      <div className="space-y-2 text-primary">
                         <div>
                           <div className="font-medium">{t('flow_builder.n8n_input_payload_structure', 'Input Payload Structure:')}</div>
-                          <code className="text-xs bg-white p-1 rounded block mt-1">
+                          <code className="text-xs bg-card p-1 rounded block mt-1">
                             {`{
   "chatInput": "User message",
   "messageType": "image",
@@ -1091,7 +1094,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                         </div>
                         <div>
                           <div className="font-medium">{t('flow_builder.n8n_response_format', 'Response Format:')}</div>
-                          <code className="text-xs bg-white p-1 rounded block mt-1">
+                          <code className="text-xs bg-card p-1 rounded block mt-1">
                             {`{
   "text": "AI response text",
   "media": [{
@@ -1111,9 +1114,9 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
 
             {/* Workflow Selector */}
             {showWorkflowSelector && (
-              <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded">
+              <div className="mt-2 p-3 bg-muted border border-border rounded">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xs font-medium text-gray-700">{t('flow_builder.n8n_select_workflow', 'Select Workflow')}</h4>
+                  <h4 className="text-xs font-medium text-foreground">{t('flow_builder.n8n_select_workflow', 'Select Workflow')}</h4>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1131,28 +1134,32 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                         className={cn(
                           "p-2 rounded cursor-pointer border transition-colors text-xs",
                           selectedWorkflowIndex === index
-                            ? "bg-orange-100 border-orange-300"
-                            : "bg-white border-gray-200 hover:bg-gray-50"
+                            ? "bg-primary/10 border-primary/20"
+                            : "bg-card border-border hover:bg-muted"
                         )}
                         onClick={() => selectWorkflow(workflow, index)}
                       >
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-foreground">
                           {t('flow_builder.n8n_workflow_id_name', 'ID: {{id}} - Name: {{name}}', { id: workflow.id, name: workflow.name })}
                         </div>
-                        <div className="text-gray-500 mt-1">
+                        <div className="text-muted-foreground mt-1">
                           {t('flow_builder.n8n_workflow_active', 'Active: {{status}}', { status: workflow.active ? t('flow_builder.n8n_yes', 'Yes') : t('flow_builder.n8n_no', 'No') })}
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="p-4 text-center text-gray-500 text-xs">
-                      <Workflow className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                    <div className="p-4 text-center text-muted-foreground text-xs">
+                      <img 
+                        src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.75.0/files/dark/n8n-color.png" 
+                        alt="n8n" 
+                        className="h-8 w-8 mx-auto mb-2 opacity-50"
+                      />
                       <p>{t('flow_builder.n8n_no_workflows_found_title', 'No workflows found')}</p>
-                      <p className="text-gray-400 mt-1">{t('flow_builder.n8n_create_workflows_first', 'Create workflows in your n8n instance first')}</p>
+                      <p className="text-muted-foreground opacity-50 mt-1">{t('flow_builder.n8n_create_workflows_first', 'Create workflows in your n8n instance first')}</p>
                     </div>
                   )}
                 </div>
-                <div className="mt-2 text-xs text-gray-500">
+                <div className="mt-2 text-xs text-muted-foreground">
                   {workflowsList.length > 0
                     ? t('flow_builder.n8n_click_workflow_select', 'Click on a workflow to select it and populate the Workflow ID/Name field.')
                     : t('flow_builder.n8n_ensure_instance_running', 'Make sure your n8n instance is running and contains workflows.')
@@ -1165,15 +1172,15 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
             {showTestResult && testResult && (
               <div className={cn(
                 "p-2 rounded text-xs",
-                testResult.success ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
+                testResult.success ? "bg-primary/10 border border-primary/20" : "bg-destructive/10 border border-destructive/20"
               )}>
                 <div className="flex items-center gap-1 mb-1">
                   {testResult.success ? (
-                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <CheckCircle className="h-3 w-3 text-primary" />
                   ) : (
-                    <AlertCircle className="h-3 w-3 text-red-600" />
+                    <AlertCircle className="h-3 w-3 text-destructive" />
                   )}
-                  <span className={testResult.success ? "text-green-800" : "text-red-800"}>
+                  <span className={testResult.success ? "text-primary" : "text-destructive"}>
                     {testResult.success ? t('flow_builder.n8n_connection_successful', 'Connection Successful') : t('flow_builder.n8n_connection_failed', 'Connection Failed')}
                   </span>
                 </div>
@@ -1181,7 +1188,7 @@ export function N8nNode({ id, data, isConnectable }: N8nNodeProps) {
                   <p className="text-muted-foreground">{testResult.message}</p>
                 )}
                 {testResult.error && (
-                  <p className="text-red-700">{testResult.error}</p>
+                  <p className="text-destructive">{testResult.error}</p>
                 )}
               </div>
             )}

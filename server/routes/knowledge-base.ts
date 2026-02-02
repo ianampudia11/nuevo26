@@ -11,6 +11,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import knowledgeBaseService from '../services/knowledge-base-service';
 import { TextDocumentProcessor } from '../services/document-processors/text-processor';
 import { z } from 'zod';
+import { dataUsageTracker } from '../services/data-usage-tracker';
 
 const router = express.Router();
 
@@ -165,6 +166,11 @@ router.post('/documents/upload',
           console.error('Background document processing failed:', error);
         });
 
+
+      dataUsageTracker.trackFileUpload(companyId, req.file.size).catch(err => {
+        console.error('Failed to track file upload usage:', err);
+      });
+
       res.json({
         success: true,
         data: document
@@ -258,6 +264,13 @@ router.delete('/documents/:id',
       } catch (error) {
         console.error('Error deleting vectors from Pinecone:', error);
 
+      }
+
+
+      if (document.fileSize) {
+        dataUsageTracker.trackFileDelete(companyId, document.fileSize).catch(err => {
+          console.error('Failed to track file deletion usage:', err);
+        });
       }
 
       res.json({

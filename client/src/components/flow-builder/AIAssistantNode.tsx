@@ -4,8 +4,7 @@ import { useReactFlow } from 'reactflow';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useOpenRouterModels, type ProcessedModel } from '@/services/openrouter';
-import { Trash2, Copy, Info, Settings, RefreshCw, Plus, ChevronDown, ChevronRight, GripVertical, Eye, EyeOff, Clock, Calendar as CalendarIcon, CheckCircle, AlertCircle, AlertTriangle, LogOut, ExternalLink, FileText, Upload, Folder, Key, Building, Shield, BookOpen, Search, Target } from 'lucide-react';
-import BotIcon from '@/components/ui/bot-icon';
+import { Trash2, Copy, Info, Settings, RefreshCw, Plus, ChevronDown, ChevronRight, GripVertical, Eye, EyeOff, Clock, Calendar as CalendarIcon, CheckCircle, AlertCircle, AlertTriangle, LogOut, ExternalLink, FileText, Upload, Folder, Key, Building, Shield, BookOpen, Search, Target, HelpCircle } from 'lucide-react';
 import { OpenAIIcon } from '@/components/ui/openai-icon';
 import { useFlowContext } from '../../pages/flow-builder';
 import { useTranslation } from '@/hooks/use-translation';
@@ -36,6 +35,9 @@ import { useZohoCalendarAuth } from '@/hooks/useZohoCalendarAuth';
 import { DocumentList } from "@/components/knowledge-base/DocumentList";
 import { RAGConfiguration } from "@/components/knowledge-base/RAGConfiguration";
 import { MCPServerConfig } from '@shared/types/mcp-types';
+import { WeeklyScheduleEditor } from './WeeklyScheduleEditor';
+import type { DaySchedule, CalendarAdvancedSettings } from '@shared/types/calendar-types';
+import { DEFAULT_WEEKLY_SCHEDULE, createDefaultScheduleFromHours } from '@shared/types/calendar-types';
 
 interface MCPServerCardProps {
   server: MCPServerConfig;
@@ -157,10 +159,10 @@ function MCPServerCard({ server, onUpdate, onRemove, parseServerJson, getServerJ
   };
 
   return (
-    <div className="border rounded-lg p-3 bg-white space-y-3">
+    <div className="border rounded-lg p-3 bg-card space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex-1 mr-2">
-          <Label className="text-[10px] font-medium text-gray-700">Server Name</Label>
+          <Label className="text-[10px] font-medium text-foreground">Server Name</Label>
           <Input
             value={server.name || ''}
             onChange={(e) => onUpdate({ name: e.target.value })}
@@ -187,7 +189,7 @@ function MCPServerCard({ server, onUpdate, onRemove, parseServerJson, getServerJ
       </div>
 
       <div>
-        <Label className="text-[10px] font-medium text-gray-700 mb-1 block">
+        <Label className="text-[10px] font-medium text-foreground mb-1 block">
           Server Configuration (JSON)
         </Label>
         <Textarea
@@ -205,11 +207,11 @@ function MCPServerCard({ server, onUpdate, onRemove, parseServerJson, getServerJ
           }}
           onFocus={() => setIsFocused(true)}
           onBlur={handleBlur}
-          className={`text-xs font-mono min-h-[120px] resize-y ${jsonError ? 'border-red-300' : ''}`}
+          className={`text-xs font-mono min-h-[120px] resize-y ${jsonError ? 'border-destructive' : ''}`}
           placeholder={`{\n  "command": "npx",\n  "args": ["@brightdata/mcp"],\n  "env": {\n    "API_TOKEN": "your-token-here"\n  }\n}`}
         />
         {jsonError && (
-          <div className="flex items-start gap-2 mt-2 p-2 bg-red-50 border border-red-200 rounded text-[10px] text-red-800">
+          <div className="flex items-start gap-2 mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded text-[10px] text-red-800 dark:text-red-400">
             <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
             <span>{jsonError}</span>
           </div>
@@ -226,25 +228,39 @@ interface Provider {
 }
 
 
+/** OpenAI chat models with function calling support (from OpenAI API docs) */
 const OPENAI_MODELS = [
-  { id: 'gpt-4o', name: 'GPT-4o (Latest)', supportsTools: true },
+  { id: 'gpt-5.2', name: 'GPT-5.2', supportsTools: true },
+  { id: 'gpt-5-mini', name: 'GPT-5 Mini', supportsTools: true },
+  { id: 'gpt-5-nano', name: 'GPT-5 Nano', supportsTools: true },
+  { id: 'gpt-5.2-pro', name: 'GPT-5.2 Pro', supportsTools: true },
+  { id: 'gpt-5', name: 'GPT-5', supportsTools: true },
+  { id: 'gpt-4.1', name: 'GPT-4.1', supportsTools: true },
+  { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', supportsTools: true },
+  { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', supportsTools: true },
+  { id: 'gpt-4o', name: 'GPT-4o', supportsTools: true },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', supportsTools: true },
   { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', supportsTools: true },
   { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', supportsTools: true }
 ];
 
-
+/** OpenRouter fallback when /api/openrouter/models is unavailable; tool-capable models from OpenRouter docs */
 const FALLBACK_OPENROUTER_MODELS = [
-  { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5.2', name: 'GPT-5.2 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o', name: 'GPT-4o (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B (OpenAI)', supportsTools: true },
+  { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', supportsTools: true },
   { id: 'anthropic/claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', supportsTools: true },
   { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', supportsTools: true },
+  { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', supportsTools: true },
   { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', supportsTools: true },
+  { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro', supportsTools: true },
   { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash', supportsTools: true },
-  { id: 'thudm/glm-4-32b', name: 'GLM-4 32B (Function Calling Optimized)', supportsTools: true },
-  { id: '01-ai/yi-large-fc', name: 'Yi Large FC (Tool Use Specialized)', supportsTools: true },
+  { id: 'thudm/glm-4-32b', name: 'GLM-4 32B', supportsTools: true },
+  { id: '01-ai/yi-large-fc', name: 'Yi Large FC', supportsTools: true },
   { id: 'mistralai/mistral-nemo', name: 'Mistral Nemo 12B', supportsTools: true },
   { id: 'cognitivecomputations/dolphin-llama-3-70b', name: 'Dolphin Llama 3 70B', supportsTools: true },
   { id: 'cohere/command-r-plus', name: 'Command R+', supportsTools: true },
@@ -302,17 +318,17 @@ function TaskConfigurationCard({ task, index, onUpdate, onRemove, t }: TaskConfi
   return (
     <div className={`group border rounded-lg p-3 transition-all duration-200 ${
       task.enabled
-        ? 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50'
-        : 'border-gray-200 bg-gray-50/50 hover:bg-gray-50'
+        ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-900/10 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+        : 'border-border bg-muted/50 hover:bg-muted'
     }`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <GripVertical className="h-3 w-3 text-gray-400 cursor-grab" />
+            <GripVertical className="h-3 w-3 text-muted-foreground cursor-grab" />
           </div>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             {isExpanded ? (
               <ChevronDown className="h-3 w-3" />
@@ -328,7 +344,7 @@ function TaskConfigurationCard({ task, index, onUpdate, onRemove, t }: TaskConfi
               <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${
                 task.enabled
                   ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-gray-100 text-gray-500'
+                  : 'bg-muted text-muted-foreground'
               }`}>
                 {task.enabled ? <Eye className="h-2.5 w-2.5" /> : <EyeOff className="h-2.5 w-2.5" />}
                 {task.enabled ? t('flow_builder.ai_task_active', 'Active') : t('flow_builder.ai_task_inactive', 'Inactive')}
@@ -364,7 +380,7 @@ function TaskConfigurationCard({ task, index, onUpdate, onRemove, t }: TaskConfi
         <div className="mt-3 space-y-3 pl-4 border-l-2 border-emerald-200">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_task_name_label', 'Task Name')}</Label>
+              <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_task_name_label', 'Task Name')}</Label>
               <Input
                 value={task.name}
                 onChange={(e) => onUpdate({ name: e.target.value })}
@@ -373,7 +389,7 @@ function TaskConfigurationCard({ task, index, onUpdate, onRemove, t }: TaskConfi
               />
             </div>
             <div>
-              <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_function_name_label', 'Function Name')}</Label>
+              <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_function_name_label', 'Function Name')}</Label>
               <Input
                 value={task.functionDefinition.name}
                 onChange={(e) => {
@@ -404,7 +420,7 @@ function TaskConfigurationCard({ task, index, onUpdate, onRemove, t }: TaskConfi
           </div>
 
           <div>
-            <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_task_description_label', 'Task Description')}</Label>
+            <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_task_description_label', 'Task Description')}</Label>
             <Textarea
               value={task.description}
               onChange={(e) => onUpdate({ description: e.target.value })}
@@ -414,7 +430,7 @@ function TaskConfigurationCard({ task, index, onUpdate, onRemove, t }: TaskConfi
           </div>
 
           <div>
-            <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_function_description_label', 'AI Function Description')}</Label>
+            <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_function_description_label', 'AI Function Description')}</Label>
             <Textarea
               value={task.functionDefinition.description}
               onChange={(e) => onUpdate({
@@ -432,7 +448,7 @@ function TaskConfigurationCard({ task, index, onUpdate, onRemove, t }: TaskConfi
           </div>
 
           <div>
-            <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_output_handle_label', 'Output Handle ID')}</Label>
+            <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_output_handle_label', 'Output Handle ID')}</Label>
             <Input
               value={task.outputHandle}
               onChange={(e) => onUpdate({ outputHandle: e.target.value })}
@@ -527,7 +543,6 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
   const [model, setModel] = useState(data.model || 'gpt-4o-mini');
   const [apiKey, setApiKey] = useState(data.apiKey || '');
   const [credentialSource, setCredentialSource] = useState(data.credentialSource || 'auto');
-  const [timezone, setTimezone] = useState(data.timezone || getBrowserTimezone());
   const [language, setLanguage] = useState(data.language || 'en');
   const [prompt, setPrompt] = useState(data.prompt || t('flow_builder.ai_default_system_prompt', 'You are a helpful assistant. Answer user questions concisely and accurately. Only perform specific actions when the user explicitly requests them.'));
   const [enableHistory, setEnableHistory] = useState(data.enableHistory !== undefined ? data.enableHistory : true);
@@ -589,12 +604,54 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
   const [calendarDefaultDuration, setCalendarDefaultDuration] = useState((data as any).calendarDefaultDuration || 60);
   const [calendarBufferMinutes, setCalendarBufferMinutes] = useState((data as any).calendarBufferMinutes || 0);
   const [calendarTimeZone, setCalendarTimeZone] = useState((data as any).calendarTimeZone || getBrowserTimezone());
+  
+
+  const [calendarAdvancedMode, setCalendarAdvancedMode] = useState((data as any).calendarAdvancedMode !== undefined ? (data as any).calendarAdvancedMode : true);
+  const [calendarWeeklySchedule, setCalendarWeeklySchedule] = useState<DaySchedule[]>(() => {
+    if ((data as any).calendarAdvancedSettings?.weeklySchedule) {
+      const loadedSchedule = (data as any).calendarAdvancedSettings.weeklySchedule;
+      const loadedOffDays = (data as any).calendarAdvancedSettings?.offDays || [];
+
+      return loadedSchedule.map((day: DaySchedule) => ({
+        ...day,
+        enabled: loadedOffDays.includes(day.dayIndex) ? false : day.enabled
+      }));
+    }
+    return createDefaultScheduleFromHours(calendarBusinessHours.start, calendarBusinessHours.end);
+  });
+  const [calendarOffDays, setCalendarOffDays] = useState<number[]>(() => {
+    if ((data as any).calendarAdvancedSettings?.offDays) {
+      return (data as any).calendarAdvancedSettings.offDays;
+    }
+    return [0, 6]; // Default: Sunday and Saturday off
+  });
 
 
   const [enableZohoCalendar, setEnableZohoCalendar] = useState((data as any).enableZohoCalendar || false);
   const [zohoCalendarBusinessHours, setZohoCalendarBusinessHours] = useState((data as any).zohoCalendarBusinessHours || { start: '09:00', end: '17:00' });
   const [zohoCalendarDefaultDuration, setZohoCalendarDefaultDuration] = useState((data as any).zohoCalendarDefaultDuration || 60);
   const [zohoCalendarTimeZone, setZohoCalendarTimeZone] = useState((data as any).zohoCalendarTimeZone || getBrowserTimezone());
+  
+
+  const [zohoCalendarAdvancedMode, setZohoCalendarAdvancedMode] = useState((data as any).zohoCalendarAdvancedMode !== undefined ? (data as any).zohoCalendarAdvancedMode : true);
+  const [zohoCalendarWeeklySchedule, setZohoCalendarWeeklySchedule] = useState<DaySchedule[]>(() => {
+    if ((data as any).zohoCalendarAdvancedSettings?.weeklySchedule) {
+      const loadedSchedule = (data as any).zohoCalendarAdvancedSettings.weeklySchedule;
+      const loadedOffDays = (data as any).zohoCalendarAdvancedSettings?.offDays || [];
+
+      return loadedSchedule.map((day: DaySchedule) => ({
+        ...day,
+        enabled: loadedOffDays.includes(day.dayIndex) ? false : day.enabled
+      }));
+    }
+    return createDefaultScheduleFromHours(zohoCalendarBusinessHours.start, zohoCalendarBusinessHours.end);
+  });
+  const [zohoCalendarOffDays, setZohoCalendarOffDays] = useState<number[]>(() => {
+    if ((data as any).zohoCalendarAdvancedSettings?.offDays) {
+      return (data as any).zohoCalendarAdvancedSettings.offDays;
+    }
+    return [0, 6]; // Default: Sunday and Saturday off
+  });
 
 
 
@@ -679,7 +736,6 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
     if (data.model !== undefined && data.model !== model) setModel(data.model);
     if (data.apiKey !== undefined && data.apiKey !== apiKey) setApiKey(data.apiKey);
     if (data.credentialSource !== undefined && data.credentialSource !== credentialSource) setCredentialSource(data.credentialSource);
-    if (data.timezone !== undefined && data.timezone !== timezone) setTimezone(data.timezone);
     if (data.language !== undefined && data.language !== language) setLanguage(data.language);
     if (data.prompt !== undefined && data.prompt !== prompt) setPrompt(data.prompt);
     if (data.enableHistory !== undefined) setEnableHistory(data.enableHistory);
@@ -699,12 +755,36 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
     if ((data as any).calendarDefaultDuration !== undefined) setCalendarDefaultDuration((data as any).calendarDefaultDuration);
     if ((data as any).calendarBufferMinutes !== undefined) setCalendarBufferMinutes((data as any).calendarBufferMinutes);
     if ((data as any).calendarTimeZone !== undefined) setCalendarTimeZone((data as any).calendarTimeZone);
+    if ((data as any).calendarAdvancedMode !== undefined) {
+      setCalendarAdvancedMode((data as any).calendarAdvancedMode);
+    } else {
+
+      setCalendarAdvancedMode(true);
+    }
+    if ((data as any).calendarAdvancedSettings?.weeklySchedule) {
+      setCalendarWeeklySchedule((data as any).calendarAdvancedSettings.weeklySchedule);
+    }
+    if ((data as any).calendarAdvancedSettings?.offDays) {
+      setCalendarOffDays((data as any).calendarAdvancedSettings.offDays);
+    }
 
 
     if ((data as any).enableZohoCalendar !== undefined) setEnableZohoCalendar((data as any).enableZohoCalendar);
     if ((data as any).zohoCalendarBusinessHours !== undefined) setZohoCalendarBusinessHours((data as any).zohoCalendarBusinessHours);
     if ((data as any).zohoCalendarDefaultDuration !== undefined) setZohoCalendarDefaultDuration((data as any).zohoCalendarDefaultDuration);
     if ((data as any).zohoCalendarTimeZone !== undefined) setZohoCalendarTimeZone((data as any).zohoCalendarTimeZone);
+    if ((data as any).zohoCalendarAdvancedMode !== undefined) {
+      setZohoCalendarAdvancedMode((data as any).zohoCalendarAdvancedMode);
+    } else {
+
+      setZohoCalendarAdvancedMode(true);
+    }
+    if ((data as any).zohoCalendarAdvancedSettings?.weeklySchedule) {
+      setZohoCalendarWeeklySchedule((data as any).zohoCalendarAdvancedSettings.weeklySchedule);
+    }
+    if ((data as any).zohoCalendarAdvancedSettings?.offDays) {
+      setZohoCalendarOffDays((data as any).zohoCalendarAdvancedSettings.offDays);
+    }
     if (data.elevenLabsApiKey !== undefined) setElevenLabsApiKey(data.elevenLabsApiKey);
     if (data.elevenLabsVoiceId !== undefined) setElevenLabsVoiceId(data.elevenLabsVoiceId);
     if (data.elevenLabsCustomVoiceId !== undefined) setElevenLabsCustomVoiceId(data.elevenLabsCustomVoiceId);
@@ -886,7 +966,6 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
       let configObj = parsed;
       let extractedName: string | undefined = undefined;
 
-
       if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
 
         const serverNames = Object.keys(parsed.mcpServers);
@@ -994,7 +1073,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
         description: t('flow_builder.ai_book_appointment_desc', 'Book a new appointment in Google Calendar'),
         functionDefinition: {
           name: 'book_appointment',
-          description: t('flow_builder.ai_function_book_appointment', 'Create a new calendar event/appointment in Google Calendar. Use this when the user wants to schedule a meeting or appointment.'),
+          description: t('flow_builder.ai_function_book_appointment', 'Create a new calendar event/appointment in Google Calendar. Use this when the user wants to schedule a meeting or appointment. The system automatically prevents double bookings by checking for conflicts against confirmed bookings (with buffer time) and Google Calendar busy times. If a slot becomes unavailable, the system will return a user-friendly error message. Buffer time is automatically applied to prevent back-to-back bookings. Times must be provided in ISO format (YYYY-MM-DDTHH:MM:SS) or clearly specify timezone. If timezone is not specified, the node\'s configured timezone will be used.'),
           parameters: {
             type: 'object',
             properties: {
@@ -1016,7 +1095,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
               },
               time_zone: {
                 type: 'string',
-                description: 'Timezone for the event (e.g., America/New_York, UTC). Defaults to node configuration timezone.'
+                description: 'Timezone for the event (e.g., America/New_York, UTC, Asia/Karachi). If not specified, the node\'s configured timezone will be used. Common aliases like PST, EST, PKT are supported.'
               },
               attendees: {
                 type: 'array',
@@ -1061,7 +1140,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
         description: 'Check available time slots in Google Calendar',
         functionDefinition: {
           name: 'check_availability',
-          description: 'Check available time slots in Google Calendar for scheduling appointments. Use this to find free time slots before booking.',
+          description: 'Check available time slots in Google Calendar for scheduling appointments. Use this to find free time slots before booking. Slots are shown in the configured timezone (or node\'s timezone if not specified) and are checked against existing bookings in real-time. Availability is checked in real-time and may change before booking, so users should book immediately after receiving available slots.',
           parameters: {
             type: 'object',
             properties: {
@@ -1153,7 +1232,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
               },
               time_zone: {
                 type: 'string',
-                description: 'Timezone for the event (e.g., America/New_York, UTC). Defaults to node configuration timezone.'
+                description: 'Timezone for the event (e.g., America/New_York, UTC, Asia/Karachi). If not specified, the node\'s configured timezone will be used. Common aliases like PST, EST, PKT are supported.'
               },
               location: {
                 type: 'string',
@@ -1189,13 +1268,29 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
         description: 'Cancel/delete an event from Google Calendar',
         functionDefinition: {
           name: 'cancel_calendar_event',
-          description: 'Cancel or delete a calendar event from Google Calendar. Use this to remove appointments that are no longer needed.',
+          description: 'Cancel or delete a calendar event from Google Calendar. Use this to remove appointments that are no longer needed. You can provide either the event_link (preferred), event_id, OR the date/time/email to find and cancel the event. IMPORTANT: The event_link is the primary identifier - it is the link provided to the user when the appointment was booked. The handler can derive the event ID from the provided link.',
           parameters: {
             type: 'object',
             properties: {
+              event_link: {
+                type: 'string',
+                description: 'The Google Calendar event link provided when the appointment was booked. This is the preferred method for cancellation as it is the most reliable. Example: https://www.google.com/calendar/event?eid=abc123'
+              },
               event_id: {
                 type: 'string',
-                description: 'ID of the event to cancel/delete'
+                description: 'ID of the event to cancel/delete. If not provided, event_link or date and time must be provided to find the event.'
+              },
+              date: {
+                type: 'string',
+                description: 'Date of the appointment to cancel. MUST be in YYYY-MM-DD format (e.g., "2025-11-10"). Convert user input like "10/11/2025", "November 10", or "tomorrow" to this format before calling. Required if event_id or event_link is not provided.'
+              },
+              time: {
+                type: 'string',
+                description: 'Time of the appointment to cancel. MUST be in HH:MM format using 24-hour notation (e.g., "16:15" for 4:15 PM). Convert user input like "4:15 PM", "4:15 pm", or "16:15" to this format before calling. Required if event_id or event_link is not provided.'
+              },
+              attendee_email: {
+                type: 'string',
+                description: 'Email address of the attendee to help identify the correct event when using date/time lookup'
               },
               send_updates: {
                 type: 'boolean',
@@ -1203,7 +1298,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                 default: true
               }
             },
-            required: ['event_id']
+            required: []
           }
         },
         outputHandle: `calendar_cancel_${Date.now()}`,
@@ -1522,7 +1617,6 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
         model,
         apiKey,
         credentialSource,
-        timezone,
 
         language: language,
         prompt,
@@ -1542,6 +1636,11 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
         calendarDefaultDuration,
         calendarBufferMinutes,
         calendarTimeZone,
+        calendarAdvancedMode,
+        calendarAdvancedSettings: {
+          weeklySchedule: calendarWeeklySchedule,
+          offDays: calendarOffDays
+        },
         calendarFunctions: getCalendarFunctions(),
 
 
@@ -1549,6 +1648,11 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
         zohoCalendarBusinessHours,
         zohoCalendarDefaultDuration,
         zohoCalendarTimeZone,
+        zohoCalendarAdvancedMode,
+        zohoCalendarAdvancedSettings: {
+          weeklySchedule: zohoCalendarWeeklySchedule,
+          offDays: zohoCalendarOffDays
+        },
       zohoCalendarFunctions: getZohoCalendarFunctions(),
 
       knowledgeBaseEnabled,
@@ -1575,7 +1679,6 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
     model,
     apiKey,
     credentialSource,
-    timezone,
 
     prompt,
     enableHistory,
@@ -1594,11 +1697,17 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
     calendarDefaultDuration,
     calendarBufferMinutes,
     calendarTimeZone,
+    calendarAdvancedMode,
+    calendarWeeklySchedule,
+    calendarOffDays,
     getCalendarFunctions,
     enableZohoCalendar,
     zohoCalendarBusinessHours,
     zohoCalendarDefaultDuration,
     zohoCalendarTimeZone,
+    zohoCalendarAdvancedMode,
+    zohoCalendarWeeklySchedule,
+    zohoCalendarOffDays,
     getZohoCalendarFunctions,
     knowledgeBaseEnabled,
     knowledgeBaseConfig,
@@ -1677,14 +1786,14 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
       case 'openai':
         return <OpenAIIcon size={16} className="text-emerald-600" />;
       case 'openrouter':
-        return <BotIcon size={16} color="#059669" className="text-emerald-600" />;
+        return <img src="https://cdn-icons-png.flaticon.com/512/14958/14958196.png" alt="AI Assistant" className="h-4 w-4" />;
       default:
-        return <BotIcon size={16} color="#059669" className="text-emerald-600" />;
+        return <img src="https://cdn-icons-png.flaticon.com/512/14958/14958196.png" alt="AI Assistant" className="h-4 w-4" />;
     }
   };
 
   return (
-    <div className="node-ai-assistant rounded-lg bg-white border border-emerald-200 shadow-sm min-w-[420px] max-w-[550px] group relative">
+    <div className="node-ai-assistant rounded-lg bg-card border border-emerald-200 dark:border-emerald-900 shadow-sm min-w-[420px] max-w-[550px] group relative">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -1706,7 +1815,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
       </div>
 
       {/* Fixed Header */}
-      <div className="p-3 border-b border-emerald-100 bg-emerald-50/30">
+      <div className="p-3 border-b border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/30 dark:bg-emerald-900/10">
         <div className="font-medium flex items-center gap-2">
           {getProviderIcon()}
           <span>{t('flow_builder.ai_assistant', 'AI Assistant')}</span>
@@ -1734,7 +1843,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
         <div className="p-3 space-y-3">
 
           {/* Configuration Summary */}
-          <div className="text-sm p-3 bg-secondary/40 rounded border border-border">
+          <div className="text-sm p-3  rounded border border-border">
             <div className="flex items-center gap-1 mb-2">
               <Settings className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="font-medium">{getProviderDisplayName()}</span>
@@ -1749,22 +1858,22 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
             <div className="flex flex-wrap gap-1">
               {enableHistory && (
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">
                   {t('flow_builder.ai_summary_history', 'History:')} {historyLimit}
                 </span>
               )}
               {enableTaskExecution && tasks.filter(task => task.enabled).length > 0 && (
-                <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-400 px-1.5 py-0.5 rounded-full">
                   {t('flow_builder.ai_summary_tasks', 'Tasks:')} {tasks.filter(task => task.enabled).length}
                 </span>
               )}
               {enableTextToSpeech && provider === 'openai' && (
-                <span className="text-[10px] bg-pink-100 text-pink-800 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] bg-pink-100 dark:bg-pink-900/20 text-pink-800 dark:text-pink-400 px-1.5 py-0.5 rounded-full">
                   {t('flow_builder.ai_summary_tts', 'TTS:')} {VOICE_RESPONSE_MODES.find(m => m.id === voiceResponseMode)?.name || t('flow_builder.ai_voice_mode_always', 'Always')}
                 </span>
               )}
               {enableTextToSpeech && provider === 'openai' && maxAudioDuration && maxAudioDuration < 30 && (
-                <span className="text-[10px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400 px-1.5 py-0.5 rounded-full">
                   {t('flow_builder.ai_summary_audio', 'Audio:')} {t('flow_builder.ai_summary_audio_max', '{{duration}}s max', { duration: maxAudioDuration })}
                 </span>
               )}
@@ -1775,8 +1884,8 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
           {isEditing && (
             <>
               {/* AI Configuration Section */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-emerald-50 to-blue-50">
-                <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <div className="border rounded-lg p-3 ">
+                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Settings className="h-4 w-4" />
                   AI Configuration
                 </h3>
@@ -1784,7 +1893,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_provider', 'AI Provider')}</Label>
+                      <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_provider', 'AI Provider')}</Label>
                       <Select value={provider} onValueChange={handleProviderChange}>
                         <SelectTrigger className="text-xs h-7 mt-1">
                           <SelectValue placeholder={t('flow_builder.ai_select_provider', 'Select provider')} />
@@ -1800,10 +1909,10 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                     </div>
 
                     <div>
-                      <Label className="text-[10px] font-medium text-gray-700 flex items-center gap-1">
+                      <Label className="text-[10px] font-medium text-foreground flex items-center gap-1">
                         {t('flow_builder.ai_model', 'Model')}
                         {provider === 'openrouter' && isLoadingModels && (
-                          <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
+                          <RefreshCw className="w-3 h-3 animate-spin text-blue-500 dark:text-blue-400" />
                         )}
                       </Label>
                       <Select value={model} onValueChange={handleModelChange} disabled={provider === 'openrouter' && isLoadingModels}>
@@ -1843,7 +1952,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                   </div>
 
                   <div>
-                    <Label className="text-[10px] font-medium text-gray-700 flex items-center gap-1">
+                    <Label className="text-[10px] font-medium text-foreground flex items-center gap-1">
                       <Key className="w-3 h-3" />
                       {t('flow_builder.ai_credential_source', 'Credential Source')}
                     </Label>
@@ -1918,7 +2027,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
                   {credentialSource === 'manual' && (
                     <div>
-                      <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_api_key', 'API Key')}</Label>
+                      <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_api_key', 'API Key')}</Label>
                       <Input
                         type="password"
                         placeholder={t('flow_builder.ai_api_key_placeholder', 'Enter your {{provider}} API key', { provider: getProviderDisplayName() })}
@@ -1939,35 +2048,9 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                     </div>
                   )}
 
-                  {/* Timezone Configuration */}
-                  <div>
-                    <Label className="text-[10px] font-medium text-gray-700 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {t('flow_builder.ai_timezone', 'Timezone for Date/Time Context')}
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div>
-                            <TimezoneSelector
-                              value={timezone}
-                              onChange={setTimezone}
-                              className="text-xs mt-1"
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs max-w-xs">
-                            {t('flow_builder.ai_timezone_tooltip', 'The AI will receive current date and time information in this timezone for accurate temporal context in responses and function calls.')}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-
                   {/* Language Selection */}
                   <div>
-                    <Label className="text-[10px] font-medium text-gray-700">
+                    <Label className="text-[10px] font-medium text-foreground">
                       {t('flow_builder.ai_language_label', 'Response Language')}
                     </Label>
                     <Select 
@@ -1983,6 +2066,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         <SelectValue placeholder={t('flow_builder.ai_language_placeholder', 'Select language...')} />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="auto">Auto Detect (use contact language)</SelectItem>
                         {availableLanguages && availableLanguages.length > 0 ? (
                           availableLanguages
                             .filter((lang: any) => lang.isActive !== false)
@@ -2008,7 +2092,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                   </div>
 
                   <div>
-                    <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.ai_system_prompt', 'System Prompt')}</Label>
+                    <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.ai_system_prompt', 'System Prompt')}</Label>
                     <Textarea
                       placeholder={t('flow_builder.ai_prompt_placeholder', 'Enter instructions for the AI')}
                       value={prompt}
@@ -2020,8 +2104,8 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
               </div>
 
               {/* Conversation Section */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-blue-50 to-purple-50">
-                <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <div className="border rounded-lg p-3">
+                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Info className="h-4 w-4" />
                   Conversation
                 </h3>
@@ -2040,7 +2124,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                   {enableHistory && (
                     <div className="pl-4 border-l-2 border-blue-200">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-medium text-gray-700">
+                        <Label className="text-[10px] font-medium text-foreground">
                           {t('flow_builder.ai_history_limit', 'Message Limit')}
                         </Label>
                         <div className="flex items-center gap-1">
@@ -2074,9 +2158,9 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
 
                 {/* Session Takeover Section */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-orange-50 to-red-50">
+              <div className="border rounded-lg p-3 ">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <LogOut className="h-4 w-4" />
                     {t('flow_builder.ai_session_takeover', 'Session Takeover')}
                   </h3>
@@ -2089,7 +2173,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                 {enableSessionTakeover && (
                   <div className="space-y-3">
                     <div>
-                      <Label className="text-xs font-medium text-gray-700">
+                      <Label className="text-xs font-medium text-foreground">
                         {t('flow_builder.ai_stop_keyword', 'Stop Keyword')}
                       </Label>
                       <Input
@@ -2105,8 +2189,8 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
 
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
-                      <p className="text-[10px] text-blue-700">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md p-2">
+                      <p className="text-[10px] text-blue-700 dark:text-blue-400">
                         {t('flow_builder.ai_session_takeover_tip', '💡 Tip: When enabled, the AI will handle all subsequent messages until the stop keyword is received or the session is manually ended.')}
                       </p>
                     </div>
@@ -2122,8 +2206,8 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
               {/* Voice Processing Section - Available for OpenAI and other providers */}
               {provider === 'openai' && (
-                <div className="border rounded-lg p-3 bg-gradient-to-r from-orange-50 to-pink-50">
-                  <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <div className="border rounded-lg p-3 ">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
@@ -2149,7 +2233,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                     {enableTextToSpeech && (
                       <div className="pl-4 border-l-2 border-pink-200 space-y-3">
                         <div>
-                          <Label className="text-[10px] font-medium text-gray-700">
+                          <Label className="text-[10px] font-medium text-foreground">
                             {t('flow_builder.ai_tts_provider', 'TTS Provider')}
                           </Label>
                           <Select value={ttsProvider} onValueChange={setTtsProvider}>
@@ -2174,7 +2258,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
                         {/* Voice Selection - Provider Specific */}
                         <div>
-                          <Label className="text-[10px] font-medium text-gray-700">
+                          <Label className="text-[10px] font-medium text-foreground">
                             {t('flow_builder.ai_voice_selection', 'Voice Selection')}
                           </Label>
                           <Select
@@ -2211,7 +2295,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         {/* Custom Voice ID Input - Only for ElevenLabs */}
                         {ttsProvider === 'elevenlabs' && (elevenLabsVoiceId === 'custom' || elevenLabsCustomVoiceId) && (
                           <div className="pl-4 border-l-2 border-purple-300 bg-purple-25">
-                            <Label className="text-[10px] font-medium text-gray-700">
+                            <Label className="text-[10px] font-medium text-foreground">
                               {t('flow_builder.ai_custom_voice_id', 'Custom Voice ID')}
                             </Label>
                             <Input
@@ -2248,9 +2332,9 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
                         {/* ElevenLabs Specific Configuration */}
                         {ttsProvider === 'elevenlabs' && (
-                          <div className="space-y-3 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                          <div className="space-y-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-900 rounded-md">
                             <div>
-                              <Label className="text-[10px] font-medium text-gray-700">
+                              <Label className="text-[10px] font-medium text-foreground">
                                 {t('flow_builder.ai_elevenlabs_api_key', 'ElevenLabs API Key')}
                               </Label>
                               <Input
@@ -2266,7 +2350,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                             </div>
 
                             <div>
-                              <Label className="text-[10px] font-medium text-gray-700">
+                              <Label className="text-[10px] font-medium text-foreground">
                                 {t('flow_builder.ai_elevenlabs_model', 'Model')}
                               </Label>
                               <Select value={elevenLabsModel} onValueChange={setElevenLabsModel}>
@@ -2285,7 +2369,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <Label className="text-[10px] font-medium text-gray-700">
+                                <Label className="text-[10px] font-medium text-foreground">
                                   {t('flow_builder.ai_elevenlabs_stability', 'Stability ({{value}})', { value: elevenLabsStability })}
                                 </Label>
                                 <input
@@ -2295,11 +2379,11 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                                   step="0.1"
                                   value={elevenLabsStability}
                                   onChange={(e) => setElevenLabsStability(parseFloat(e.target.value))}
-                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-1"
+                                  className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer mt-1"
                                 />
                               </div>
                               <div>
-                                <Label className="text-[10px] font-medium text-gray-700">
+                                <Label className="text-[10px] font-medium text-foreground">
                                   {t('flow_builder.ai_elevenlabs_similarity', 'Similarity ({{value}})', { value: elevenLabsSimilarityBoost })}
                                 </Label>
                                 <input
@@ -2309,13 +2393,13 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                                   step="0.1"
                                   value={elevenLabsSimilarityBoost}
                                   onChange={(e) => setElevenLabsSimilarityBoost(parseFloat(e.target.value))}
-                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-1"
+                                  className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer mt-1"
                                 />
                               </div>
                             </div>
 
                             <div className="flex items-center justify-between">
-                              <Label className="text-[10px] font-medium text-gray-700">
+                              <Label className="text-[10px] font-medium text-foreground">
                                 {t('flow_builder.ai_elevenlabs_speaker_boost', 'Speaker Boost')}
                               </Label>
                               <Switch
@@ -2327,7 +2411,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         )}
 
                         <div>
-                          <Label className="text-[10px] font-medium text-gray-700">
+                          <Label className="text-[10px] font-medium text-foreground">
                             {t('flow_builder.ai_voice_response_mode', 'Voice Response Mode')}
                           </Label>
                           <Select value={voiceResponseMode} onValueChange={setVoiceResponseMode}>
@@ -2352,8 +2436,8 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                       </div>
                     )}
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
-                      <p className="text-[10px] text-blue-700">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md p-2">
+                      <p className="text-[10px] text-blue-700 dark:text-blue-400">
                         <strong>{t('flow_builder.ai_voice_processing_label', 'Voice Processing:')}</strong>
                         {ttsProvider === 'elevenlabs' ? (
                           <span> {t('flow_builder.ai_voice_processing_elevenlabs', 'Speech-to-Text uses OpenAI Whisper, Text-to-Speech uses ElevenLabs API')}</span>
@@ -2372,15 +2456,15 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
               {/* Audio Processing Limits Section */}
               {provider === 'openai' && enableTextToSpeech && (
-                <div className="border rounded-lg p-3 bg-gradient-to-r from-orange-50 to-red-50">
-                  <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <div className="border rounded-lg p-3 ">
+                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <Clock className="h-4 w-4" />
                     {t('flow_builder.ai_audio_limits', 'Audio Processing Limits')}
                   </h3>
 
                   <div className="space-y-3">
                     <div>
-                      <Label className="text-[10px] font-medium text-gray-700">
+                      <Label className="text-[10px] font-medium text-foreground">
                         {t('flow_builder.ai_max_audio_duration', 'Maximum Audio Duration (seconds)')}
                       </Label>
                       <NumberInput
@@ -2407,8 +2491,8 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                       )}
                     </div>
 
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-2">
-                      <p className="text-[10px] text-yellow-700">
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900 rounded-md p-2">
+                      <p className="text-[10px] text-yellow-700 dark:text-yellow-400">
                         {t('flow_builder.ai_cost_optimization_tip', '💰 Cost Optimization: Limiting audio duration prevents expensive API calls for long voice messages. Users will receive a text response asking them to send shorter messages.')}
                       </p>
                     </div>
@@ -2419,9 +2503,9 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
             
 
               {/* Task Execution Section */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-indigo-50 to-purple-50">
+              <div className="border rounded-lg p-3">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <RefreshCw className="h-4 w-4" />
                     {t('flow_builder.ai_task_execution', 'Task Execution')}
                   </h3>
@@ -2434,7 +2518,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                 {enableTaskExecution && (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs font-medium text-gray-700">
+                      <Label className="text-xs font-medium text-foreground">
                         {t('flow_builder.ai_tasks', 'Configured Tasks')} ({tasks.length})
                       </Label>
                       <div className="flex items-center gap-1">
@@ -2458,7 +2542,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                     </div>
 
                     {tasks.length === 0 ? (
-                      <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
+                      <div className="text-center py-4 border-2 border-dashed border-border rounded-lg">
                         <div className="text-xs text-muted-foreground mb-2">
                           {t('flow_builder.ai_no_tasks_configured', 'No tasks configured')}
                         </div>
@@ -2481,8 +2565,8 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                       </div>
                     )}
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
-                      <p className="text-[10px] text-blue-700">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-md p-2">
+                      <p className="text-[10px] text-blue-700 dark:text-blue-400">
                         {t('flow_builder.ai_tasks_tip', '💡 Tip: Each active task creates an output handle for flow routing. Use specific descriptions to prevent false triggers.')}
                       </p>
                     </div>
@@ -2497,9 +2581,9 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
               </div>
 
               {/* Google Calendar Integration Section */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-green-50 to-blue-50">
+              <div className="border rounded-lg p-3 ">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <CalendarIcon className="h-4 w-4" />
                     {t('flow_builder.ai_google_calendar_integration', 'Google Calendar')}
                   </h3>
@@ -2512,7 +2596,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                 {enableGoogleCalendar && (
                   <div className="space-y-4">
                     {/* Authentication Status */}
-                    <div className="bg-white rounded-md p-3 border">
+                    <div className="bg-card rounded-md p-3 border">
                       {isLoadingGoogleCalendarStatus ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <RefreshCw className="h-4 w-4 animate-spin" />
@@ -2520,7 +2604,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         </div>
                       ) : isGoogleCalendarConnected ? (
                         <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-green-600">
+                          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                             <CheckCircle className="h-4 w-4" />
                             {t('flow_builder.ai_google_calendar_connected', 'Google Calendar connected')}
                           </div>
@@ -2548,7 +2632,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                               onClick={disconnectGoogleCalendar}
                               variant="outline"
                               size="sm"
-                              className="text-xs h-7 text-red-600 border-red-200 hover:bg-red-50"
+                              className="text-xs h-7 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
                               <LogOut className="mr-1 h-3 w-3" />
                               {t('flow_builder.ai_disconnect', 'Disconnect')}
@@ -2557,7 +2641,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-amber-600">
+                          <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
                             <AlertCircle className="h-4 w-4" />
                             {t('flow_builder.ai_google_calendar_not_connected', 'Authentication required')}
                           </div>
@@ -2565,7 +2649,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                             onClick={authenticateGoogleCalendar}
                             disabled={isGoogleCalendarAuthenticating}
                             size="sm"
-                            className="text-xs h-7 bg-green-600 hover:bg-green-700"
+                            className="text-xs h-7 bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
                           >
                             {isGoogleCalendarAuthenticating ? (
                               <>
@@ -2585,7 +2669,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
                     {/* Calendar Functions Status */}
                     {isGoogleCalendarConnected && (
-                      <div className="bg-white rounded-md p-3 border mb-3">
+                      <div className="bg-card rounded-md p-3 border mb-3">
                         <div className="flex items-center gap-2 text-sm text-green-600 mb-2">
                           <CheckCircle className="h-4 w-4" />
                           Calendar Functions Available
@@ -2593,7 +2677,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         <div className="text-xs text-muted-foreground">
                           {t('flow_builder.ai_calendar_features_available', 'The AI can now: book appointments, check availability, list events, update events, and cancel events.')}
                           <br />
-                          <span className="text-blue-600 font-medium">{t('flow_builder.ai_calendar_system_prompt_note', 'Core calendar behavior is enforced when enabled. The prompt customizes tone and extra guidance.')}</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">{t('flow_builder.ai_calendar_system_prompt_note', 'Core calendar behavior is enforced when enabled. The prompt customizes tone and extra guidance.')}</span>
                         </div>
                       </div>
                     )}
@@ -2636,7 +2720,23 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                             />
                           </div>
                           <div>
-                            <Label className="text-xs font-medium">{t('flow_builder.ai_buffer_minutes', 'Buffer between meetings (minutes)')}</Label>
+                            <Label className="text-xs font-medium flex items-center gap-1">
+                              {t('flow_builder.ai_buffer_minutes', 'Buffer between meetings (minutes)')}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" className="max-w-xs">
+                                    <p className="text-xs">
+                                      Buffer time prevents back-to-back bookings by adding spacing before and after each appointment.
+                                      This allows for overrun/setup time between meetings. Recommended: 0 for no buffer, 15-30 minutes for typical use cases.
+                                      Buffer time is automatically applied when checking availability and creating bookings.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </Label>
                             <Input
                               type="number"
                               min="0"
@@ -2651,13 +2751,58 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
                         <div className="grid grid-cols-1 gap-3">
                           <div>
-                            <Label className="text-xs font-medium">{t('flow_builder.ai_timezone', 'Timezone')}</Label>
+                            <Label className="text-xs font-medium flex items-center gap-1">
+                              {t('flow_builder.ai_timezone', 'Timezone')}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" className="max-w-xs">
+                                    <p className="text-xs">
+                                      The timezone used for all calendar operations. This determines when appointments are scheduled and how availability is displayed.
+                                      If not specified in booking requests, this timezone will be used. Defaults to your browser's timezone.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </Label>
                             <TimezoneSelector
                               value={calendarTimeZone}
                               onChange={setCalendarTimeZone}
                               className="text-xs h-7"
                             />
                           </div>
+                        </div>
+
+                        {/* Advanced Settings Section */}
+                        <div className="border-t pt-3 mt-3">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-xs font-semibold text-foreground">Advanced Settings</h4>
+                            <Switch
+                              checked={calendarAdvancedMode}
+                              onCheckedChange={setCalendarAdvancedMode}
+                            />
+                          </div>
+                          
+                          {calendarAdvancedMode ? (
+                            <div className="space-y-3">
+                              <p className="text-[10px] text-muted-foreground">
+                                Configure day-specific working hours and mark off-days. Off-days won't show any available slots.
+                              </p>
+                              <WeeklyScheduleEditor
+                                schedule={calendarWeeklySchedule}
+                                offDays={calendarOffDays}
+                                onScheduleChange={setCalendarWeeklySchedule}
+                                onOffDaysChange={setCalendarOffDays}
+                                disabled={!isGoogleCalendarConnected}
+                              />
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-muted-foreground">
+                              Using simple hours: {calendarBusinessHours.start} - {calendarBusinessHours.end} for all days
+                            </div>
+                          )}
                         </div>
 
                       </div>
@@ -2673,9 +2818,9 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
               </div>
 
               {/* Zoho Calendar Integration Section */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-orange-50 to-red-50">
+              <div className="border rounded-lg p-3 ">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <CalendarIcon className="h-4 w-4" />
                     {t('flow_builder.ai_zoho_calendar_integration', 'Zoho Calendar')}
                   </h3>
@@ -2688,7 +2833,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                 {enableZohoCalendar && (
                   <div className="space-y-4">
                     {/* Authentication Status */}
-                    <div className="bg-white rounded-md p-3 border">
+                    <div className="bg-card rounded-md p-3 border">
                       {isLoadingZohoCalendarStatus ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <RefreshCw className="h-4 w-4 animate-spin" />
@@ -2696,7 +2841,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         </div>
                       ) : isZohoCalendarConnected ? (
                         <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-green-600">
+                          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                             <CheckCircle className="h-4 w-4" />
                             {t('flow_builder.ai_zoho_calendar_connected', 'Zoho Calendar connected')}
                           </div>
@@ -2706,7 +2851,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                               disabled={isZohoCalendarAuthenticating}
                               variant="outline"
                               size="sm"
-                              className="text-xs h-7 border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+                              className="text-xs h-7 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700"
                               title={t('flow_builder.ai_switch_account', 'Connect a different Zoho account')}
                             >
                               {isZohoCalendarAuthenticating ? (
@@ -2725,7 +2870,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                               onClick={disconnectZohoCalendar}
                               variant="outline"
                               size="sm"
-                              className="text-xs h-7 text-red-600 border-red-200 hover:bg-red-50"
+                              className="text-xs h-7 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
                               <LogOut className="mr-1 h-3 w-3" />
                               {t('flow_builder.ai_disconnect', 'Disconnect')}
@@ -2734,7 +2879,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-amber-600">
+                          <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
                             <AlertCircle className="h-4 w-4" />
                             {t('flow_builder.ai_zoho_calendar_not_connected', 'Authentication required')}
                           </div>
@@ -2742,7 +2887,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                             onClick={authenticateZohoCalendar}
                             disabled={isZohoCalendarAuthenticating}
                             size="sm"
-                            className="text-xs h-7 bg-orange-600 hover:bg-orange-700"
+                            className="text-xs h-7 bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600"
                           >
                             {isZohoCalendarAuthenticating ? (
                               <>
@@ -2762,7 +2907,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
 
                     {/* Calendar Functions Status */}
                     {isZohoCalendarConnected && (
-                      <div className="bg-white rounded-md p-3 border mb-3">
+                      <div className="bg-card rounded-md p-3 border mb-3">
                         <div className="flex items-center gap-2 text-sm text-green-600 mb-2">
                           <CheckCircle className="h-4 w-4" />
                           Zoho Calendar Functions Available
@@ -2770,7 +2915,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                         <div className="text-xs text-muted-foreground">
                           {t('flow_builder.ai_zoho_calendar_features_available', 'The AI can now: book appointments, check availability, list events, update events, and cancel events in Zoho Calendar.')}
                           <br />
-                          <span className="text-blue-600 font-medium">{t('flow_builder.ai_calendar_system_prompt_note', 'Core calendar behavior is enforced when enabled. The prompt customizes tone and extra guidance.')}</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">{t('flow_builder.ai_calendar_system_prompt_note', 'Core calendar behavior is enforced when enabled. The prompt customizes tone and extra guidance.')}</span>
                         </div>
                       </div>
                     )}
@@ -2822,6 +2967,36 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                           </div>
                         </div>
 
+                        {/* Advanced Settings Section */}
+                        <div className="border-t pt-3 mt-3">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-xs font-semibold text-foreground">Advanced Settings</h4>
+                            <Switch
+                              checked={zohoCalendarAdvancedMode}
+                              onCheckedChange={setZohoCalendarAdvancedMode}
+                            />
+                          </div>
+                          
+                          {zohoCalendarAdvancedMode ? (
+                            <div className="space-y-3">
+                              <p className="text-[10px] text-muted-foreground">
+                                Configure day-specific working hours and mark off-days. Off-days won't show any available slots.
+                              </p>
+                              <WeeklyScheduleEditor
+                                schedule={zohoCalendarWeeklySchedule}
+                                offDays={zohoCalendarOffDays}
+                                onScheduleChange={setZohoCalendarWeeklySchedule}
+                                onOffDaysChange={setZohoCalendarOffDays}
+                                disabled={!isZohoCalendarConnected}
+                              />
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-muted-foreground">
+                              Using simple hours: {zohoCalendarBusinessHours.start} - {zohoCalendarBusinessHours.end} for all days
+                            </div>
+                          )}
+                        </div>
+
                       </div>
                     )}
                   </div>
@@ -2835,14 +3010,14 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
               </div>
 
               {/* Knowledge Base Configuration */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="border rounded-lg p-3 ">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <BookOpen className="h-4 w-4" />
                     {t('flow_builder.ai_knowledge_base', 'Knowledge Base')}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">{t('flow_builder.ai_rag_enhancement', 'RAG Enhancement')}</span>
+                    <span className="text-xs text-muted-foreground">{t('flow_builder.ai_rag_enhancement', 'RAG Enhancement')}</span>
                     <div className="flex items-center space-x-2">
                       <Switch
                         checked={knowledgeBaseEnabled}
@@ -2856,15 +3031,15 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                 {knowledgeBaseEnabled ? (
                   <div className="space-y-4">
                     {/* Pinecone Credentials */}
-                    <div className="space-y-3 p-3 bg-white rounded-lg border border-blue-200">
+                    <div className="space-y-3 p-3 bg-card rounded-lg border border-blue-200 dark:border-blue-900">
                       <div className="flex items-center gap-2 mb-2">
-                        <Target className="h-4 w-4 text-blue-600" />
-                        <h4 className="text-xs font-semibold text-gray-700">Pinecone Configuration</h4>
+                        <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <h4 className="text-xs font-semibold text-foreground">Pinecone Configuration</h4>
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="pinecone-api-key" className="text-xs">
-                          Pinecone API Key <span className="text-red-500">*</span>
+                          Pinecone API Key <span className="text-red-500 dark:text-red-400">*</span>
                         </Label>
                         <div className="relative">
                           <Input
@@ -2878,13 +3053,13 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                           <button
                             type="button"
                             onClick={() => setShowPineconeApiKey(!showPineconeApiKey)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           >
                             {showPineconeApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                           </button>
                         </div>
                         <p className="text-[10px] text-muted-foreground">
-                          Get your API key from <a href="https://app.pinecone.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Pinecone Console</a>
+                          Get your API key from <a href="https://app.pinecone.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Pinecone Console</a>
                         </p>
                       </div>
 
@@ -2966,9 +3141,9 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
               </div>
 
               {/* MCP Servers Configuration */}
-              <div className="border rounded-lg p-3 bg-gradient-to-r from-purple-50 to-pink-50">
+              <div className="border rounded-lg p-3 ">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Settings className="h-4 w-4" />
                     {t('flow_builder.ai_mcp_servers', 'MCP Servers')}
                   </h3>
@@ -2976,7 +3151,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                          <Info className="h-3 w-3 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="max-w-xs">
@@ -3028,7 +3203,7 @@ export function AIAssistantNode({ id, data, isConnectable }: AIAssistantNodeProp
                     </Button>
 
                     {mcpServers.length === 0 && (
-                      <div className="text-center p-4 bg-white rounded-lg border border-purple-200">
+                      <div className="text-center p-4 bg-card rounded-lg border border-purple-200 dark:border-purple-900">
                         <p className="text-[10px] text-muted-foreground mb-2">
                           No MCP servers configured. Click "Add another MCP Server" to get started.
                         </p>

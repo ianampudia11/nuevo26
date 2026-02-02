@@ -233,7 +233,7 @@ export function ContactExportModal({
                   
                   {/* Selected Tags */}
                   {filters.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2 p-2 sm:p-3 bg-muted rounded-lg">
                       {filters.tags.map(tag => (
                         <Badge key={tag} variant="secondary" className="flex items-center gap-1 text-xs sm:text-sm">
                           {tag}

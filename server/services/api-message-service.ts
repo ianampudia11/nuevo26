@@ -2,8 +2,6 @@ import { storage } from '../storage';
 import { ChannelConnection, InsertMessage, InsertConversation, InsertContact } from '@shared/schema';
 import whatsAppService from './channels/whatsapp';
 import whatsAppOfficialService from './channels/whatsapp-official';
-import whatsAppTwilioService from './channels/whatsapp-twilio';
-import whatsApp360DialogPartnerService from './channels/whatsapp-360dialog-partner';
 import whatsAppMetaPartnerService from './channels/whatsapp-meta-partner';
 import telegramService from './channels/telegram';
 import instagramService from './channels/instagram';
@@ -33,6 +31,7 @@ export interface MessageResponse {
   timestamp: Date;
   channelType: string;
   conversationId: number;
+  error?: string;
 }
 
 export interface ChannelInfo {
@@ -179,6 +178,284 @@ class ApiMessageService {
   }
 
   /**
+   * Send batch messages
+   */
+  async sendBatchMessages(companyId: number, messages: SendMessageRequest[]): Promise<MessageResponse[]> {
+    if (messages.length > 100) {
+      const error = new Error('Batch size cannot exceed 100 messages');
+      error.name = 'BatchSizeExceededError';
+      throw error;
+    }
+
+    const results: MessageResponse[] = [];
+    
+    for (const messageRequest of messages) {
+      try {
+        const result = await this.sendMessage(companyId, messageRequest);
+        results.push(result);
+      } catch (error: any) {
+        results.push({
+          id: 0,
+          status: 'failed',
+          timestamp: new Date(),
+          channelType: 'unknown',
+          conversationId: 0,
+          error: error.message || 'Failed to send message'
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Send template message (WhatsApp official/meta only)
+   */
+  async sendTemplateMessage(
+    companyId: number,
+    request: {
+      channelId: number;
+      to: string;
+      templateName: string;
+      templateLanguage: string;
+      components?: Array<{
+        type: 'header' | 'body' | 'button';
+        parameters: Array<string | { type: 'text'; text: string }>;
+      }>;
+    }
+  ): Promise<MessageResponse> {
+    const connection = await this.validateChannelAccess(companyId, request.channelId);
+    
+    if (connection.channelType !== 'whatsapp_official' && connection.channelType !== 'whatsapp_meta') {
+      throw new Error('Template messages are only supported on WhatsApp official and meta channels');
+    }
+
+    const contact = await this.findOrCreateContact(companyId, request.to, connection.channelType);
+    const conversation = await this.findOrCreateConversation(contact.id, connection);
+    const systemUserId = 1;
+
+    let sentMessage;
+    if (connection.channelType === 'whatsapp_official') {
+      if (!connection.companyId) {
+        throw new Error('Company ID is required for WhatsApp Official template messages');
+      }
+      const { sendTemplateMessage } = await import('./channels/whatsapp-official');
+
+      const convertedComponents = (request.components || []).map(comp => ({
+        type: comp.type,
+        parameters: comp.parameters.map(param => 
+          typeof param === 'string' 
+            ? { type: 'text' as const, text: param }
+            : param
+        )
+      }));
+      sentMessage = await sendTemplateMessage(
+        connection.id,
+        systemUserId,
+        connection.companyId,
+        request.to,
+        request.templateName,
+        request.templateLanguage,
+        convertedComponents
+      );
+    } else {
+
+      throw new Error('Template messages are not supported on WhatsApp Meta Partner channels via API');
+    }
+
+    return {
+      id: sentMessage.id,
+      externalId: sentMessage.externalId || undefined,
+      status: sentMessage.status || 'sent',
+      timestamp: sentMessage.createdAt || new Date(),
+      channelType: connection.channelType,
+      conversationId: conversation.id
+    };
+  }
+
+  /**
+   * Send interactive message (WhatsApp only)
+   */
+  async sendInteractiveMessage(
+    companyId: number,
+    request: {
+      channelId: number;
+      to: string;
+      interactiveType: 'button' | 'list';
+      content: {
+        header?: {
+          type: 'text' | 'image' | 'video' | 'document';
+          text?: string;
+          mediaUrl?: string;
+        };
+        body: {
+          text: string;
+        };
+        footer?: {
+          text: string;
+        };
+      };
+      options: {
+        type: 'button';
+        buttons: Array<{ id: string; title: string }>;
+      } | {
+        type: 'list';
+        button: string;
+        sections: Array<{
+          title?: string;
+          rows: Array<{ id: string; title: string; description?: string }>;
+        }>;
+      };
+    }
+  ): Promise<MessageResponse> {
+    const connection = await this.validateChannelAccess(companyId, request.channelId);
+    
+    if (connection.channelType !== 'whatsapp_official' && connection.channelType !== 'whatsapp_meta') {
+      throw new Error('Interactive messages are only supported on WhatsApp official and meta channels');
+    }
+
+    const contact = await this.findOrCreateContact(companyId, request.to, connection.channelType);
+    const conversation = await this.findOrCreateConversation(contact.id, connection);
+    const systemUserId = 1;
+
+    let sentMessage;
+    if (connection.channelType === 'whatsapp_official') {
+      if (!connection.companyId) {
+        throw new Error('Company ID is required for WhatsApp Official interactive messages');
+      }
+      const { sendInteractiveMessage } = await import('./channels/whatsapp-official');
+
+      const interactiveMessage: any = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: request.to,
+        type: 'interactive',
+        interactive: {
+          type: request.interactiveType,
+          ...(request.content.header && {
+            header: request.content.header.type === 'text' 
+              ? { type: 'text', text: request.content.header.text }
+              : { type: request.content.header.type, [request.content.header.type]: { link: request.content.header.mediaUrl } }
+          }),
+          body: request.content.body,
+          ...(request.content.footer && { footer: request.content.footer }),
+          action: request.options.type === 'button'
+            ? { buttons: request.options.buttons.map(btn => ({ type: 'reply', reply: { id: btn.id, title: btn.title } })) }
+            : { button: request.options.button, sections: request.options.sections }
+        }
+      };
+      
+      const result = await sendInteractiveMessage(connection.id, interactiveMessage);
+
+      const messageData: InsertMessage = {
+        conversationId: conversation.id,
+        senderId: systemUserId,
+        content: request.content.body.text,
+        type: 'interactive',
+        direction: 'outbound',
+        status: result.success ? 'sent' : 'failed',
+        externalId: result.messageId,
+        metadata: { interactiveType: request.interactiveType, options: request.options } as any
+      };
+      sentMessage = await storage.createMessage(messageData);
+    } else {
+
+      throw new Error('Interactive messages are not supported on WhatsApp Meta Partner channels via API');
+    }
+
+    return {
+      id: sentMessage.id,
+      externalId: sentMessage.externalId || undefined,
+      status: sentMessage.status || 'sent',
+      timestamp: sentMessage.createdAt || new Date(),
+      channelType: connection.channelType,
+      conversationId: conversation.id
+    };
+  }
+
+  /**
+   * Get conversations with pagination and filters
+   */
+  async getConversations(
+    companyId: number,
+    options: {
+      page: number;
+      limit: number;
+      channelId?: number;
+      status?: string;
+      isGroup?: boolean;
+    }
+  ): Promise<{ conversations: any[]; total: number }> {
+
+    const result = await storage.getConversations({
+      companyId,
+      page: options.page,
+      limit: options.limit
+    });
+
+
+    let filteredConversations = result.conversations;
+    if (options.channelId) {
+      filteredConversations = filteredConversations.filter((conv: any) => conv.channelId === options.channelId);
+    }
+    if (options.status) {
+      filteredConversations = filteredConversations.filter((conv: any) => conv.status === options.status);
+    }
+    if (options.isGroup !== undefined) {
+      filteredConversations = filteredConversations.filter((conv: any) => conv.isGroup === options.isGroup);
+    }
+
+
+    const total = await storage.getConversationsCountByCompany(companyId);
+
+    return {
+      conversations: filteredConversations.map((conv: any) => ({
+        id: conv.id,
+        contactId: conv.contactId,
+        channelId: conv.channelId,
+        channelType: conv.channelType,
+        status: conv.status,
+        isGroup: conv.isGroup,
+        lastMessageAt: conv.lastMessageAt,
+        createdAt: conv.createdAt
+      })),
+      total
+    };
+  }
+
+  /**
+   * Get contacts with pagination and search
+   */
+  async getContacts(
+    companyId: number,
+    options: {
+      page: number;
+      limit: number;
+      search?: string;
+    }
+  ): Promise<{ contacts: any[]; total: number }> {
+
+    const result = await storage.getContacts({
+      companyId,
+      page: options.page,
+      limit: options.limit,
+      search: options.search
+    });
+
+    return {
+      contacts: result.contacts.map((contact: any) => ({
+        id: contact.id,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+        identifier: contact.identifier,
+        createdAt: contact.createdAt
+      })),
+      total: result.total
+    };
+  }
+
+  /**
    * Validate that a channel belongs to the company
    */
   private async validateChannelAccess(companyId: number, channelId: number): Promise<ChannelConnection> {
@@ -270,12 +547,6 @@ class ApiMessageService {
         }
         return await whatsAppOfficialService.sendMessage(connection.id, systemUserId, connection.companyId, to, message);
       
-      case 'whatsapp_twilio':
-        return await whatsAppTwilioService.sendMessage(connection.id, systemUserId, to, message);
-      
-      case 'whatsapp_360dialog':
-        return await whatsApp360DialogPartnerService.sendMessage(connection.id, systemUserId, to, message);
-      
       case 'whatsapp_meta':
         return await whatsAppMetaPartnerService.sendMessage(connection.id, systemUserId, to, message);
 
@@ -320,6 +591,38 @@ class ApiMessageService {
         const { sendMessage: messengerSendMessage } = await import('./channels/messenger');
         return await messengerSendMessage(connection.id, systemUserId, connection.companyId, to, message);
 
+      case 'tiktok':
+        if (!conversationId) {
+          throw new Error('Conversation ID is required for TikTok messages');
+        }
+        const TikTokService = await import('./channels/tiktok');
+        return await TikTokService.default.sendAndSaveMessage(
+          connection.id,
+          conversationId,
+          to,
+          message,
+          'text'
+        );
+
+      case 'email':
+        const emailService = await import('./channels/email');
+        return await emailService.sendMessage(
+          connection.id,
+          systemUserId,
+          to,
+          'API Message',
+          message,
+          { isHtml: false }
+        );
+
+      case 'webchat':
+        const webchatService = await import('./channels/webchat');
+        return await webchatService.default.sendMessage(
+          connection.id,
+          to, // sessionId
+          message
+        );
+
       default:
         throw new Error(`Unsupported channel type: ${connection.channelType}`);
     }
@@ -350,12 +653,6 @@ class ApiMessageService {
         }
         return await whatsAppOfficialService.sendMedia(connection.id, systemUserId, connection.companyId, to, mediaType, mediaUrl, caption, filename, undefined, true);
       
-      case 'whatsapp_twilio':
-        return await whatsAppTwilioService.sendMedia(connection.id, systemUserId, to, mediaType, mediaUrl, caption, filename);
-      
-      case 'whatsapp_360dialog':
-        return await whatsApp360DialogPartnerService.sendMedia(connection.id, systemUserId, to, mediaType, mediaUrl, caption, filename);
-      
       case 'whatsapp_meta':
         return await whatsAppMetaPartnerService.sendMessage(connection.id, systemUserId, to, caption, mediaUrl, mediaType);
 
@@ -381,6 +678,53 @@ class ApiMessageService {
 
       case 'twilio_sms':
         return await twilioSmsService.sendMedia(connection.id, systemUserId, to, mediaType, mediaUrl, caption);
+
+      case 'tiktok':
+
+        if (mediaType !== 'image' && mediaType !== 'video') {
+          throw new Error(`TikTok only supports image and video media types, not ${mediaType}`);
+        }
+        if (!_conversationId) {
+          throw new Error('Conversation ID is required for TikTok media messages');
+        }
+
+
+        const TikTokService = await import('./channels/tiktok');
+        const messageContent = mediaUrl ? `${caption || ''} [Media: ${mediaUrl}]` : (caption || '');
+        const messageType = mediaType === 'image' ? 'image' : mediaType === 'video' ? 'video' : 'text';
+        return await TikTokService.default.sendAndSaveMessage(
+          connection.id,
+          _conversationId,
+          to,
+          messageContent,
+          messageType
+        );
+
+      case 'email':
+
+
+        const emailService = await import('./channels/email');
+        const emailContent = caption || `Media: ${mediaUrl}`;
+        return await emailService.sendMessage(
+          connection.id,
+          systemUserId,
+          to,
+          'API Media Message',
+          emailContent,
+          { isHtml: false }
+        );
+
+      case 'webchat':
+
+        const webchatService = await import('./channels/webchat');
+        const webchatMessageType = mediaType === 'image' ? 'image' : mediaType === 'video' ? 'video' : mediaType === 'audio' ? 'audio' : 'document';
+        return await webchatService.default.sendMessage(
+          connection.id,
+          to, // sessionId
+          caption || '',
+          webchatMessageType,
+          mediaUrl
+        );
 
       default:
         throw new Error(`Unsupported channel type for media: ${connection.channelType}`);

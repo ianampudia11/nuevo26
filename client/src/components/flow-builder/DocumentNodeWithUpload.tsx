@@ -199,7 +199,7 @@ export function DocumentNodeWithUpload({ id, data, isConnectable }: DocumentNode
       ) : (
         <div className="space-y-3">
           {mediaUrl ? (
-            <div className="relative bg-secondary/30 rounded overflow-hidden p-3 flex flex-col items-center justify-center">
+            <div className="relative  rounded overflow-hidden p-3 flex flex-col items-center justify-center">
               {getFileIcon(mediaUrl)}
               <div className="text-xs mt-2 text-center max-w-full truncate">
                 {getFileName(mediaUrl)}
@@ -207,7 +207,7 @@ export function DocumentNodeWithUpload({ id, data, isConnectable }: DocumentNode
               <span className="absolute top-1 right-1 text-[10px] px-1 bg-background/80 rounded">{t('flow_builder.document_upload_document_label', 'Document')}</span>
             </div>
           ) : (
-            <div className="bg-secondary/30 p-3 rounded flex flex-col items-center justify-center">
+            <div className=" p-3 rounded flex flex-col items-center justify-center">
               <File className="h-8 w-8 text-muted-foreground mb-1" />
               <span className="text-xs text-muted-foreground">{t('flow_builder.document_upload_no_document_selected', 'No document selected')}</span>
             </div>

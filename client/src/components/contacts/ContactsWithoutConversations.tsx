@@ -204,7 +204,7 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
       case 'telegram':
         return { label: 'Telegram', color: 'bg-sky-100 text-sky-800' };
       default:
-        return { label: identifierType || 'Unknown', color: 'bg-gray-100 text-gray-800' };
+        return { label: identifierType || 'Unknown', color: 'bg-muted text-muted-foreground' };
     }
   };
 
@@ -213,14 +213,14 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
 
   if (!isExpanded) {
     return (
-      <div className="border-b border-gray-200 bg-white">
+      <div className="border-b border-border bg-card">
         <button
           onClick={() => setIsExpanded(true)}
-          className="w-full p-3 sm:p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+          className="w-full p-3 sm:p-4 flex items-center justify-between hover:bg-accent/50 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
               {t('contacts.start_new_conversations', 'Start New Conversations')}
             </span>
             {totalContacts > 0 && (
@@ -229,19 +229,19 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
               </Badge>
             )}
           </div>
-          <Plus className="h-4 w-4 text-gray-400" />
+          <Plus className="h-4 w-4 text-muted-foreground" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="border-b border-gray-200 bg-white">
-      <div className="p-3 sm:p-4 border-b border-gray-100">
+    <div className="border-b border-border bg-card">
+      <div className="p-3 sm:p-4 border-b border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
               {t('contacts.start_new_conversations', 'Start New Conversations')}
             </span>
             {totalContacts > 0 && (
@@ -252,14 +252,14 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
           </div>
           <button
             onClick={() => setIsExpanded(false)}
-            className="p-1 rounded hover:bg-gray-100"
+            className="p-1 rounded hover:bg-accent"
           >
-            <Plus className="h-4 w-4 text-gray-400 rotate-45" />
+            <Plus className="h-4 w-4 text-muted-foreground rotate-45" />
           </button>
         </div>
         
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t('contacts.search_contacts', 'Search contacts...')}
             value={searchQuery}
@@ -269,7 +269,7 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
           {searchQuery && (
             <button
               onClick={() => handleSearchChange('')}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <Plus className="h-4 w-4 rotate-45" />
             </button>
@@ -304,17 +304,17 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
             <div className="p-4 space-y-3">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="flex items-center gap-3 animate-pulse">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                  <div className="w-10 h-10 bg-muted rounded-full"></div>
                   <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-1"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-4 bg-muted rounded w-3/4 mb-1"></div>
+                    <div className="h-3 bg-muted rounded w-1/2"></div>
                   </div>
-                  <div className="w-16 h-6 bg-gray-200 rounded"></div>
+                  <div className="w-16 h-6 bg-muted rounded"></div>
                 </div>
               ))}
             </div>
           ) : contacts.length === 0 && !error ? (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-muted-foreground">
               <div className="text-sm">
                 {debouncedSearchQuery
                   ? t('contacts.no_contacts_found', 'No contacts found')
@@ -322,7 +322,7 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
                 }
               </div>
               {debouncedSearchQuery && (
-                <div className="text-xs mt-1 text-gray-400">
+                <div className="text-xs mt-1 text-muted-foreground">
                   {t('contacts.try_different_search', 'Try a different search term')}
                 </div>
               )}
@@ -336,7 +336,7 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
                 return (
                   <div
                     key={contact.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors"
                   >
                     <ContactAvatar
                       contact={contact}
@@ -346,7 +346,7 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {truncateName(contact.name)}
                         </p>
                         <Badge
@@ -356,7 +356,7 @@ export function ContactsWithoutConversations({ onConversationCreated }: Contacts
                           {channelInfo.label}
                         </Badge>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-xs text-muted-foreground truncate">
                         {contact.phone || contact.email}
                       </p>
                     </div>

@@ -30,8 +30,8 @@ export const WHATSAPP_LIMITS = {
     },
     AUDIO: {
       MAX_SIZE: 16 * 1024 * 1024, // 16MB
-      FORMATS: ['audio/aac', 'audio/mp4', 'audio/mpeg', 'audio/amr', 'audio/ogg'],
-      EXTENSIONS: ['.aac', '.m4a', '.mp3', '.amr', '.ogg']
+      FORMATS: ['audio/aac', 'audio/mp4', 'audio/mpeg', 'audio/amr', 'audio/ogg'], // OGG must use Opus codec
+      EXTENSIONS: ['.aac', '.m4a', '.mp3', '.amr', '.ogg'] // Preferred format: OGG Opus
     },
     DOCUMENT: {
       MAX_SIZE: 100 * 1024 * 1024, // 100MB
@@ -267,3 +267,35 @@ export const validateMediaFile = (file: File, mediaType: WhatsAppMessageType) =>
     errors
   };
 };
+
+
+export const DAYS_OF_WEEK = [
+  { value: 0, label: 'Sunday', short: 'Sun' },
+  { value: 1, label: 'Monday', short: 'Mon' },
+  { value: 2, label: 'Tuesday', short: 'Tue' },
+  { value: 3, label: 'Wednesday', short: 'Wed' },
+  { value: 4, label: 'Thursday', short: 'Thu' },
+  { value: 5, label: 'Friday', short: 'Fri' },
+  { value: 6, label: 'Saturday', short: 'Sat' }
+] as const;
+
+export const RECURRING_DAILY_LIMITS = {
+  MAX_SEND_TIMES: 10,
+  MIN_SEND_TIMES: 1,
+  MIN_TIME_INTERVAL_MINUTES: 1 // Minimum gap between send times
+} as const;
+
+export const isValidTimeFormat = (time: string): boolean => {
+  return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time);
+};
+
+/**
+ * Audio specifications for WhatsApp compatibility
+ * Recommended settings for optimal voice message quality
+ */
+export const AUDIO_SPECS = {
+  sampleRate: 48000, // Opus codec preferred sample rate
+  bitrate: '64k', // Optimal for voice
+  channels: 1, // Mono
+  codec: 'opus' // For OGG format
+} as const;

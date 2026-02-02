@@ -40,7 +40,7 @@ export function VersionDisplay({
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
-      <Badge variant={variant} className="text-xs text-white">
+      <Badge variant={variant} className="text-xs text-primary-foreground">
          v{version}
       </Badge>
       {showIcon && (

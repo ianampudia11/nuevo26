@@ -241,7 +241,10 @@ class SmartWebSocketBroadcaster {
         if (!client.isAuthenticated || !client.userId) return;
 
 
-        if (event.companyId && client.companyId !== event.companyId) return;
+        if (event.companyId && client.companyId !== event.companyId) {
+
+          return;
+        }
 
 
         if (event.userId && client.userId !== event.userId) return;
@@ -262,7 +265,10 @@ class SmartWebSocketBroadcaster {
         if (!subscription.eventTypes.has(event.type)) return;
 
 
-        if (event.companyId && subscription.companyId !== event.companyId) return;
+        if (event.companyId && subscription.companyId !== event.companyId) {
+
+          return;
+        }
 
 
         if (event.userId && subscription.userId !== event.userId) return;

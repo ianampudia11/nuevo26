@@ -39,20 +39,20 @@ export default function PollMessage({
   };
 
   return (
-    <div className="poll-message bg-white rounded-lg border border-gray-200 overflow-hidden max-w-sm">
+    <div className="poll-message bg-card rounded-lg border border-border overflow-hidden max-w-sm">
       {/* Poll Header */}
-      <div className="px-4 py-3 bg-green-50 border-b border-gray-200">
+      <div className="px-4 py-3 bg-green-50 dark:bg-green-900/40 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-5 h-5 rounded-full flex items-center justify-center">
             <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
           </div>
-          <span className="text-sm font-medium text-green-800">
+          <span className="text-sm font-medium text-green-800 dark:text-green-300">
             {t('poll.title', 'Poll')}
           </span>
         </div>
-        <p className="text-sm font-medium text-gray-900 leading-relaxed">
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
           {question}
         </p>
       </div>
@@ -69,14 +69,14 @@ export default function PollMessage({
               key={index}
               className={`relative rounded-lg border transition-colors ${
                 isSelected 
-                  ? 'border-green-500 ' 
-                  : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                  ? 'border-green-500' 
+                  : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
               {/* Vote percentage background bar */}
               {showResults && totalVotes > 0 && (
                 <div 
-                  className="absolute inset-0 bg-green-100 rounded-lg transition-all duration-300"
+                  className="absolute inset-0 bg-green-100 dark:bg-green-800/50 rounded-lg transition-all duration-300"
                   style={{ width: `${percentage}%` }}
                 />
               )}
@@ -88,13 +88,13 @@ export default function PollMessage({
                     {isSelected ? (
                       <CheckCircle className="w-4 h-4 text-green-600" />
                     ) : (
-                      <Circle className="w-4 h-4 text-gray-400" />
+                      <Circle className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                     )}
                   </div>
                   
                   {/* Option text */}
                   <span className={`text-sm font-medium flex-1 ${
-                    isSelected ? 'text-green-900' : 'text-gray-900'
+                    isSelected ? 'text-green-900 dark:text-green-200' : 'text-gray-900 dark:text-gray-100'
                   }`}>
                     {option.text}
                   </span>
@@ -102,7 +102,7 @@ export default function PollMessage({
 
                 {/* Vote count and percentage */}
                 {showResults && (
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                     {votes > 0 && (
                       <> &nbsp;
                         <span>({percentage}%)</span>
@@ -120,8 +120,8 @@ export default function PollMessage({
 
       {/* Poll Footer */}
       {showResults && totalVotes > 0 && (
-        <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
-          <p className="text-xs text-gray-600 text-center">
+        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
             {t('poll.total_votes', '{{count}} vote', { count: totalVotes })}
           </p>
         </div>
@@ -129,7 +129,7 @@ export default function PollMessage({
       
       {/* View/Hide votes link for outbound polls */}
       {isOutbound && (
-        <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
           <button
             className="text-xs text-green-600 hover:text-green-700 font-medium w-full text-center transition-colors disabled:opacity-50"
             onClick={onViewVotes}

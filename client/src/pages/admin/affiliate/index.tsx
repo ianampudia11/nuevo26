@@ -341,12 +341,12 @@ export default function AffiliateManagementPage() {
       resetAffiliateForm();
       toast({
         title: t('admin.affiliate.create.success', 'Affiliate created successfully'),
-        description: 'The new affiliate has been added to the system.',
+        description: t('admin.affiliate.create.success_description', 'The new affiliate has been added to the system.'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
+        title: t('common.error', 'Error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -366,12 +366,12 @@ export default function AffiliateManagementPage() {
       setSelectedAffiliate(null);
       toast({
         title: t('admin.affiliate.update.success', 'Affiliate updated successfully'),
-        description: 'The affiliate information has been updated.',
+        description: t('admin.affiliate.update.success_description', 'The affiliate information has been updated.'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
+        title: t('common.error', 'Error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -390,12 +390,12 @@ export default function AffiliateManagementPage() {
       setConfirmDialogOpen(false);
       toast({
         title: t('admin.affiliate.delete.success', 'Affiliate deleted successfully'),
-        description: 'The affiliate has been removed from the system.',
+        description: t('admin.affiliate.delete.success_description', 'The affiliate has been removed from the system.'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
+        title: t('common.error', 'Error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -413,12 +413,12 @@ export default function AffiliateManagementPage() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'affiliate'] });
       toast({
         title: t('admin.affiliate.approve.success', 'Affiliate approved successfully'),
-        description: 'The affiliate has been activated and can now start earning commissions.',
+        description: t('admin.affiliate.approve.success_description', 'The affiliate has been activated and can now start earning commissions.'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
+        title: t('common.error', 'Error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -436,12 +436,12 @@ export default function AffiliateManagementPage() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'affiliate'] });
       toast({
         title: t('admin.affiliate.suspend.success', 'Affiliate suspended successfully'),
-        description: 'The affiliate has been suspended and cannot earn new commissions.',
+        description: t('admin.affiliate.suspend.success_description', 'The affiliate has been suspended and cannot earn new commissions.'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
+        title: t('common.error', 'Error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -458,13 +458,13 @@ export default function AffiliateManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'affiliate'] });
       toast({
-        title: 'Success',
-        description: 'Application approved successfully',
+        title: t('admin.affiliate.applications.approve.success_title', 'Success'),
+        description: t('admin.affiliate.applications.approve.success_description', 'Application approved successfully'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
+        title: t('common.error', 'Error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -481,13 +481,13 @@ export default function AffiliateManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'affiliate'] });
       toast({
-        title: 'Success',
-        description: 'Application rejected successfully',
+        title: t('admin.affiliate.applications.reject.success_title', 'Success'),
+        description: t('admin.affiliate.applications.reject.success_description', 'Application rejected successfully'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
+        title: t('common.error', 'Error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -534,14 +534,14 @@ export default function AffiliateManagementPage() {
 
   const openDeleteDialog = (affiliate: Affiliate) => {
     setSelectedAffiliate(affiliate);
-    setConfirmMessage(`Are you sure you want to delete the affiliate "${affiliate.name}"? This action cannot be undone and will remove all associated data.`);
+    setConfirmMessage(t('admin.affiliate.delete.confirm_message', 'Are you sure you want to delete the affiliate "{{name}}"? This action cannot be undone and will remove all associated data.', { name: affiliate.name }));
     setConfirmAction(() => () => deleteAffiliateMutation.mutate(affiliate.id));
     setConfirmDialogOpen(true);
   };
 
   const openBulkDeleteDialog = () => {
     const count = selectedAffiliates.length;
-    setConfirmMessage(`Are you sure you want to delete ${count} selected affiliate${count > 1 ? 's' : ''}? This action cannot be undone and will remove all associated data.`);
+    setConfirmMessage(t('admin.affiliate.delete.bulk_confirm_message', 'Are you sure you want to delete {{count}} selected affiliate{{plural}}? This action cannot be undone and will remove all associated data.', { count, plural: count > 1 ? 's' : '' }));
     setConfirmAction(() => () => {
 
       selectedAffiliates.forEach(affiliateId => {
@@ -616,7 +616,7 @@ export default function AffiliateManagementPage() {
 
   const TrendIndicator = ({ current, previous, suffix = "" }: { current: number; previous: number; suffix?: string }) => {
     if (current === undefined || previous === undefined) {
-      return <div className="text-xs text-muted-foreground">-</div>;
+      return <div className="text-xs text-muted-foreground">{t('admin.affiliate.metrics.no_data', '-')}</div>;
     }
 
     const change = calculatePercentageChange(current, previous);
@@ -763,7 +763,7 @@ export default function AffiliateManagementPage() {
               <TrendIndicator
                 current={safeMetrics.conversionRate}
                 previous={safeMetrics.previousPeriod.conversionRate}
-                suffix=" pts"
+                suffix={t('admin.affiliate.metrics.points_suffix', ' pts')}
               />
             </div>
           </CardContent>
@@ -864,15 +864,15 @@ export default function AffiliateManagementPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7d">Last 7 days</SelectItem>
-                    <SelectItem value="30d">Last 30 days</SelectItem>
-                    <SelectItem value="90d">Last 90 days</SelectItem>
-                    <SelectItem value="1y">Last year</SelectItem>
+                    <SelectItem value="7d">{t('admin.affiliate.time_range.last_7_days', 'Last 7 days')}</SelectItem>
+                    <SelectItem value="30d">{t('admin.affiliate.time_range.last_30_days', 'Last 30 days')}</SelectItem>
+                    <SelectItem value="90d">{t('admin.affiliate.time_range.last_90_days', 'Last 90 days')}</SelectItem>
+                    <SelectItem value="1y">{t('admin.affiliate.time_range.last_year', 'Last year')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline" size="sm">
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
+                  {t('admin.affiliate.refresh', 'Refresh')}
                 </Button>
               </div>
             </div>
@@ -885,7 +885,7 @@ export default function AffiliateManagementPage() {
                   {t('admin.affiliate.charts.performance_trends', 'Performance Trends')}
                 </CardTitle>
                 <CardDescription>
-                  Track revenue, conversions, and sign-ups over time
+                  {t('admin.affiliate.charts.performance_trends_description', 'Track revenue, conversions, and sign-ups over time')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -894,7 +894,7 @@ export default function AffiliateManagementPage() {
                     <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm">
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">Loading chart data...</p>
+                        <p className="text-sm text-muted-foreground">{t('admin.affiliate.charts.loading', 'Loading chart data...')}</p>
                       </div>
                     </div>
                   ) : null}
@@ -930,9 +930,9 @@ export default function AffiliateManagementPage() {
                         fillOpacity={0.1}
                         stroke={brandColors.primary}
                         strokeWidth={2}
-                        name="Revenue"
+                        name={t('admin.affiliate.charts.series.revenue', 'Revenue')}
                       />
-                      <Bar yAxisId="right" dataKey="conversions" fill={brandColors.success} name="Conversions" />
+                      <Bar yAxisId="right" dataKey="conversions" fill={brandColors.success} name={t('admin.affiliate.charts.series.conversions', 'Conversions')} />
                       <Line
                         yAxisId="right"
                         type="monotone"
@@ -940,7 +940,7 @@ export default function AffiliateManagementPage() {
                         stroke={brandColors.warning}
                         strokeWidth={2}
                         dot={{ fill: brandColors.warning, strokeWidth: 2, r: 4 }}
-                        name="Sign-ups"
+                        name={t('admin.affiliate.charts.series.sign_ups', 'Sign-ups')}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -1034,7 +1034,7 @@ export default function AffiliateManagementPage() {
                             borderRadius: '8px'
                           }}
                         />
-                        <Bar dataKey="revenue" fill={brandColors.secondary} name="Revenue" />
+                        <Bar dataKey="revenue" fill={brandColors.secondary} name={t('admin.affiliate.charts.series.revenue', 'Revenue')} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1088,22 +1088,22 @@ export default function AffiliateManagementPage() {
                   {t('admin.affiliate.export.title', 'Export Data')}
                 </CardTitle>
                 <CardDescription>
-                  Download affiliate performance data and reports
+                  {t('admin.affiliate.export.description', 'Download affiliate performance data and reports')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-colors">
                     <Download className="h-4 w-4 mr-2" />
-                    Export CSV
+                    {t('admin.affiliate.export.csv', 'Export CSV')}
                   </Button>
                   <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-colors">
                     <Download className="h-4 w-4 mr-2" />
-                    Export PDF Report
+                    {t('admin.affiliate.export.pdf', 'Export PDF Report')}
                   </Button>
                   <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-colors">
                     <Download className="h-4 w-4 mr-2" />
-                    Export Chart Data
+                    {t('admin.affiliate.export.chart_data', 'Export Chart Data')}
                   </Button>
                 </div>
               </CardContent>
@@ -1115,7 +1115,7 @@ export default function AffiliateManagementPage() {
               <CardHeader>
                 <CardTitle>{t('admin.affiliate.applications.title', 'Affiliate Applications')}</CardTitle>
                 <CardDescription>
-                  Review and manage affiliate partner applications
+                  {t('admin.affiliate.applications.description', 'Review and manage affiliate partner applications')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1144,7 +1144,7 @@ export default function AffiliateManagementPage() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-500">
-                        {applications.length} application{applications.length !== 1 ? 's' : ''} found
+                        {t('admin.affiliate.applications.count', '{{count}} application{{plural}} found', { count: applications.length, plural: applications.length !== 1 ? 's' : '' })}
                       </div>
                       <Button
                         variant="outline"
@@ -1152,20 +1152,20 @@ export default function AffiliateManagementPage() {
                         onClick={() => window.open('/become-partner', '_blank')}
                       >
                         <Eye className="mr-2 h-4 w-4" />
-                        Preview Application Form
+                        {t('admin.affiliate.applications.preview_form', 'Preview Application Form')}
                       </Button>
                     </div>
 
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Applicant</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Marketing Channels</TableHead>
-                          <TableHead>Expected Referrals</TableHead>
-                          <TableHead>Submitted</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableHead>{t('admin.affiliate.applications.table.applicant', 'Applicant')}</TableHead>
+                          <TableHead>{t('admin.affiliate.applications.table.email', 'Email')}</TableHead>
+                          <TableHead>{t('admin.affiliate.applications.table.status', 'Status')}</TableHead>
+                          <TableHead>{t('admin.affiliate.applications.table.marketing_channels', 'Marketing Channels')}</TableHead>
+                          <TableHead>{t('admin.affiliate.applications.table.expected_referrals', 'Expected Referrals')}</TableHead>
+                          <TableHead>{t('admin.affiliate.applications.table.submitted', 'Submitted')}</TableHead>
+                          <TableHead className="text-right">{t('admin.affiliate.applications.table.actions', 'Actions')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1189,11 +1189,7 @@ export default function AffiliateManagementPage() {
                                 application.status === 'under_review' ? 'secondary' :
                                 'outline'
                               }>
-                                {application.status === 'pending' ? 'Pending' :
-                                 application.status === 'approved' ? 'Approved' :
-                                 application.status === 'rejected' ? 'Rejected' :
-                                 application.status === 'under_review' ? 'Under Review' :
-                                 application.status}
+                                {t(`admin.affiliate.applications.status.${application.status}`, application.status)}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -1204,7 +1200,7 @@ export default function AffiliateManagementPage() {
                                     ).join(', ')
                                   : application.marketingChannels}
                                 {Array.isArray(application.marketingChannels) && application.marketingChannels.length > 2 &&
-                                  ` +${application.marketingChannels.length - 2} more`}
+                                  t('admin.affiliate.applications.more_channels', ' +{{count}} more', { count: application.marketingChannels.length - 2 })}
                               </div>
                             </TableCell>
                             <TableCell>{application.expectedMonthlyReferrals}</TableCell>
@@ -1224,7 +1220,7 @@ export default function AffiliateManagementPage() {
                                     setViewApplicationDialogOpen(true);
                                   }}>
                                     <Eye className="mr-2 h-4 w-4" />
-                                    View Details
+                                    {t('admin.affiliate.applications.actions.view_details', 'View Details')}
                                   </DropdownMenuItem>
                                   {application.status === 'pending' && (
                                     <>
@@ -1232,11 +1228,11 @@ export default function AffiliateManagementPage() {
                                         approveApplicationMutation.mutate(application.id);
                                       }}>
                                         <CheckCircle className="mr-2 h-4 w-4" />
-                                        Approve
+                                        {t('admin.affiliate.applications.actions.approve', 'Approve')}
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem onClick={() => {
-                                        const rejectionReason = prompt('Please provide a reason for rejection:');
+                                        const rejectionReason = prompt(t('admin.affiliate.applications.reject.prompt', 'Please provide a reason for rejection:'));
                                         if (rejectionReason) {
                                           rejectApplicationMutation.mutate({
                                             applicationId: application.id,
@@ -1245,7 +1241,7 @@ export default function AffiliateManagementPage() {
                                         }
                                       }}>
                                         <AlertCircle className="mr-2 h-4 w-4" />
-                                        Reject
+                                        {t('admin.affiliate.applications.actions.reject', 'Reject')}
                                       </DropdownMenuItem>
                                     </>
                                   )}
@@ -1267,7 +1263,7 @@ export default function AffiliateManagementPage() {
               <CardHeader>
                 <CardTitle>{t('admin.affiliate.affiliates.title', 'Affiliate Partners')}</CardTitle>
                 <CardDescription>
-                  Manage affiliate partners and their commission structures
+                  {t('admin.affiliate.affiliates.description', 'Manage affiliate partners and their commission structures')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1297,7 +1293,7 @@ export default function AffiliateManagementPage() {
                       </Select>
                       <Button variant="outline" size="sm">
                         <Filter className="h-4 w-4 mr-2" />
-                        More Filters
+                        {t('admin.affiliate.affiliates.more_filters', 'More Filters')}
                       </Button>
                     </div>
                   </div>
@@ -1306,7 +1302,7 @@ export default function AffiliateManagementPage() {
                   {selectedAffiliates.length > 0 && (
                     <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <span className="text-sm font-medium text-blue-900">
-                        {selectedAffiliates.length} affiliate(s) selected
+                        {t('admin.affiliate.affiliates.selected_count', '{{count}} affiliate{{plural}} selected', { count: selectedAffiliates.length, plural: selectedAffiliates.length !== 1 ? 's' : '' })}
                       </span>
                       <div className="flex gap-2 ml-auto">
                         {canBulkApprove() && (
@@ -1322,16 +1318,16 @@ export default function AffiliateManagementPage() {
                             ) : (
                               <CheckCircle className="h-4 w-4 mr-2" />
                             )}
-                            Approve Selected
+                            {t('admin.affiliate.affiliates.bulk_actions.approve', 'Approve Selected')}
                           </Button>
                         )}
                         <Button variant="outline" size="sm">
                           <Mail className="h-4 w-4 mr-2" />
-                          Send Email
+                          {t('admin.affiliate.affiliates.bulk_actions.send_email', 'Send Email')}
                         </Button>
                         <Button variant="outline" size="sm">
                           <Download className="h-4 w-4 mr-2" />
-                          Export Selected
+                          {t('admin.affiliate.affiliates.bulk_actions.export', 'Export Selected')}
                         </Button>
                         <Button
                           variant="outline"
@@ -1345,7 +1341,7 @@ export default function AffiliateManagementPage() {
                           ) : (
                             <Trash2 className="h-4 w-4 mr-2" />
                           )}
-                          Delete Selected
+                          {t('admin.affiliate.affiliates.bulk_actions.delete', 'Delete Selected')}
                         </Button>
                       </div>
                     </div>
@@ -1496,7 +1492,7 @@ export default function AffiliateManagementPage() {
                               <div className="text-sm">
                                 <div className="font-medium">{affiliate.totalReferrals}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {affiliate.successfulReferrals} converted
+                                  {t('admin.affiliate.affiliates.converted_count', '{{count}} converted', { count: affiliate.successfulReferrals })}
                                 </div>
                               </div>
                             </TableCell>
@@ -1504,7 +1500,7 @@ export default function AffiliateManagementPage() {
                               <div className="text-sm">
                                 <div className="font-medium">{formatCurrency(affiliate.totalEarnings)}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {formatCurrency(affiliate.pendingEarnings)} pending
+                                  {t('admin.affiliate.affiliates.pending_earnings', '{{amount}} pending', { amount: formatCurrency(affiliate.pendingEarnings) })}
                                 </div>
                               </div>
                             </TableCell>
@@ -1529,11 +1525,11 @@ export default function AffiliateManagementPage() {
                                       const url = generateReferralUrl(affiliate.affiliateCode);
                                       navigator.clipboard.writeText(url);
                                       toast({
-                                        title: 'Copied!',
-                                        description: 'Referral URL copied to clipboard',
+                                        title: t('admin.affiliate.copied_title', 'Copied!'),
+                                        description: t('admin.affiliate.copied_description', 'Referral URL copied to clipboard'),
                                       });
                                     }}
-                                    title="Copy referral URL"
+                                    title={t('admin.affiliate.copy_url_tooltip', 'Copy referral URL')}
                                   >
                                     <Copy className="h-4 w-4" />
                                   </Button>
@@ -1545,7 +1541,7 @@ export default function AffiliateManagementPage() {
                                       const url = generateReferralUrl(affiliate.affiliateCode);
                                       window.open(url, '_blank');
                                     }}
-                                    title="Open referral URL"
+                                    title={t('admin.affiliate.open_url_tooltip', 'Open referral URL')}
                                   >
                                     <ExternalLink className="h-4 w-4" />
                                   </Button>
@@ -1578,20 +1574,20 @@ export default function AffiliateManagementPage() {
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={() => openViewDialog(affiliate)}>
                                       <Eye className="mr-2 h-4 w-4" />
-                                      View Details
+                                      {t('admin.affiliate.actions.view_details', 'View Details')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => openEditDialog(affiliate)}>
                                       <Edit className="mr-2 h-4 w-4" />
-                                      Edit Affiliate
+                                      {t('admin.affiliate.actions.edit', 'Edit Affiliate')}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem>
                                       <Mail className="mr-2 h-4 w-4" />
-                                      Send Email
+                                      {t('admin.affiliate.actions.send_email', 'Send Email')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem>
                                       <Download className="mr-2 h-4 w-4" />
-                                      Export Data
+                                      {t('admin.affiliate.actions.export_data', 'Export Data')}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     {affiliate.status === 'pending' && (
@@ -1605,7 +1601,7 @@ export default function AffiliateManagementPage() {
                                         ) : (
                                           <CheckCircle className="mr-2 h-4 w-4" />
                                         )}
-                                        Approve
+                                        {t('admin.affiliate.actions.approve', 'Approve')}
                                       </DropdownMenuItem>
                                     )}
                                     {affiliate.status === 'active' && (
@@ -1619,7 +1615,7 @@ export default function AffiliateManagementPage() {
                                         ) : (
                                           <AlertCircle className="mr-2 h-4 w-4" />
                                         )}
-                                        Suspend
+                                        {t('admin.affiliate.actions.suspend', 'Suspend')}
                                       </DropdownMenuItem>
                                     )}
                                     {affiliate.status === 'suspended' && (
@@ -1633,7 +1629,7 @@ export default function AffiliateManagementPage() {
                                         ) : (
                                           <CheckCircle className="mr-2 h-4 w-4" />
                                         )}
-                                        Reactivate
+                                        {t('admin.affiliate.actions.reactivate', 'Reactivate')}
                                       </DropdownMenuItem>
                                     )}
                                     <DropdownMenuSeparator />
@@ -1647,7 +1643,7 @@ export default function AffiliateManagementPage() {
                                       ) : (
                                         <Trash2 className="mr-2 h-4 w-4" />
                                       )}
-                                      Delete Affiliate
+                                      {t('admin.affiliate.actions.delete', 'Delete Affiliate')}
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
@@ -1702,7 +1698,7 @@ export default function AffiliateManagementPage() {
               <CardHeader>
                 <CardTitle>{t('admin.affiliate.referrals.title', 'Affiliate Referrals')}</CardTitle>
                 <CardDescription>
-                  Track and manage all affiliate referrals and conversions
+                  {t('admin.affiliate.referrals.description', 'Track and manage all affiliate referrals and conversions')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1795,7 +1791,7 @@ export default function AffiliateManagementPage() {
                   </>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    No referrals found
+                    {t('admin.affiliate.referrals.empty', 'No referrals found')}
                   </div>
                 )}
               </CardContent>
@@ -1807,7 +1803,7 @@ export default function AffiliateManagementPage() {
               <CardHeader>
                 <CardTitle>{t('admin.affiliate.payouts.title', 'Affiliate Payouts')}</CardTitle>
                 <CardDescription>
-                  Manage affiliate commission payouts and payment processing
+                  {t('admin.affiliate.payouts.description', 'Manage affiliate commission payouts and payment processing')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1851,12 +1847,12 @@ export default function AffiliateManagementPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="capitalize">
-                                {payout.paymentMethod || 'Not specified'}
+                                {payout.paymentMethod || t('admin.affiliate.payouts.not_specified', 'Not specified')}
                               </TableCell>
                               <TableCell className="text-sm">
                                 <div>
                                   <div>{formatDate(payout.periodStart)}</div>
-                                  <div className="text-xs text-muted-foreground">to {formatDate(payout.periodEnd)}</div>
+                                  <div className="text-xs text-muted-foreground">{t('admin.affiliate.payouts.to', 'to')} {formatDate(payout.periodEnd)}</div>
                                 </div>
                               </TableCell>
                               <TableCell className="text-sm">
@@ -1903,7 +1899,7 @@ export default function AffiliateManagementPage() {
                   </>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    No payouts found
+                    {t('admin.affiliate.payouts.empty', 'No payouts found')}
                   </div>
                 )}
               </CardContent>
@@ -1928,7 +1924,7 @@ export default function AffiliateManagementPage() {
                     id="name"
                     value={affiliateForm.name}
                     onChange={(e) => setAffiliateForm({ ...affiliateForm, name: e.target.value })}
-                    placeholder="Enter full name"
+                    placeholder={t('admin.affiliate.form.placeholders.name', 'Enter full name')}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1938,7 +1934,7 @@ export default function AffiliateManagementPage() {
                     type="email"
                     value={affiliateForm.email}
                     onChange={(e) => setAffiliateForm({ ...affiliateForm, email: e.target.value })}
-                    placeholder="Enter email address"
+                    placeholder={t('admin.affiliate.form.placeholders.email', 'Enter email address')}
                   />
                 </div>
               </div>
@@ -1949,7 +1945,7 @@ export default function AffiliateManagementPage() {
                     id="phone"
                     value={affiliateForm.phone}
                     onChange={(e) => setAffiliateForm({ ...affiliateForm, phone: e.target.value })}
-                    placeholder="Enter phone number"
+                    placeholder={t('admin.affiliate.form.placeholders.phone', 'Enter phone number')}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1968,7 +1964,7 @@ export default function AffiliateManagementPage() {
                   id="businessName"
                   value={affiliateForm.businessName}
                   onChange={(e) => setAffiliateForm({ ...affiliateForm, businessName: e.target.value })}
-                  placeholder="Enter business name"
+                    placeholder={t('admin.affiliate.form.placeholders.business_name', 'Enter business name')}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -2009,7 +2005,7 @@ export default function AffiliateManagementPage() {
                   id="notes"
                   value={affiliateForm.notes}
                   onChange={(e) => setAffiliateForm({ ...affiliateForm, notes: e.target.value })}
-                  placeholder="Additional notes about this affiliate"
+                  placeholder={t('admin.affiliate.form.placeholders.notes', 'Additional notes about this affiliate')}
                   rows={3}
                 />
               </div>
@@ -2046,7 +2042,7 @@ export default function AffiliateManagementPage() {
                     id="edit-name"
                     value={affiliateForm.name}
                     onChange={(e) => setAffiliateForm({ ...affiliateForm, name: e.target.value })}
-                    placeholder="Enter full name"
+                    placeholder={t('admin.affiliate.form.placeholders.name', 'Enter full name')}
                   />
                 </div>
                 <div className="space-y-2">
@@ -2056,7 +2052,7 @@ export default function AffiliateManagementPage() {
                     type="email"
                     value={affiliateForm.email}
                     onChange={(e) => setAffiliateForm({ ...affiliateForm, email: e.target.value })}
-                    placeholder="Enter email address"
+                    placeholder={t('admin.affiliate.form.placeholders.email', 'Enter email address')}
                   />
                 </div>
               </div>
@@ -2067,7 +2063,7 @@ export default function AffiliateManagementPage() {
                     id="edit-phone"
                     value={affiliateForm.phone}
                     onChange={(e) => setAffiliateForm({ ...affiliateForm, phone: e.target.value })}
-                    placeholder="Enter phone number"
+                    placeholder={t('admin.affiliate.form.placeholders.phone', 'Enter phone number')}
                   />
                 </div>
                 <div className="space-y-2">
@@ -2086,7 +2082,7 @@ export default function AffiliateManagementPage() {
                   id="edit-businessName"
                   value={affiliateForm.businessName}
                   onChange={(e) => setAffiliateForm({ ...affiliateForm, businessName: e.target.value })}
-                  placeholder="Enter business name"
+                    placeholder={t('admin.affiliate.form.placeholders.business_name', 'Enter business name')}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -2154,11 +2150,11 @@ export default function AffiliateManagementPage() {
                       {t('admin.affiliate.view.basic_info', 'Basic Information')}
                     </Label>
                     <div className="mt-2 space-y-2">
-                      <div><strong>Name:</strong> {selectedAffiliate.name}</div>
-                      <div><strong>Email:</strong> {selectedAffiliate.email}</div>
-                      {selectedAffiliate.phone && <div><strong>Phone:</strong> {selectedAffiliate.phone}</div>}
-                      {selectedAffiliate.website && <div><strong>Website:</strong> {selectedAffiliate.website}</div>}
-                      {selectedAffiliate.businessName && <div><strong>Business:</strong> {selectedAffiliate.businessName}</div>}
+                      <div><strong>{t('admin.affiliate.view.name', 'Name')}:</strong> {selectedAffiliate.name}</div>
+                      <div><strong>{t('admin.affiliate.view.email', 'Email')}:</strong> {selectedAffiliate.email}</div>
+                      {selectedAffiliate.phone && <div><strong>{t('admin.affiliate.view.phone', 'Phone')}:</strong> {selectedAffiliate.phone}</div>}
+                      {selectedAffiliate.website && <div><strong>{t('admin.affiliate.view.website', 'Website')}:</strong> {selectedAffiliate.website}</div>}
+                      {selectedAffiliate.businessName && <div><strong>{t('admin.affiliate.view.business', 'Business')}:</strong> {selectedAffiliate.businessName}</div>}
                     </div>
                   </div>
                   <div>
@@ -2166,11 +2162,11 @@ export default function AffiliateManagementPage() {
                       {t('admin.affiliate.view.performance', 'Performance')}
                     </Label>
                     <div className="mt-2 space-y-2">
-                      <div><strong>Total Referrals:</strong> {selectedAffiliate.totalReferrals}</div>
-                      <div><strong>Successful:</strong> {selectedAffiliate.successfulReferrals}</div>
-                      <div><strong>Total Earnings:</strong> {formatCurrency(selectedAffiliate.totalEarnings)}</div>
-                      <div><strong>Pending:</strong> {formatCurrency(selectedAffiliate.pendingEarnings)}</div>
-                      <div><strong>Paid:</strong> {formatCurrency(selectedAffiliate.paidEarnings)}</div>
+                      <div><strong>{t('admin.affiliate.view.total_referrals', 'Total Referrals')}:</strong> {selectedAffiliate.totalReferrals}</div>
+                      <div><strong>{t('admin.affiliate.view.successful', 'Successful')}:</strong> {selectedAffiliate.successfulReferrals}</div>
+                      <div><strong>{t('admin.affiliate.view.total_earnings', 'Total Earnings')}:</strong> {formatCurrency(selectedAffiliate.totalEarnings)}</div>
+                      <div><strong>{t('admin.affiliate.view.pending', 'Pending')}:</strong> {formatCurrency(selectedAffiliate.pendingEarnings)}</div>
+                      <div><strong>{t('admin.affiliate.view.paid', 'Paid')}:</strong> {formatCurrency(selectedAffiliate.paidEarnings)}</div>
                     </div>
                   </div>
                 </div>
@@ -2179,10 +2175,10 @@ export default function AffiliateManagementPage() {
                     {t('admin.affiliate.view.commission_settings', 'Commission Settings')}
                   </Label>
                   <div className="mt-2 space-y-2">
-                    <div><strong>Commission Rate:</strong> {selectedAffiliate.defaultCommissionRate}%</div>
-                    <div><strong>Commission Type:</strong> {selectedAffiliate.commissionType}</div>
-                    <div><strong>Status:</strong> {getStatusBadge(selectedAffiliate.status)}</div>
-                    <div><strong>Joined:</strong> {formatDate(selectedAffiliate.createdAt)}</div>
+                    <div><strong>{t('admin.affiliate.view.commission_rate', 'Commission Rate')}:</strong> {selectedAffiliate.defaultCommissionRate}%</div>
+                    <div><strong>{t('admin.affiliate.view.commission_type', 'Commission Type')}:</strong> {selectedAffiliate.commissionType}</div>
+                    <div><strong>{t('admin.affiliate.view.status', 'Status')}:</strong> {getStatusBadge(selectedAffiliate.status)}</div>
+                    <div><strong>{t('admin.affiliate.view.joined', 'Joined')}:</strong> {formatDate(selectedAffiliate.createdAt)}</div>
                   </div>
                 </div>
                 <div>
@@ -2228,7 +2224,7 @@ export default function AffiliateManagementPage() {
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      Share this URL with potential customers. When they sign up using this link, the affiliate will receive commission for successful conversions.
+                      {t('admin.affiliate.view.referral_url_description', 'Share this URL with potential customers. When they sign up using this link, the affiliate will receive commission for successful conversions.')}
                     </p>
                   </div>
                 </div>
@@ -2293,9 +2289,9 @@ export default function AffiliateManagementPage() {
         <Dialog open={viewApplicationDialogOpen} onOpenChange={setViewApplicationDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Application Details</DialogTitle>
+              <DialogTitle>{t('admin.affiliate.applications.details.title', 'Application Details')}</DialogTitle>
               <DialogDescription>
-                Complete information for this affiliate application
+                {t('admin.affiliate.applications.details.description', 'Complete information for this affiliate application')}
               </DialogDescription>
             </DialogHeader>
 
@@ -2304,41 +2300,41 @@ export default function AffiliateManagementPage() {
                 {/* Personal Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Personal Information</h3>
+                    <h3 className="text-lg font-semibold border-b pb-2">{t('admin.affiliate.applications.details.personal_info', 'Personal Information')}</h3>
                     <div className="space-y-3">
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Full Name</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.full_name', 'Full Name')}</Label>
                         <p className="text-sm">{selectedApplication.firstName} {selectedApplication.lastName}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Email</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.email', 'Email')}</Label>
                         <p className="text-sm">{selectedApplication.email}</p>
                       </div>
                       {selectedApplication.phone && (
                         <div>
-                          <Label className="text-sm font-medium text-gray-600">Phone</Label>
+                          <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.phone', 'Phone')}</Label>
                           <p className="text-sm">{selectedApplication.phone}</p>
                         </div>
                       )}
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Country</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.country', 'Country')}</Label>
                         <p className="text-sm">{selectedApplication.country}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Business Information</h3>
+                    <h3 className="text-lg font-semibold border-b pb-2">{t('admin.affiliate.applications.details.business_info', 'Business Information')}</h3>
                     <div className="space-y-3">
                       {selectedApplication.company && (
                         <div>
-                          <Label className="text-sm font-medium text-gray-600">Company</Label>
+                          <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.company', 'Company')}</Label>
                           <p className="text-sm">{selectedApplication.company}</p>
                         </div>
                       )}
                       {selectedApplication.website && (
                         <div>
-                          <Label className="text-sm font-medium text-gray-600">Website</Label>
+                          <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.website', 'Website')}</Label>
                           <p className="text-sm">
                             <a
                               href={selectedApplication.website}
@@ -2352,7 +2348,7 @@ export default function AffiliateManagementPage() {
                         </div>
                       )}
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Status</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.status', 'Status')}</Label>
                         <div className="mt-1">
                           <Badge variant={
                             selectedApplication.status === 'approved' ? 'default' :
@@ -2360,16 +2356,12 @@ export default function AffiliateManagementPage() {
                             selectedApplication.status === 'under_review' ? 'secondary' :
                             'outline'
                           }>
-                            {selectedApplication.status === 'pending' ? 'Pending' :
-                             selectedApplication.status === 'approved' ? 'Approved' :
-                             selectedApplication.status === 'rejected' ? 'Rejected' :
-                             selectedApplication.status === 'under_review' ? 'Under Review' :
-                             selectedApplication.status}
+                            {t(`admin.affiliate.applications.status.${selectedApplication.status}`, selectedApplication.status)}
                           </Badge>
                         </div>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-600">Submitted</Label>
+                        <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.submitted', 'Submitted')}</Label>
                         <p className="text-sm">
                           {new Date(selectedApplication.submittedAt || selectedApplication.createdAt).toLocaleString()}
                         </p>
@@ -2380,10 +2372,10 @@ export default function AffiliateManagementPage() {
 
                 {/* Marketing Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Marketing Information</h3>
+                  <h3 className="text-lg font-semibold border-b pb-2">{t('admin.affiliate.applications.details.marketing_info', 'Marketing Information')}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Marketing Channels</Label>
+                      <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.marketing_channels', 'Marketing Channels')}</Label>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {Array.isArray(selectedApplication.marketingChannels) ?
                           selectedApplication.marketingChannels.map((channel: string, index: number) => (
@@ -2399,7 +2391,7 @@ export default function AffiliateManagementPage() {
                       </div>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Expected Monthly Referrals</Label>
+                      <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.expected_referrals', 'Expected Monthly Referrals')}</Label>
                       <p className="text-sm">{selectedApplication.expectedMonthlyReferrals}</p>
                     </div>
                   </div>
@@ -2407,16 +2399,16 @@ export default function AffiliateManagementPage() {
 
                 {/* Experience */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Experience & Motivation</h3>
+                  <h3 className="text-lg font-semibold border-b pb-2">{t('admin.affiliate.applications.details.experience_motivation', 'Experience & Motivation')}</h3>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Experience</Label>
+                    <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.experience', 'Experience')}</Label>
                     <div className="mt-2 p-3 bg-gray-50 rounded-md">
                       <p className="text-sm whitespace-pre-wrap">{selectedApplication.experience}</p>
                     </div>
                   </div>
                   {selectedApplication.motivation && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Motivation</Label>
+                      <Label className="text-sm font-medium text-gray-600">{t('admin.affiliate.applications.details.motivation', 'Motivation')}</Label>
                       <div className="mt-2 p-3 bg-gray-50 rounded-md">
                         <p className="text-sm whitespace-pre-wrap">{selectedApplication.motivation}</p>
                       </div>
@@ -2426,17 +2418,17 @@ export default function AffiliateManagementPage() {
 
                 {/* Terms Agreement */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Agreement</h3>
+                  <h3 className="text-lg font-semibold border-b pb-2">{t('admin.affiliate.applications.details.agreement', 'Agreement')}</h3>
                   <div className="flex items-center space-x-2">
                     <Checkbox checked={selectedApplication.agreeToTerms} disabled />
-                    <Label className="text-sm">Agreed to Terms and Conditions</Label>
+                    <Label className="text-sm">{t('admin.affiliate.applications.details.agreed_to_terms', 'Agreed to Terms and Conditions')}</Label>
                   </div>
                 </div>
 
                 {/* Rejection Reason (if rejected) */}
                 {selectedApplication.status === 'rejected' && selectedApplication.rejectionReason && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2 text-red-600">Rejection Reason</h3>
+                    <h3 className="text-lg font-semibold border-b pb-2 text-red-600">{t('admin.affiliate.applications.details.rejection_reason', 'Rejection Reason')}</h3>
                     <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                       <p className="text-sm text-red-800">{selectedApplication.rejectionReason}</p>
                     </div>
@@ -2458,12 +2450,12 @@ export default function AffiliateManagementPage() {
                       disabled={approveApplicationMutation.isPending}
                     >
                       <CheckCircle className="mr-2 h-4 w-4" />
-                      Approve
+                      {t('admin.affiliate.applications.actions.approve', 'Approve')}
                     </Button>
                     <Button
                       variant="destructive"
                       onClick={() => {
-                        const rejectionReason = prompt('Please provide a reason for rejection:');
+                        const rejectionReason = prompt(t('admin.affiliate.applications.reject.prompt', 'Please provide a reason for rejection:'));
                         if (rejectionReason) {
                           rejectApplicationMutation.mutate({
                             applicationId: selectedApplication.id,
@@ -2475,13 +2467,13 @@ export default function AffiliateManagementPage() {
                       disabled={rejectApplicationMutation.isPending}
                     >
                       <AlertCircle className="mr-2 h-4 w-4" />
-                      Reject
+                      {t('admin.affiliate.applications.actions.reject', 'Reject')}
                     </Button>
                   </>
                 )}
               </div>
               <Button variant="outline" onClick={() => setViewApplicationDialogOpen(false)}>
-                Close
+                {t('common.close', 'Close')}
               </Button>
             </DialogFooter>
           </DialogContent>

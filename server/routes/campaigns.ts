@@ -125,7 +125,13 @@ router.post('/', requireAnyPermission(['create_campaigns']), async (req, res) =>
     res.json({ success: true, data: campaign });
   } catch (error) {
     console.error('Error creating campaign:', error);
-    res.status(500).json({ success: false, error: getErrorMessage(error) });
+    const errorMessage = getErrorMessage(error);
+
+    if (errorMessage.includes('Validation failed') || errorMessage.includes('recurring daily')) {
+      res.status(400).json({ success: false, error: errorMessage });
+    } else {
+      res.status(500).json({ success: false, error: errorMessage });
+    }
   }
 });
 
@@ -486,7 +492,21 @@ router.post('/validate-content', requireAnyPermission(['view_campaigns', 'create
   }
 });
 
+router.post('/validate-whatsapp-content', requireAnyPermission(['view_campaigns', 'create_campaigns']), async (req, res) => {
+  try {
+    const { content, whatsappChannelType, messageType } = req.body;
 
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'Content is required' });
+    }
+
+    const validation = await campaignService.validateCampaignContent(content);
+    res.json({ success: true, data: validation });
+  } catch (error) {
+    console.error('Error validating WhatsApp content:', error);
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
 
 
 
@@ -538,7 +558,6 @@ router.put('/:id', requireAnyPermission(['edit_campaigns']), async (req, res) =>
       updateData.scheduledAt = scheduledDate;
     }
 
-
     if (updateData.scheduledAt === '') {
       updateData.scheduledAt = null;
     }
@@ -547,7 +566,13 @@ router.put('/:id', requireAnyPermission(['edit_campaigns']), async (req, res) =>
     res.json({ success: true, data: campaign });
   } catch (error) {
     console.error('Error updating campaign:', error);
-    res.status(500).json({ success: false, error: getErrorMessage(error) });
+    const errorMessage = getErrorMessage(error);
+
+    if (errorMessage.includes('Validation failed') || errorMessage.includes('recurring daily')) {
+      res.status(400).json({ success: false, error: errorMessage });
+    } else {
+      res.status(500).json({ success: false, error: errorMessage });
+    }
   }
 });
 

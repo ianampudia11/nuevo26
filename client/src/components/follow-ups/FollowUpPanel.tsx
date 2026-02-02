@@ -147,7 +147,7 @@ const FollowUpPanel: React.FC<FollowUpPanelProps> = ({ conversationId, contactId
       case 'failed': return <XCircle className="w-4 h-4 text-red-500" />;
       case 'cancelled': return <X className="w-4 h-4 text-gray-500" />;
       case 'expired': return <AlertCircle className="w-4 h-4 text-orange-500" />;
-      default: return <Clock className="w-4 h-4 text-gray-500" />;
+      default: return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
   };
 

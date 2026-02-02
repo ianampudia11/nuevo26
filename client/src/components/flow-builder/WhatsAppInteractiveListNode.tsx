@@ -13,7 +13,6 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  List,
   ChevronDown
 } from 'lucide-react';
 import {
@@ -213,7 +212,7 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
     );
 
   return (
-    <div className="node-whatsapp-interactive-list p-3 rounded-lg bg-white border border-green-200 shadow-sm min-w-[400px] max-w-[500px] group">
+    <div className="node-whatsapp-interactive-list p-3 rounded-lg bg-card border border-border shadow-sm min-w-[400px] max-w-[500px] group">
       {/* Node Toolbar */}
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip>
@@ -252,10 +251,10 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
       {/* Node Header */}
       <div className="font-medium flex items-center gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <List className="h-4 w-4 text-green-600" />
+          <img src="https://cdn-icons-png.flaticon.com/128/8428/8428362.png" alt="WhatsApp Interactive List" className="h-4 w-4" />
           <span className="text-sm">{t('whatsapp_list.node_title', 'WhatsApp Interactive List')}</span>
         </div>
-        <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border border-primary/20">
           {t('whatsapp_list.official_api', 'Official API')}
         </Badge>
         <button
@@ -278,9 +277,9 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
 
       {/* Error Indicator */}
       {hasErrors && (
-        <div className="flex items-center gap-2 mb-3 p-2 bg-red-50 border border-red-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-red-500" />
-          <span className="text-xs text-red-600">
+        <div className="flex items-center gap-2 mb-3 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-xs text-destructive">
             {t('whatsapp_list.validation_errors', 'Please fix validation errors')}
           </span>
         </div>
@@ -293,19 +292,19 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_list.header_text', 'Header Text')}
-              <span className="text-gray-500 ml-1">({t('common.optional', 'Optional')})</span>
+              <span className="text-muted-foreground ml-1">({t('common.optional', 'Optional')})</span>
             </Label>
             <Input
               value={headerText}
               onChange={(e) => setHeaderText(e.target.value)}
               placeholder={t('whatsapp_list.header_placeholder', 'Optional header text...')}
-              className={cn("text-xs", headerError && "border-red-300")}
+              className={cn("text-xs", headerError && "border-destructive")}
               maxLength={60}
             />
             {headerError && (
-              <p className="text-xs text-red-500">{headerError}</p>
+              <p className="text-xs text-destructive">{headerError}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {headerText.length}/60 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -314,19 +313,19 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_list.body_text', 'Body Text')}
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-destructive ml-1">*</span>
             </Label>
             <Textarea
               value={bodyText}
               onChange={(e) => setBodyText(e.target.value)}
               placeholder={t('whatsapp_list.body_placeholder', 'Enter your message text...')}
-              className={cn("text-xs min-h-[60px]", bodyError && "border-red-300")}
+              className={cn("text-xs min-h-[60px]", bodyError && "border-destructive")}
               maxLength={1024}
             />
             {bodyError && (
-              <p className="text-xs text-red-500">{bodyError}</p>
+              <p className="text-xs text-destructive">{bodyError}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {bodyText.length}/1024 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -335,19 +334,19 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_list.button_text', 'Button Text')}
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-destructive ml-1">*</span>
             </Label>
             <Input
               value={buttonText}
               onChange={(e) => setButtonText(e.target.value)}
               placeholder={t('whatsapp_list.button_placeholder', 'View Options')}
-              className={cn("text-xs", buttonError && "border-red-300")}
+              className={cn("text-xs", buttonError && "border-destructive")}
               maxLength={20}
             />
             {buttonError && (
-              <p className="text-xs text-red-500">{buttonError}</p>
+              <p className="text-xs text-destructive">{buttonError}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {buttonText.length}/20 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -356,19 +355,19 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_list.footer_text', 'Footer Text')}
-              <span className="text-gray-500 ml-1">({t('common.optional', 'Optional')})</span>
+              <span className="text-muted-foreground ml-1">({t('common.optional', 'Optional')})</span>
             </Label>
             <Input
               value={footerText}
               onChange={(e) => setFooterText(e.target.value)}
               placeholder={t('whatsapp_list.footer_placeholder', 'Optional footer text...')}
-              className={cn("text-xs", footerError && "border-red-300")}
+              className={cn("text-xs", footerError && "border-destructive")}
               maxLength={60}
             />
             {footerError && (
-              <p className="text-xs text-red-500">{footerError}</p>
+              <p className="text-xs text-destructive">{footerError}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {footerText.length}/60 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -378,7 +377,7 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
             <div className="flex items-center justify-between">
               <Label className="text-xs font-medium">
                 {t('whatsapp_list.sections', 'List Sections')}
-                <span className="text-red-500 ml-1">*</span>
+                <span className="text-destructive ml-1">*</span>
               </Label>
               <Button
                 type="button"
@@ -395,9 +394,9 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
 
             <div className="space-y-3 max-h-60 overflow-y-auto">
               {sections.map((section, sectionIndex) => (
-                <div key={section.id} className="border rounded-lg p-3 bg-gray-50">
+                <div key={section.id} className="border rounded-lg p-3 bg-muted">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-gray-700">
+                    <span className="text-xs font-medium text-foreground">
                       {t('whatsapp_list.section', 'Section')} {sectionIndex + 1}
                     </span>
                     {sections.length > 1 && (
@@ -406,7 +405,7 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
                         variant="ghost"
                         size="sm"
                         onClick={() => removeSection(section.id)}
-                        className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
+                        className="h-5 w-5 p-0 text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -417,7 +416,7 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
                     <div>
                       <Label className="text-xs">
                         {t('whatsapp_list.section_title', 'Section Title')}
-                        <span className="text-red-500 ml-1">*</span>
+                        <span className="text-destructive ml-1">*</span>
                       </Label>
                       <Input
                         value={section.title}
@@ -450,9 +449,9 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
                       {section.rows.map((row, rowIndex) => {
                         const validation = validateRow(row);
                         return (
-                          <div key={row.id} className="border rounded p-2 bg-white space-y-2 relative">
+                          <div key={row.id} className="border rounded p-2 bg-card space-y-2 relative">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-600">
+                              <span className="text-xs text-muted-foreground">
                                 {t('whatsapp_list.item', 'Item')} {rowIndex + 1}
                               </span>
                               {section.rows.length > 1 && (
@@ -461,7 +460,7 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => removeRow(section.id, row.id)}
-                                  className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
+                                  className="h-4 w-4 p-0 text-destructive hover:text-destructive"
                                 >
                                   <Trash2 className="h-2 w-2" />
                                 </Button>
@@ -472,51 +471,51 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
                               <div>
                                 <Label className="text-xs">
                                   {t('whatsapp_list.row_title', 'Title')}
-                                  <span className="text-red-500 ml-1">*</span>
+                                  <span className="text-destructive ml-1">*</span>
                                 </Label>
                                 <Input
                                   value={row.title}
                                   onChange={(e) => updateRow(section.id, row.id, 'title', e.target.value)}
                                   placeholder={t('whatsapp_list.row_title_placeholder', 'Item title...')}
-                                  className={cn("text-xs", !validation.titleValid && "border-red-300")}
+                                  className={cn("text-xs", !validation.titleValid && "border-destructive")}
                                   maxLength={24}
                                 />
                                 {validation.titleError && (
-                                  <p className="text-xs text-red-500">{validation.titleError}</p>
+                                  <p className="text-xs text-destructive">{validation.titleError}</p>
                                 )}
                               </div>
 
                               <div>
                                 <Label className="text-xs">
                                   {t('whatsapp_list.row_description', 'Description')}
-                                  <span className="text-gray-500 ml-1">({t('common.optional', 'Optional')})</span>
+                                  <span className="text-muted-foreground ml-1">({t('common.optional', 'Optional')})</span>
                                 </Label>
                                 <Input
                                   value={row.description || ''}
                                   onChange={(e) => updateRow(section.id, row.id, 'description', e.target.value)}
                                   placeholder={t('whatsapp_list.row_description_placeholder', 'Optional description...')}
-                                  className={cn("text-xs", !validation.descriptionValid && "border-red-300")}
+                                  className={cn("text-xs", !validation.descriptionValid && "border-destructive")}
                                   maxLength={72}
                                 />
                                 {validation.descriptionError && (
-                                  <p className="text-xs text-red-500">{validation.descriptionError}</p>
+                                  <p className="text-xs text-destructive">{validation.descriptionError}</p>
                                 )}
                               </div>
 
                               <div>
                                 <Label className="text-xs">
                                   {t('whatsapp_list.row_payload', 'Payload')}
-                                  <span className="text-red-500 ml-1">*</span>
+                                  <span className="text-destructive ml-1">*</span>
                                 </Label>
                                 <Input
                                   value={row.payload}
                                   onChange={(e) => updateRow(section.id, row.id, 'payload', e.target.value)}
                                   placeholder={t('whatsapp_list.row_payload_placeholder', 'item_value')}
-                                  className={cn("text-xs", !validation.payloadValid && "border-red-300")}
+                                  className={cn("text-xs", !validation.payloadValid && "border-destructive")}
                                   maxLength={200}
                                 />
                                 {validation.payloadError && (
-                                  <p className="text-xs text-red-500">{validation.payloadError}</p>
+                                  <p className="text-xs text-destructive">{validation.payloadError}</p>
                                 )}
                               </div>
                             </div>
@@ -542,17 +541,17 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
               ))}
             </div>
 
-            <div className="text-xs text-gray-500 space-y-1">
+            <div className="text-xs text-muted-foreground space-y-1">
               <p>{t('whatsapp_list.section_limit', 'Maximum 10 sections allowed by WhatsApp API')}</p>
               <p>{t('whatsapp_list.row_limit', `Total items: ${totalRows}/10 (maximum 10 items across all sections)`)}</p>
             </div>
           </div>
 
           {/* API Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div className="text-xs text-blue-800">
+              <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
+              <div className="text-xs text-primary">
                 <p className="font-medium mb-1">
                   {t('whatsapp_list.api_info_title', 'WhatsApp Business API Requirements')}
                 </p>
@@ -572,18 +571,18 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
       {!isEditing && (
         <div className="space-y-3">
           {/* WhatsApp Message Preview */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
             {headerText && (
-              <div className="font-medium text-sm text-gray-800 mb-2">
+              <div className="font-medium text-sm text-foreground mb-2">
                 {headerText}
               </div>
             )}
-            <div className="text-sm text-gray-700 mb-3">
+            <div className="text-sm text-foreground mb-3">
               {bodyText}
             </div>
 
             {/* List Button Preview */}
-            <div className="border border-green-300 rounded-md p-2 text-center text-sm bg-white hover:bg-green-50 transition-colors flex items-center justify-center gap-2">
+            <div className="border border-primary/20 rounded-md p-2 text-center text-sm bg-card hover:bg-primary/10 transition-colors flex items-center justify-center gap-2">
               <span>{buttonText}</span>
               <ChevronDown className="h-3 w-3" />
             </div>
@@ -591,13 +590,13 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
             {/* List Items Preview */}
             <div className="mt-3 space-y-2">
               {sections.map((section) => (
-                <div key={section.id} className="border-l-2 border-green-300 pl-2">
-                  <div className="text-xs font-medium text-gray-600 mb-1">{section.title}</div>
+                <div key={section.id} className="border-l-2 border-primary/20 pl-2">
+                  <div className="text-xs font-medium text-muted-foreground mb-1">{section.title}</div>
                   {section.rows.map((row) => (
-                    <div key={row.id} className="text-xs text-gray-500 mb-1 relative">
+                    <div key={row.id} className="text-xs text-muted-foreground mb-1 relative">
                       <div className="font-medium">{row.title}</div>
                       {row.description && (
-                        <div className="text-gray-400">{row.description}</div>
+                        <div className="text-muted-foreground/70">{row.description}</div>
                       )}
                       <Handle
                         type="source"
@@ -617,13 +616,13 @@ const WhatsAppInteractiveListNode: React.FC<WhatsAppInteractiveListNodeProps> = 
             </div>
 
             {footerText && (
-              <div className="text-xs text-gray-500 mt-3">
+              <div className="text-xs text-muted-foreground mt-3">
                 {footerText}
               </div>
             )}
           </div>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {t('whatsapp_list.item_count', `${totalRows} item(s) in ${sections.length} section(s)`)}
           </div>
         </div>

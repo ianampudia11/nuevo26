@@ -1,5 +1,7 @@
 import { db } from '../db';
 import { eq, and, desc, sql, inArray, gte, lte, like, or, not, count } from 'drizzle-orm';
+import { format, isAfter, isBefore, parseISO } from 'date-fns';
+import { logger } from '../utils/logger';
 import {
   campaigns,
   campaignTemplates,
@@ -11,6 +13,8 @@ import {
   conversations,
   companies,
   plans,
+  channelConnections,
+  deals,
   type Campaign,
   type CampaignTemplate,
   type ContactSegment,
@@ -19,6 +23,7 @@ import {
   type InsertContactSegment,
   type SegmentFilterCriteria
 } from '../../shared/schema';
+import { normalizePhoneForInternal } from '../../shared/utils/phone';
 
 interface CampaignFilters {
   status?: string;
@@ -40,6 +45,9 @@ interface TemplateFilters {
 
 export class CampaignService {
 
+  private nextSendTimeCache: Map<string, { time: Date | null, cachedAt: number }> = new Map();
+  private readonly CACHE_TTL = 60000; // 1 minute TTL
+
   async createCampaign(companyId: number, userId: number, campaignData: Partial<InsertCampaign>): Promise<Campaign> {
     try {
       
@@ -56,22 +64,71 @@ export class CampaignService {
         throw limitError;
       }
 
+
+      let initialStatus: 'draft' | 'scheduled' = 'draft';
+      if (campaignData.campaignType === 'scheduled' && campaignData.scheduledAt) {
+        const scheduledDate = new Date(campaignData.scheduledAt);
+        const now = new Date();
+
+        if (scheduledDate > now) {
+          initialStatus = 'scheduled';
+        }
+      }
+
+
+      let dripSettings = campaignData.dripSettings;
+      let timezone = campaignData.timezone || 'UTC';
+      let scheduledAt = campaignData.scheduledAt;
+      
+      if (campaignData.campaignType === 'recurring_daily' || (campaignData as any).recurringDailySettings) {
+        const recurringSettings = (campaignData as any).recurringDailySettings;
+        
+        if (recurringSettings) {
+
+          const validation = this.validateRecurringDailySettings(recurringSettings);
+          if (!validation.isValid) {
+            console.error(`[Campaign Service] Validation failed for recurring daily campaign: ${validation.errors.join(', ')}`);
+            throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+          }
+          
+
+          dripSettings = recurringSettings;
+          timezone = recurringSettings.timezone || 'UTC';
+          initialStatus = 'scheduled'; // Recurring daily campaigns start as scheduled
+          
+
+          if (!scheduledAt) {
+            const now = new Date();
+            scheduledAt = this.calculateNextRecurringSendTime(recurringSettings, now, timezone);
+          } 
+        } else if (campaignData.campaignType === 'recurring_daily') {
+          throw new Error('Validation failed: Recurring daily settings are required');
+        }
+      }
+
       const campaignInsertData = {
         companyId,
         createdById: userId,
         name: campaignData.name || 'Untitled Campaign',
         content: campaignData.content || '',
-        status: 'draft' as const,
+        status: initialStatus,
+        timezone,
+        dripSettings,
+        scheduledAt,
         ...campaignData
       };
 
       const [campaign] = await db.insert(campaigns).values(campaignInsertData).returning();
 
-      
+
+      const campaignPipelineStageIds = (campaignData as any).pipelineStageIds;
 
       if (campaignData.segmentId) {
-        
-        await this.populateCampaignRecipients(campaign.id, campaignData.segmentId);
+
+        await this.populateCampaignRecipients(campaign.id, campaignData.segmentId, campaignPipelineStageIds);
+      } else if (campaignPipelineStageIds && campaignPipelineStageIds.length > 0) {
+
+        await this.populateCampaignRecipientsFromPipelineStages(campaign.id, companyId, campaignPipelineStageIds);
       }
 
       return campaign;
@@ -141,7 +198,7 @@ export class CampaignService {
     }
   }
 
-  async getCampaignById(companyId: number, campaignId: number): Promise<Campaign> {
+  async getCampaignById(companyId: number, campaignId: number): Promise<any> {
     try {
       const [campaign] = await db.select()
         .from(campaigns)
@@ -154,6 +211,14 @@ export class CampaignService {
         throw new Error('Campaign not found');
       }
 
+
+      if (campaign.campaignType === 'recurring_daily' && campaign.dripSettings) {
+        return {
+          ...campaign,
+          recurringDailySettings: campaign.dripSettings
+        };
+      }
+
       return campaign;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -161,13 +226,331 @@ export class CampaignService {
     }
   }
 
+  validateRecurringDailySettings(settings: any): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!settings) {
+      errors.push('Recurring daily settings are required');
+      return { isValid: false, errors };
+    }
+
+    if (!settings.sendTimes || !Array.isArray(settings.sendTimes) || settings.sendTimes.length === 0) {
+      errors.push('At least one send time is required');
+    } else {
+      const timeFormatRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      const invalidTimes = settings.sendTimes.filter((time: string) => !timeFormatRegex.test(time));
+      if (invalidTimes.length > 0) {
+        errors.push('Invalid time format. Use HH:mm format');
+      }
+    }
+
+    if (!settings.timezone || typeof settings.timezone !== 'string' || settings.timezone.trim() === '') {
+      errors.push('Timezone is required');
+    }
+
+    if (settings.offDays && Array.isArray(settings.offDays)) {
+      const invalidOffDays = settings.offDays.filter((day: any) => typeof day !== 'number' || day < 0 || day > 6);
+      if (invalidOffDays.length > 0) {
+        errors.push('Off days must be numbers between 0-6');
+      }
+      if (settings.offDays.length === 7) {
+        errors.push('Cannot mark all days as off days');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Helper function to create a Date object for a specific time in a specific timezone
+   * Returns a UTC Date object that represents the given time in the target timezone
+   */
+  private createDateInTimezone(year: number, month: number, day: number, hour: number, minute: number, timezone: string): Date {
+
+    let candidateDate = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+    
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    
+
+
+    for (let i = 0; i < 10; i++) { // Max 10 iterations to avoid infinite loops
+      const parts = formatter.formatToParts(candidateDate);
+      const tzYear = parseInt(parts.find(p => p.type === 'year')?.value || '0');
+      const tzMonth = parseInt(parts.find(p => p.type === 'month')?.value || '0');
+      const tzDay = parseInt(parts.find(p => p.type === 'day')?.value || '0');
+      const tzHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+      const tzMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+      
+
+      if (tzYear === year && tzMonth === month && tzDay === day && tzHour === hour && tzMinute === minute) {
+        return candidateDate;
+      }
+      
+
+      const desiredMinutes = hour * 60 + minute;
+      const actualMinutes = tzHour * 60 + tzMinute;
+      const diffMinutes = desiredMinutes - actualMinutes;
+      
+
+      const dayDiff = (year - tzYear) * 365 * 24 * 60 + (month - tzMonth) * 30 * 24 * 60 + (day - tzDay) * 24 * 60;
+      const totalDiffMinutes = dayDiff + diffMinutes;
+      
+      candidateDate = new Date(candidateDate.getTime() + totalDiffMinutes * 60 * 1000);
+    }
+    
+
+    return candidateDate;
+  }
+
+  /**
+   * Calculate the next valid send time for a recurring daily campaign
+   * Uses caching to reduce redundant date calculations
+   */
+  calculateNextRecurringSendTime(recurringSettings: any, currentDateTime: Date, timezone: string = 'UTC'): Date | null {
+    try {
+
+
+      const tz = recurringSettings?.timezone || timezone || 'UTC';
+      const normalizedTime = this.normalizeDateTimeForCache(currentDateTime, tz);
+      
+
+      const cacheKey = `${JSON.stringify(recurringSettings)}_${normalizedTime}_${tz}`;
+      const cached = this.nextSendTimeCache.get(cacheKey);
+      
+      if (cached) {
+        const now = Date.now();
+        const age = now - cached.cachedAt;
+        
+
+        if (age < this.CACHE_TTL) {
+          return cached.time ? new Date(cached.time) : null;
+        }
+        
+
+        this.nextSendTimeCache.delete(cacheKey);
+      }
+      
+      if (!recurringSettings || !recurringSettings.sendTimes || recurringSettings.sendTimes.length === 0) {
+
+        this.cacheNextSendTime(cacheKey, null);
+        return null;
+      }
+      
+
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      const currentParts = formatter.formatToParts(currentDateTime);
+      const currentYear = parseInt(currentParts.find(p => p.type === 'year')?.value || '0');
+      const currentMonth = parseInt(currentParts.find(p => p.type === 'month')?.value || '0');
+      const currentDay = parseInt(currentParts.find(p => p.type === 'day')?.value || '0');
+      const currentHour = parseInt(currentParts.find(p => p.type === 'hour')?.value || '0');
+      const currentMinute = parseInt(currentParts.find(p => p.type === 'minute')?.value || '0');
+      const currentDayOfWeek = new Date(currentYear, currentMonth - 1, currentDay).getDay();
+      const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+
+
+      const sortedSendTimes = [...recurringSettings.sendTimes].sort((a: string, b: string) => {
+        const [aHour, aMin] = a.split(':').map(Number);
+        const [bHour, bMin] = b.split(':').map(Number);
+        return aHour * 60 + aMin - (bHour * 60 + bMin);
+      });
+
+
+
+      const bufferMinutes = 1;
+      const currentTimeMinutesWithBuffer = currentHour * 60 + currentMinute + bufferMinutes;
+      
+      for (const sendTime of sortedSendTimes) {
+        const [sendHour, sendMinute] = sendTime.split(':').map(Number);
+        const sendTimeMinutes = sendHour * 60 + sendMinute;
+
+
+        if (sendTimeMinutes > currentTimeMinutesWithBuffer) {
+          const isOffDay = recurringSettings.offDays && recurringSettings.offDays.includes(currentDayOfWeek);
+          
+          if (!isOffDay) {
+
+            const targetDate = this.createDateInTimezone(currentYear, currentMonth, currentDay, sendHour, sendMinute, tz);
+            
+
+            this.cacheNextSendTime(cacheKey, targetDate);
+            
+            return targetDate;
+          }
+        }
+      }
+
+
+      for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
+
+        const nextDateInTz = new Date(currentDateTime);
+        nextDateInTz.setUTCDate(nextDateInTz.getUTCDate() + dayOffset);
+        const nextParts = formatter.formatToParts(nextDateInTz);
+        const nextYear = parseInt(nextParts.find(p => p.type === 'year')?.value || '0');
+        const nextMonth = parseInt(nextParts.find(p => p.type === 'month')?.value || '0');
+        const nextDay = parseInt(nextParts.find(p => p.type === 'day')?.value || '0');
+        const nextDayOfWeek = new Date(nextYear, nextMonth - 1, nextDay).getDay();
+
+        if (recurringSettings.offDays && recurringSettings.offDays.includes(nextDayOfWeek)) {
+          continue;
+        }
+
+
+        if (recurringSettings.startDate) {
+          const startDate = parseISO(recurringSettings.startDate);
+          const startParts = formatter.formatToParts(startDate);
+          const startYear = parseInt(startParts.find(p => p.type === 'year')?.value || '0');
+          const startMonth = parseInt(startParts.find(p => p.type === 'month')?.value || '0');
+          const startDay = parseInt(startParts.find(p => p.type === 'day')?.value || '0');
+          
+          if (nextYear < startYear || (nextYear === startYear && nextMonth < startMonth) || 
+              (nextYear === startYear && nextMonth === startMonth && nextDay < startDay)) {
+            continue;
+          }
+        }
+
+        if (recurringSettings.endDate) {
+          const endDate = parseISO(recurringSettings.endDate);
+          const endParts = formatter.formatToParts(endDate);
+          const endYear = parseInt(endParts.find(p => p.type === 'year')?.value || '0');
+          const endMonth = parseInt(endParts.find(p => p.type === 'month')?.value || '0');
+          const endDay = parseInt(endParts.find(p => p.type === 'day')?.value || '0');
+          
+          if (nextYear > endYear || (nextYear === endYear && nextMonth > endMonth) || 
+              (nextYear === endYear && nextMonth === endMonth && nextDay > endDay)) {
+            continue;
+          }
+        }
+
+
+        const [firstHour, firstMinute] = sortedSendTimes[0].split(':').map(Number);
+        const targetDate = this.createDateInTimezone(nextYear, nextMonth, nextDay, firstHour, firstMinute, tz);
+        
+
+        this.cacheNextSendTime(cacheKey, targetDate);
+        
+        return targetDate;
+      }
+      
+
+      this.cacheNextSendTime(cacheKey, null);
+      
+      return null;
+    } catch (error) {
+      logger.error('Campaign Service', 'Error calculating next recurring send time', error);
+      return null;
+    }
+  }
+
+  /**
+   * Normalize datetime to minute precision in the given timezone for cache key generation
+   */
+  private normalizeDateTimeForCache(dateTime: Date, timezone: string): string {
+    try {
+
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      
+      const parts = formatter.formatToParts(dateTime);
+      const year = parts.find(p => p.type === 'year')?.value || '0';
+      const month = parts.find(p => p.type === 'month')?.value || '0';
+      const day = parts.find(p => p.type === 'day')?.value || '0';
+      const hour = parts.find(p => p.type === 'hour')?.value || '0';
+      const minute = parts.find(p => p.type === 'minute')?.value || '0';
+      
+
+      return `${year}-${month}-${day} ${hour}:${minute}`;
+    } catch (error) {
+
+      return format(dateTime, 'yyyy-MM-dd HH:mm');
+    }
+  }
+
+  /**
+   * Cache the next send time result
+   */
+  private cacheNextSendTime(cacheKey: string, result: Date | null): void {
+    this.nextSendTimeCache.set(cacheKey, {
+      time: result,
+      cachedAt: Date.now()
+    });
+    
+
+    if (this.nextSendTimeCache.size > 1000) {
+      const now = Date.now();
+      for (const [key, value] of this.nextSendTimeCache.entries()) {
+        if (now - value.cachedAt > this.CACHE_TTL * 2) {
+          this.nextSendTimeCache.delete(key);
+        }
+      }
+    }
+  }
+
   async updateCampaign(companyId: number, campaignId: number, updateData: Partial<Campaign>): Promise<Campaign> {
     try {
+
+      let dripSettings = updateData.dripSettings;
+      let timezone = updateData.timezone;
+      
+      if (updateData.campaignType === 'recurring_daily' || (updateData as any).recurringDailySettings) {
+        const recurringSettings = (updateData as any).recurringDailySettings;
+        if (recurringSettings) {
+
+          const validation = this.validateRecurringDailySettings(recurringSettings);
+          if (!validation.isValid) {
+            throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+          }
+          
+
+          dripSettings = recurringSettings;
+          timezone = recurringSettings.timezone || updateData.timezone || 'UTC';
+        } else if (updateData.campaignType === 'recurring_daily') {
+          throw new Error('Validation failed: Recurring daily settings are required');
+        }
+      }
+
+      const updatePayload: any = {
+        ...updateData,
+        updatedAt: new Date()
+      };
+
+      if (dripSettings !== undefined) {
+        updatePayload.dripSettings = dripSettings;
+      }
+      if (timezone !== undefined) {
+        updatePayload.timezone = timezone;
+      }
+
       const [campaign] = await db.update(campaigns)
-        .set({
-          ...updateData,
-          updatedAt: new Date()
-        })
+        .set(updatePayload)
         .where(and(
           eq(campaigns.id, campaignId),
           eq(campaigns.companyId, companyId)
@@ -218,6 +601,52 @@ export class CampaignService {
         throw new Error('Campaign cannot be started from current status');
       }
 
+
+      if (campaign.campaignType === 'recurring_daily') {
+
+        if (!campaign.scheduledAt && campaign.dripSettings) {
+          const nextSendTime = this.calculateNextRecurringSendTime(
+            campaign.dripSettings,
+            new Date(),
+            campaign.timezone || 'UTC'
+          );
+          
+          if (nextSendTime) {
+            await this.updateCampaign(companyId, campaignId, {
+              status: 'scheduled',
+              scheduledAt: nextSendTime
+            });
+            return { success: true, message: 'Recurring campaign scheduled. First send will occur at the configured time.' };
+          } else {
+            throw new Error('Cannot schedule recurring campaign: No valid send time found');
+          }
+        } else {
+
+          await this.updateCampaign(companyId, campaignId, {
+            status: 'scheduled'
+          });
+          return { success: true, message: 'Recurring campaign is scheduled and will send at the configured times.' };
+        }
+      }
+
+
+      const channelIds = (campaign.channelIds as number[]) || [];
+      const singleChannelId = campaign.channelId;
+      const availableChannelIds = channelIds.length > 0 ? channelIds : (singleChannelId ? [singleChannelId] : []);
+
+      if (availableChannelIds.length === 0) {
+        throw new Error('No channel connections configured for this campaign');
+      }
+
+
+      const channels = await db.select()
+        .from(channelConnections)
+        .where(inArray(channelConnections.id, availableChannelIds));
+
+      const disconnectedChannels = channels.filter(ch => ch.status !== 'active');
+      if (disconnectedChannels.length > 0) {
+        throw new Error(`Cannot start campaign: ${disconnectedChannels.length} channel(s) are not active`);
+      }
 
       await this.updateCampaign(companyId, campaignId, {
         status: 'running',
@@ -289,8 +718,11 @@ export class CampaignService {
    * Using the same segment for new campaigns will re-evaluate contacts and can
    * change the audience implicitly if contact data has changed since the segment
    * was created.
+   * 
+   * If the campaign has pipelineStageIds, they are merged into the segment criteria
+   * to further filter recipients.
    */
-  async populateCampaignRecipients(campaignId: number, segmentId: number): Promise<number> {
+  async populateCampaignRecipients(campaignId: number, segmentId: number, campaignPipelineStageIds?: number[]): Promise<number> {
     try {
       const [segment] = await db.select()
         .from(contactSegments)
@@ -300,7 +732,21 @@ export class CampaignService {
         throw new Error('Segment not found');
       }
 
-      const segmentContacts = await this.getContactsBySegment(segment);
+
+      let effectiveSegment = segment;
+      if (campaignPipelineStageIds && campaignPipelineStageIds.length > 0) {
+        const segmentCriteria = segment.criteria as SegmentFilterCriteria;
+        const mergedCriteria: SegmentFilterCriteria = {
+          ...segmentCriteria,
+          pipelineStageIds: campaignPipelineStageIds
+        };
+        effectiveSegment = {
+          ...segment,
+          criteria: mergedCriteria
+        };
+      }
+
+      const segmentContacts = await this.getContactsBySegment(effectiveSegment);
 
       const existingRecipients = await db.select({
           contactId: campaignRecipients.contactId,
@@ -347,8 +793,15 @@ export class CampaignService {
         await db.insert(campaignRecipients).values(recipients);
       }
 
+
+      const [currentCampaign] = await db.select({ totalRecipients: campaigns.totalRecipients })
+        .from(campaigns)
+        .where(eq(campaigns.id, campaignId));
+
+      const newTotal = (currentCampaign?.totalRecipients || 0) + recipients.length;
+
       await db.update(campaigns)
-        .set({ totalRecipients: recipients.length })
+        .set({ totalRecipients: newTotal })
         .where(eq(campaigns.id, campaignId));
 
       
@@ -360,11 +813,122 @@ export class CampaignService {
   }
 
   /**
+   * Populates campaign recipients directly from pipeline stage filter when no segment is provided.
+   * 
+   * This method queries contacts that have deals in the specified pipeline stages.
+   */
+  async populateCampaignRecipientsFromPipelineStages(campaignId: number, companyId: number, pipelineStageIds: number[]): Promise<number> {
+    try {
+
+      const contactsWithDeals = await db
+        .select({
+          id: contacts.id,
+          name: contacts.name,
+          email: contacts.email,
+          phone: contacts.phone,
+          company: contacts.company,
+          tags: contacts.tags,
+          createdAt: contacts.createdAt,
+          updatedAt: contacts.updatedAt,
+          companyId: contacts.companyId,
+          isActive: contacts.isActive
+        })
+        .from(contacts)
+        .innerJoin(deals, eq(deals.contactId, contacts.id))
+        .where(and(
+          eq(contacts.companyId, companyId),
+          eq(contacts.isActive, true),
+          inArray(deals.stageId, pipelineStageIds),
+          sql`${contacts.phone} IS NOT NULL AND ${contacts.phone} != ''`,
+          sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) BETWEEN 7 AND 15`
+        ))
+        .groupBy(
+          contacts.id,
+          contacts.name,
+          contacts.email,
+          contacts.phone,
+          contacts.company,
+          contacts.tags,
+          contacts.createdAt,
+          contacts.updatedAt,
+          contacts.companyId,
+          contacts.isActive
+        )
+        .orderBy(desc(contacts.createdAt));
+
+
+      const deduplicatedContacts = this.deduplicateContactsByPhone(contactsWithDeals);
+
+
+      const existingRecipients = await db.select({
+          contactId: campaignRecipients.contactId,
+          phone: contacts.phone
+        })
+        .from(campaignRecipients)
+        .leftJoin(contacts, eq(campaignRecipients.contactId, contacts.id))
+        .where(eq(campaignRecipients.campaignId, campaignId));
+
+      const existingContactIds = new Set(existingRecipients.map(r => r.contactId));
+      const existingPhones = new Set(
+        existingRecipients
+          .map(r => this.normalizePhoneNumber(r.phone || ''))
+          .filter(phone => phone !== '')
+      );
+
+
+      const newContacts = deduplicatedContacts.filter(contact => {
+        if (existingContactIds.has(contact.id)) {
+          return false;
+        }
+        const normalizedPhone = this.normalizePhoneNumber(contact.phone || '');
+        if (normalizedPhone && existingPhones.has(normalizedPhone)) {
+          return false;
+        }
+        return true;
+      });
+
+      await this.checkRecipientLimitations(companyId, newContacts.length);
+
+      const recipients = newContacts.map(contact => ({
+        campaignId,
+        contactId: contact.id,
+        status: 'pending' as const,
+        variables: this.extractContactVariables(contact)
+      }));
+
+      if (recipients.length > 0) {
+        await db.insert(campaignRecipients).values(recipients);
+      }
+
+
+      const [currentCampaign] = await db.select({ totalRecipients: campaigns.totalRecipients })
+        .from(campaigns)
+        .where(eq(campaigns.id, campaignId));
+
+      const newTotal = (currentCampaign?.totalRecipients || 0) + recipients.length;
+
+      await db.update(campaigns)
+        .set({ totalRecipients: newTotal })
+        .where(eq(campaigns.id, campaignId));
+
+      return recipients.length;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to populate recipients from pipeline stages: ${errorMessage}`);
+    }
+  }
+
+  /**
    * Gets contacts matching a segment's criteria.
    * 
    * IMPORTANT: Segments are dynamic filters, not static contact lists. This method
    * evaluates the segment's criteria against current contact data each time it's called.
    * Contact membership is recalculated based on current tags, dates, and other filters.
+   * 
+   * CRITICAL: All criteria are combined using AND logic. This means:
+   * - If contactIds are specified along with tags/dates, only contacts that are BOTH
+   *   in the contactIds list AND match the tags/dates will be included.
+   * - This is strict AND logic, not union (OR) logic. All conditions must be satisfied.
    * 
    * Note: Results are deduplicated by normalized phone number, which may reduce
    * the apparent number of contacts compared to raw filter matches.
@@ -373,13 +937,52 @@ export class CampaignService {
     try {
       const criteria = segment.criteria as SegmentFilterCriteria;
 
+
+
+      const contactIds = criteria.contactIds && Array.isArray(criteria.contactIds) ? criteria.contactIds : [];
+      const hasContactIds = contactIds.length > 0;
+      const hasOtherCriteria = 
+        (criteria.tags && criteria.tags.length > 0) ||
+        criteria.created_after ||
+        criteria.created_before ||
+        (criteria.pipelineStageIds && criteria.pipelineStageIds.length > 0);
+
+
+      if (hasContactIds && !hasOtherCriteria) {
+        let whereConditions = [
+          eq(contacts.companyId, segment.companyId),
+          eq(contacts.isActive, true),
+          inArray(contacts.id, contactIds)
+        ];
+
+
+        whereConditions.push(sql`${contacts.phone} IS NOT NULL AND ${contacts.phone} != ''`);
+        whereConditions.push(sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) BETWEEN 7 AND 15`);
+
+
+        if (criteria.excludedContactIds && criteria.excludedContactIds.length > 0) {
+          whereConditions.push(not(inArray(contacts.id, criteria.excludedContactIds)));
+        }
+
+        const allContacts = await db
+          .select()
+          .from(contacts)
+          .where(and(...whereConditions))
+          .orderBy(desc(contacts.createdAt));
+
+
+        const deduplicatedContacts = this.deduplicateContactsByPhone(allContacts);
+        return deduplicatedContacts;
+      }
+
+
       let whereConditions = [
         eq(contacts.companyId, segment.companyId),
         eq(contacts.isActive, true)
       ];
 
       whereConditions.push(sql`${contacts.phone} IS NOT NULL AND ${contacts.phone} != ''`);
-      whereConditions.push(sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) <= 14`);
+      whereConditions.push(sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) BETWEEN 7 AND 15`);
 
 
       const tagCondition = this.createTagFilterCondition(criteria.tags);
@@ -399,13 +1002,58 @@ export class CampaignService {
         whereConditions.push(not(inArray(contacts.id, criteria.excludedContactIds)));
       }
 
-      const allContacts = await db
-        .select()
-        .from(contacts)
-        .where(and(...whereConditions))
-        .orderBy(desc(contacts.createdAt));
 
 
+      if (criteria.contactIds && criteria.contactIds.length > 0) {
+        whereConditions.push(inArray(contacts.id, criteria.contactIds));
+      }
+
+
+      const hasPipelineStageFilter = criteria.pipelineStageIds && Array.isArray(criteria.pipelineStageIds) && criteria.pipelineStageIds.length > 0;
+      
+      let allContacts;
+      if (hasPipelineStageFilter) {
+
+
+        allContacts = await db
+          .select({
+            id: contacts.id,
+            name: contacts.name,
+            email: contacts.email,
+            phone: contacts.phone,
+            company: contacts.company,
+            tags: contacts.tags,
+            createdAt: contacts.createdAt,
+            updatedAt: contacts.updatedAt,
+            companyId: contacts.companyId,
+            isActive: contacts.isActive
+          })
+          .from(contacts)
+          .innerJoin(deals, eq(deals.contactId, contacts.id))
+          .where(and(
+            ...whereConditions,
+            inArray(deals.stageId, criteria.pipelineStageIds!)
+          ))
+          .groupBy(
+            contacts.id,
+            contacts.name,
+            contacts.email,
+            contacts.phone,
+            contacts.company,
+            contacts.tags,
+            contacts.createdAt,
+            contacts.updatedAt,
+            contacts.companyId,
+            contacts.isActive
+          )
+          .orderBy(desc(contacts.createdAt));
+      } else {
+        allContacts = await db
+          .select()
+          .from(contacts)
+          .where(and(...whereConditions))
+          .orderBy(desc(contacts.createdAt));
+      }
 
       const deduplicatedContacts = this.deduplicateContactsByPhone(allContacts);
 
@@ -416,6 +1064,15 @@ export class CampaignService {
     }
   }
 
+  /**
+   * Gets contacts matching a segment's criteria with additional details (e.g., last activity).
+   * 
+   * IMPORTANT: This method uses the same AND logic as getContactsBySegment.
+   * All criteria (contactIds, tags, dates) are combined using AND logic.
+   * 
+   * CRITICAL: If contactIds are specified along with tags/dates, only contacts that are BOTH
+   * in the contactIds list AND match the tags/dates will be included.
+   */
   async getContactsBySegmentWithDetails(segment: ContactSegment, limit: number = 50): Promise<any[]> {
     try {
       const criteria = segment.criteria as SegmentFilterCriteria;
@@ -426,7 +1083,7 @@ export class CampaignService {
       ];
 
       whereConditions.push(sql`${contacts.phone} IS NOT NULL AND ${contacts.phone} != ''`);
-      whereConditions.push(sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) <= 14`);
+      whereConditions.push(sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) BETWEEN 7 AND 15`);
 
 
       const tagCondition = this.createTagFilterCondition(criteria.tags);
@@ -446,32 +1103,76 @@ export class CampaignService {
         whereConditions.push(not(inArray(contacts.id, criteria.excludedContactIds)));
       }
 
-      const contactsWithActivity = await db
-        .select({
-          id: contacts.id,
-          name: contacts.name,
-          email: contacts.email,
-          phone: contacts.phone,
-          company: contacts.company,
-          tags: contacts.tags,
-          createdAt: contacts.createdAt,
-          updatedAt: contacts.updatedAt,
-          lastActivity: sql<Date | null>`MAX(${conversations.lastMessageAt})`.as('lastActivity')
-        })
-        .from(contacts)
-        .leftJoin(conversations, eq(conversations.contactId, contacts.id))
-        .where(and(...whereConditions))
-        .groupBy(
-          contacts.id,
-          contacts.name,
-          contacts.email,
-          contacts.phone,
-          contacts.company,
-          contacts.tags,
-          contacts.createdAt,
-          contacts.updatedAt
-        )
-        .orderBy(desc(contacts.createdAt));
+
+
+      if (criteria.contactIds && criteria.contactIds.length > 0) {
+        whereConditions.push(inArray(contacts.id, criteria.contactIds));
+      }
+
+
+      const hasPipelineStageFilter = criteria.pipelineStageIds && Array.isArray(criteria.pipelineStageIds) && criteria.pipelineStageIds.length > 0;
+
+      let contactsWithActivity;
+      if (hasPipelineStageFilter) {
+
+        contactsWithActivity = await db
+          .select({
+            id: contacts.id,
+            name: contacts.name,
+            email: contacts.email,
+            phone: contacts.phone,
+            company: contacts.company,
+            tags: contacts.tags,
+            createdAt: contacts.createdAt,
+            updatedAt: contacts.updatedAt,
+            lastActivity: sql<Date | null>`MAX(${conversations.lastMessageAt})`.as('lastActivity')
+          })
+          .from(contacts)
+          .leftJoin(conversations, eq(conversations.contactId, contacts.id))
+          .innerJoin(deals, eq(deals.contactId, contacts.id))
+          .where(and(
+            ...whereConditions,
+            inArray(deals.stageId, criteria.pipelineStageIds!)
+          ))
+          .groupBy(
+            contacts.id,
+            contacts.name,
+            contacts.email,
+            contacts.phone,
+            contacts.company,
+            contacts.tags,
+            contacts.createdAt,
+            contacts.updatedAt
+          )
+          .orderBy(desc(contacts.createdAt));
+      } else {
+        contactsWithActivity = await db
+          .select({
+            id: contacts.id,
+            name: contacts.name,
+            email: contacts.email,
+            phone: contacts.phone,
+            company: contacts.company,
+            tags: contacts.tags,
+            createdAt: contacts.createdAt,
+            updatedAt: contacts.updatedAt,
+            lastActivity: sql<Date | null>`MAX(${conversations.lastMessageAt})`.as('lastActivity')
+          })
+          .from(contacts)
+          .leftJoin(conversations, eq(conversations.contactId, contacts.id))
+          .where(and(...whereConditions))
+          .groupBy(
+            contacts.id,
+            contacts.name,
+            contacts.email,
+            contacts.phone,
+            contacts.company,
+            contacts.tags,
+            contacts.createdAt,
+            contacts.updatedAt
+          )
+          .orderBy(desc(contacts.createdAt));
+      }
 
 
 
@@ -549,19 +1250,9 @@ export class CampaignService {
   }
 
   private normalizePhoneNumber(phone: string): string {
-    if (!phone) return '';
 
-    let normalized = phone.replace(/[^\d+]/g, '');
 
-    if (normalized.startsWith('+')) {
-      return normalized;
-    } else {
-      normalized = normalized.replace(/^0+/, '');
-      if (normalized.length > 10) {
-        return '+' + normalized;
-      }
-      return normalized;
-    }
+    return normalizePhoneForInternal(phone);
   }
 
   /**
@@ -1116,6 +1807,23 @@ export class CampaignService {
             .slice(0, 50);
         }
         
+
+
+        const hasContactIds = criteria.contactIds && Array.isArray(criteria.contactIds) && criteria.contactIds.length > 0;
+        const hasOtherCriteria = 
+          (criteria.tags && criteria.tags.length > 0) ||
+          criteria.created_after ||
+          criteria.created_before;
+        
+        if (hasContactIds && hasOtherCriteria) {
+          console.warn(
+            `[Segment Update] Segment ${segmentId} combines contactIds with other criteria (tags/dates). ` +
+            `This uses AND logic: only contacts matching ALL specified conditions will be included. ` +
+            `contactIds: ${criteria.contactIds.length}, tags: ${criteria.tags?.length || 0}, ` +
+            `created_after: ${criteria.created_after || 'none'}, created_before: ${criteria.created_before || 'none'}`
+          );
+        }
+        
         sanitizedUpdateData.criteria = criteria;
         
 
@@ -1192,6 +1900,34 @@ export class CampaignService {
       const contacts = await this.getContactsBySegment(segment);
       return contacts.length;
     } catch (error) {
+
+      const errorDetails = error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : { message: String(error) };
+      
+      console.error(`[Campaign Service] Error calculating segment contact count for segment ${segment.id}:`, {
+        segmentId: segment.id,
+        segmentName: segment.name,
+        companyId: segment.companyId,
+        error: errorDetails
+      });
+      
+
+
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+
+        if (errorMessage.includes('syntax') || 
+            errorMessage.includes('invalid') || 
+            errorMessage.includes('malformed') ||
+            errorMessage.includes('criteria')) {
+          throw new Error(`Failed to calculate segment contact count due to invalid criteria: ${error.message}`);
+        }
+      }
+      
+
       return 0;
     }
   }

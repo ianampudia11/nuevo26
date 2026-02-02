@@ -18,9 +18,11 @@ interface TikTokPlatformConfigFormData {
   clientKey: string;
   clientSecret: string;
   webhookUrl: string;
+  webhookVerifyToken: string;
   redirectUrl: string;
   companyName: string;
   logoUrl: string;
+  allowedScopes: string[];
 }
 
 export function TikTokPlatformConfigForm({ isOpen, onClose, onSuccess }: Props) {
@@ -34,9 +36,11 @@ export function TikTokPlatformConfigForm({ isOpen, onClose, onSuccess }: Props) 
     clientKey: '',
     clientSecret: '',
     webhookUrl: `${window.location.origin}/api/webhooks/tiktok`,
+    webhookVerifyToken: '',
     redirectUrl: `${window.location.origin}/api/tiktok/oauth/callback`,
     companyName: '',
-    logoUrl: ''
+    logoUrl: '',
+    allowedScopes: ['user.info.basic']
   });
 
   useEffect(() => {
@@ -52,13 +56,29 @@ export function TikTokPlatformConfigForm({ isOpen, onClose, onSuccess }: Props) 
       if (response.ok) {
         const config = await response.json();
         setExistingConfig(config);
+        
+
+        const APPROVED_SCOPES = [
+          'user.info.basic',      // Minimum required - always approved
+          'user.info.profile',    // Optional - only if app is approved for this scope
+        ];
+        
+        const existingScopes = config.publicProfile?.allowedScopes || ['user.info.basic'];
+
+        const filteredScopes = existingScopes.filter((scope: string) => APPROVED_SCOPES.includes(scope));
+        const allowedScopes = filteredScopes.includes('user.info.basic')
+          ? filteredScopes
+          : ['user.info.basic', ...filteredScopes];
+        
         setFormData({
           clientKey: config.partnerApiKey || '',
           clientSecret: config.partnerId || '',
           webhookUrl: config.partnerWebhookUrl || `${window.location.origin}/api/webhooks/tiktok`,
+          webhookVerifyToken: config.webhookVerifyToken || '',
           redirectUrl: config.redirectUrl || `${window.location.origin}/api/tiktok/oauth/callback`,
           companyName: config.publicProfile?.companyName || '',
-          logoUrl: config.publicProfile?.logoUrl || ''
+          logoUrl: config.publicProfile?.logoUrl || '',
+          allowedScopes: allowedScopes
         });
       }
     } catch (error) {
@@ -81,9 +101,11 @@ export function TikTokPlatformConfigForm({ isOpen, onClose, onSuccess }: Props) 
       clientKey: '',
       clientSecret: '',
       webhookUrl: `${window.location.origin}/api/webhooks/tiktok`,
+      webhookVerifyToken: '',
       redirectUrl: `${window.location.origin}/api/tiktok/oauth/callback`,
       companyName: '',
-      logoUrl: ''
+      logoUrl: '',
+      allowedScopes: ['user.info.basic']
     });
     setExistingConfig(null);
     setIsSubmitting(false);
@@ -154,15 +176,31 @@ export function TikTokPlatformConfigForm({ isOpen, onClose, onSuccess }: Props) 
 
     setIsSubmitting(true);
     try {
+
+      const APPROVED_SCOPES = [
+        'user.info.basic',      // Minimum required - always approved
+        'user.info.profile',    // Optional - only if app is approved for this scope
+      ];
+      
+
+      const filteredScopes = formData.allowedScopes.filter(scope => APPROVED_SCOPES.includes(scope));
+      
+
+      const allowedScopes = filteredScopes.includes('user.info.basic')
+        ? filteredScopes
+        : ['user.info.basic', ...filteredScopes];
+
       const payload = {
         provider: 'tiktok',
         partnerApiKey: formData.clientKey,
         partnerId: formData.clientSecret,
         partnerWebhookUrl: formData.webhookUrl,
+        webhookVerifyToken: formData.webhookVerifyToken,
         redirectUrl: formData.redirectUrl,
         publicProfile: {
           companyName: formData.companyName,
-          logoUrl: formData.logoUrl
+          logoUrl: formData.logoUrl,
+          allowedScopes: allowedScopes
         },
         isActive: true
       };
@@ -369,6 +407,23 @@ export function TikTokPlatformConfigForm({ isOpen, onClose, onSuccess }: Props) 
               </div>
 
               <div>
+                <Label htmlFor="webhookVerifyToken">Webhook Verify Token *</Label>
+                <Input
+                  id="webhookVerifyToken"
+                  name="webhookVerifyToken"
+                  type="text"
+                  value={formData.webhookVerifyToken}
+                  onChange={handleInputChange}
+                  placeholder="Enter webhook verify token"
+                  required
+                  disabled={isSubmitting || isValidating}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Token used to verify webhook requests from TikTok. This must match the token configured in your TikTok app's webhook settings.
+                </p>
+              </div>
+
+              <div>
                 <Label htmlFor="redirectUrl">OAuth Redirect URL</Label>
                 <Input
                   id="redirectUrl"
@@ -382,6 +437,53 @@ export function TikTokPlatformConfigForm({ isOpen, onClose, onSuccess }: Props) 
                 <p className="text-xs text-gray-500 mt-1">
                   Register this URL in your TikTok app's Login Kit redirect URIs
                 </p>
+              </div>
+            </div>
+
+            {/* OAuth Scopes Configuration */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">OAuth Scopes</h3>
+              <p className="text-sm text-gray-600">
+                Select the OAuth scopes that are approved for your TikTok app. Only approved scopes will be requested during OAuth.
+              </p>
+              
+              <Alert className="bg-blue-50 border-blue-200">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-sm text-blue-800">
+                  <strong>Important:</strong> Only include scopes that are approved for your TikTok app. Requesting unapproved scopes will cause OAuth to fail.
+                  The minimum required scope <code className="bg-blue-100 px-1 rounded">user.info.basic</code> is always included.
+                  Video scopes (video.list, video.upload) are not available unless your app is whitelisted by TikTok.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                {[
+                  { value: 'user.info.basic', label: 'User Info Basic', required: true, description: 'Basic user information (required)' },
+                  { value: 'user.info.profile', label: 'User Info Profile', required: false, description: 'Extended user profile information' }
+                ].map((scope) => (
+                  <div key={scope.value} className="flex items-start space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`scope-${scope.value}`}
+                      checked={formData.allowedScopes.includes(scope.value)}
+                      onChange={(e) => {
+                        if (scope.required) return; // Prevent unchecking required scope
+                        const newScopes = e.target.checked
+                          ? [...formData.allowedScopes, scope.value]
+                          : formData.allowedScopes.filter(s => s !== scope.value);
+                        setFormData(prev => ({ ...prev, allowedScopes: newScopes }));
+                      }}
+                      disabled={isSubmitting || isValidating || scope.required}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor={`scope-${scope.value}`} className={scope.required ? 'font-semibold' : ''}>
+                        {scope.label} {scope.required && <span className="text-red-500">*</span>}
+                      </Label>
+                      <p className="text-xs text-gray-500">{scope.description}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

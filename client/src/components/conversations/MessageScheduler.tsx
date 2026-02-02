@@ -231,20 +231,20 @@ export default function MessageScheduler({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
+      <div className="bg-card rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <h2 className="text-lg font-semibold text-foreground">
                 {t('scheduler.title', 'Schedule Message')}
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -273,7 +273,7 @@ export default function MessageScheduler({
           {/* Media Preview */}
           {messageType === 'media' && mediaFile && (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 {t('scheduler.media_label', 'Media File')}
               </label>
               <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
@@ -287,7 +287,7 @@ export default function MessageScheduler({
                   <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {mediaFile.name}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -301,7 +301,7 @@ export default function MessageScheduler({
           {/* Date and Time Selection */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 {t('scheduler.date_label', 'Date')}
               </label>
               <input
@@ -309,18 +309,18 @@ export default function MessageScheduler({
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 {t('scheduler.time_label', 'Time')}
               </label>
               <input
                 type="time"
                 value={scheduledTime}
                 onChange={(e) => setScheduledTime(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
               />
             </div>
           </div>
@@ -373,7 +373,7 @@ export default function MessageScheduler({
           <div className="flex gap-6">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+              className="flex-1 px-4 py-2 text-foreground bg-muted hover:bg-accent rounded-md transition-colors"
             >
               {t('common.cancel', 'Cancel')}
             </button>

@@ -41,6 +41,24 @@ export const ensureSuperAdmin = (req: Request, res: Response, next: NextFunction
   });
 };
 
+/** Call Agent health: super admins get full access; company admins get their company's connections only */
+export const ensureCallAgentHealthAccess = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  const user = req.user as SelectUser;
+  if (user.isSuperAdmin) {
+    (req as any).healthScope = 'full';
+    return next();
+  }
+  if (user.companyId) {
+    (req as any).healthScope = 'company';
+    (req as any).healthCompanyId = user.companyId;
+    return next();
+  }
+  return res.status(403).json({ message: 'Company admin access required' });
+};
+
 export const ensureAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: 'Unauthorized' });

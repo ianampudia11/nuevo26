@@ -2,6 +2,47 @@ import { useState, useEffect } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
 
+function TikTokVideoShareCard({ message, mediaUrl, t }: { message: any; mediaUrl?: string; t: (key: string, fallback?: string) => string }) {
+  const [imgError, setImgError] = useState(false);
+  const meta = typeof message.metadata === 'string' ? ({} as Record<string, unknown>) : (message.metadata || {}) as Record<string, unknown>;
+  const coverImageUrl = (meta.cover_image_url || meta.coverImageUrl || mediaUrl) as string | undefined;
+  const videoUrl = (meta.video_url || meta.videoUrl) as string | undefined;
+  const title = (meta.title) as string | undefined;
+  const creatorName = (meta.creator_name || meta.creatorName) as string | undefined;
+  const linkUrl = videoUrl || mediaUrl;
+  return (
+    <div className="message-media tiktok-video-share">
+      <div className="rounded-lg border border-border overflow-hidden bg-muted/30 max-w-[280px]">
+        {coverImageUrl && !imgError ? (
+          <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="block">
+            <img
+              src={coverImageUrl}
+              alt={title || t('message_bubble.tiktok_video', 'TikTok video')}
+              className="w-full aspect-video object-cover"
+              loading="lazy"
+              onError={() => setImgError(true)}
+            />
+          </a>
+        ) : (
+          <div className="w-full aspect-video flex items-center justify-center bg-muted">
+            <i className="ri-video-line text-4xl text-muted-foreground" />
+          </div>
+        )}
+        <div className="p-2">
+          {title && <p className="text-sm font-medium line-clamp-1">{title}</p>}
+          {creatorName && <p className="text-xs text-muted-foreground">{creatorName}</p>}
+          {linkUrl && (
+            <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary mt-1">
+              {t('message_bubble.open_in_tiktok', 'Open in TikTok')}
+              <i className="ri-external-link-line" />
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface OptimizedMediaBubbleProps {
   message: any;
   mediaUrl?: string;
@@ -32,6 +73,12 @@ export default function OptimizedMediaBubble({
 
   const checkMediaSize = async (url: string) => {
     try {
+
+      if (url.includes('lookaside.fbsbx.com')) {
+        setShouldAutoLoad(false); // Force download button for Instagram media
+        setIsCheckingSize(false);
+        return;
+      }
 
       const response = await fetch(url, {
         method: 'HEAD',
@@ -151,7 +198,7 @@ export default function OptimizedMediaBubble({
                 </div>
                 <button
                   onClick={onDownload}
-                  className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white py-2 px-4 rounded-md text-sm transition-all"
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-4 rounded-md text-sm transition-all"
                   disabled={isDownloading}
                 >
                   {isDownloading ? (
@@ -206,7 +253,7 @@ export default function OptimizedMediaBubble({
                 </div>
                 <button
                   onClick={onDownload}
-                  className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white py-2 px-4 rounded-md text-sm transition-all"
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-4 rounded-md text-sm transition-all"
                   disabled={isDownloading}
                 >
                   {isDownloading ? (
@@ -284,7 +331,7 @@ export default function OptimizedMediaBubble({
                 </div>
                 <button
                   onClick={onDownload}
-                  className="flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white py-1 px-3 rounded-md text-xs transition-all ml-3"
+                  className="flex items-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground py-1 px-3 rounded-md text-xs transition-all ml-3"
                   disabled={isDownloading}
                 >
                   {isDownloading ? (
@@ -325,7 +372,7 @@ export default function OptimizedMediaBubble({
                 href={mediaUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white py-1 px-3 rounded-md text-xs transition-all ml-2 flex-shrink-0"
+                className="flex items-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground py-1 px-3 rounded-md text-xs transition-all ml-2 flex-shrink-0"
               >
                 <i className="ri-external-link-line"></i>
                 <span>{t('message_bubble.open', 'Open')}</span>
@@ -333,7 +380,7 @@ export default function OptimizedMediaBubble({
             ) : (
               <button
                 onClick={onDownload}
-                className="flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white py-1 px-3 rounded-md text-xs transition-all ml-2 flex-shrink-0"
+                className="flex items-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground py-1 px-3 rounded-md text-xs transition-all ml-2 flex-shrink-0"
                 disabled={isDownloading}
               >
                 {isDownloading ? (
@@ -350,6 +397,15 @@ export default function OptimizedMediaBubble({
               </button>
             )}
           </div>
+        );
+
+      case 'tiktok_video_share':
+        return (
+          <TikTokVideoShareCard
+            message={message}
+            mediaUrl={mediaUrl}
+            t={t}
+          />
         );
 
       case 'sticker':
@@ -384,7 +440,7 @@ export default function OptimizedMediaBubble({
                 </div>
                 <button
                   onClick={onDownload}
-                  className="flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white py-1 px-3 rounded-md text-xs transition-all ml-3"
+                  className="flex items-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground py-1 px-3 rounded-md text-xs transition-all ml-3"
                   disabled={isDownloading}
                 >
                   {isDownloading ? (

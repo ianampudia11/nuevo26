@@ -414,7 +414,7 @@ export default function QuickReplyPanel({
           <Button
             variant="ghost"
             size="sm"
-            className={`flex items-center gap-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 ${className}`}
+            className={`flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-accent ${className}`}
             title={t('quick_replies.use_quick_response', 'Use a Quick Response')}
           >
             <Zap className="h-4 w-4" />
@@ -425,7 +425,7 @@ export default function QuickReplyPanel({
         <PopoverContent className="w-80 p-0" align="start" side="top">
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-sm text-gray-900">
+              <h4 className="font-medium text-sm text-foreground">
                 {t('quick_replies.use_quick_response', 'Use a Quick Response')}
               </h4>
               <Button
@@ -439,7 +439,7 @@ export default function QuickReplyPanel({
             </div>
 
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder={t('quick_replies.search', 'Search')}
                 value={searchTerm}
@@ -450,11 +450,11 @@ export default function QuickReplyPanel({
 
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {isLoading ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
+                <div className="text-center py-4 text-muted-foreground text-sm">
                   {t('quick_replies.loading', 'Loading templates...')}
                 </div>
               ) : filteredTemplates.length === 0 ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
+                <div className="text-center py-4 text-muted-foreground text-sm">
                   {searchTerm 
                     ? t('quick_replies.no_results', 'No templates found')
                     : t('quick_replies.no_templates', 'No templates available')
@@ -464,13 +464,13 @@ export default function QuickReplyPanel({
                 filteredTemplates.map((template: QuickReplyTemplate) => (
                   <div
                     key={template.id}
-                    className="relative p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-colors group"
+                    className="relative p-3 rounded-lg hover:bg-accent cursor-pointer border border-transparent hover:border-border transition-colors group"
                     onClick={() => handleSelectTemplate(template)}
                     onMouseEnter={() => setHoveredTemplateId(template.id)}
                     onMouseLeave={() => setHoveredTemplateId(null)}
                   >
                     <div className="flex items-start justify-between mb-1">
-                      <h5 className="font-medium text-sm text-gray-900 truncate pr-2">
+                      <h5 className="font-medium text-sm text-foreground truncate pr-2">
                         {template.name}
                       </h5>
                       <div className="flex items-center gap-1">
@@ -479,21 +479,21 @@ export default function QuickReplyPanel({
                         }`}>
                           <button
                             onClick={(e) => handleEditTemplate(template, e)}
-                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors"
+                            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                             title={t('quick_replies.edit_template', 'Edit template')}
                           >
                             <Edit3 className="h-3 w-3" />
                           </button>
                           <button
                             onClick={(e) => handleDuplicateTemplate(template, e)}
-                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors"
+                            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                             title={t('quick_replies.duplicate_template', 'Duplicate template')}
                           >
                             <Copy className="h-3 w-3" />
                           </button>
                           <button
                             onClick={(e) => handleDeleteTemplate(template, e)}
-                            className="p-1 rounded hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                             title={t('quick_replies.delete_template', 'Delete template')}
                           >
                             <Trash2 className="h-3 w-3" />
@@ -501,7 +501,7 @@ export default function QuickReplyPanel({
                         </div>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-600 line-clamp-2">
+                    <p className="text-xs text-muted-foreground line-clamp-2">
                       {getTemplatePreview(template)}
                     </p>
                     {hasVariables(template.content) && (
@@ -522,7 +522,7 @@ export default function QuickReplyPanel({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full justify-start text-gray-600 hover:text-gray-800"
+              className="w-full justify-start text-muted-foreground hover:text-foreground"
               onClick={() => setIsCreateModalOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -543,7 +543,7 @@ export default function QuickReplyPanel({
           
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
+              <label className="text-sm font-medium text-foreground mb-1 block">
                 {t('quick_replies.template_name', 'Template Name')}
               </label>
               <Input
@@ -554,7 +554,7 @@ export default function QuickReplyPanel({
             </div>
             
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
+              <label className="text-sm font-medium text-foreground mb-1 block">
                 {t('quick_replies.template_content', 'Template Content')}
               </label>
               <Textarea
@@ -611,7 +611,7 @@ export default function QuickReplyPanel({
                                       {variable.description}
                                     </div>
                                   </div>
-                                  <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                  <code className="text-xs bg-muted px-2 py-1 rounded">
                                     {`{{${variable.value}}}`}
                                   </code>
                                 </div>
@@ -656,7 +656,7 @@ export default function QuickReplyPanel({
           {editingTemplate && (
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                <label className="text-sm font-medium text-foreground mb-1 block">
                   {t('quick_replies.template_name', 'Template Name')}
                 </label>
                 <Input
@@ -667,7 +667,7 @@ export default function QuickReplyPanel({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                <label className="text-sm font-medium text-foreground mb-1 block">
                   {t('quick_replies.template_content', 'Template Content')}
                 </label>
                 <Textarea
@@ -724,7 +724,7 @@ export default function QuickReplyPanel({
                                         {variable.description}
                                       </div>
                                     </div>
-                                    <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                    <code className="text-xs bg-muted px-2 py-1 rounded">
                                       {`{{${variable.value}}}`}
                                     </code>
                                   </div>
@@ -765,7 +765,7 @@ export default function QuickReplyPanel({
             <AlertDialogDescription>
               {t('quick_replies.delete_template_desc', 'Are you sure you want to delete this template? This action cannot be undone.')}
               {templateToDelete && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                <div className="mt-2 p-2 bg-muted rounded text-sm">
                   <strong>{templateToDelete.name}</strong>
                 </div>
               )}
@@ -775,7 +775,7 @@ export default function QuickReplyPanel({
             <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               disabled={deleteTemplateMutation.isPending}
             >
               {deleteTemplateMutation.isPending

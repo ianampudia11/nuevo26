@@ -9,7 +9,7 @@ VALUES (
   NOW(),
   NOW()
 )
-ON CONFLICT (key) DO UPDATE;
+ON CONFLICT (key) DO UPDATE SET updated_at = NOW();
 
 -- Add a comment to document the setting
 COMMENT ON TABLE app_settings IS 'Global application settings including feature toggles';

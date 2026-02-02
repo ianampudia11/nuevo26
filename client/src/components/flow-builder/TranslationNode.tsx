@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, FC, memo } from 'react';
 import { Handle, Position, useReactFlow } from 'reactflow';
-import { Trash2, Copy, Settings, Languages, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Copy, Settings, Eye, EyeOff } from 'lucide-react';
 import { useFlowContext } from '../../pages/flow-builder';
 import { useTranslation } from '@/hooks/use-translation';
 
@@ -81,9 +81,13 @@ const NodeToolbar: FC<{ onDelete: () => void; onDuplicate: () => void; }> = memo
 const NodeHeader: FC<{ isEditing: boolean; onToggleEdit: () => void; }> = memo(({ isEditing, onToggleEdit }) => {
   const { t } = useTranslation();
   return (
-    <div className="p-3 border-b border-blue-100 bg-blue-50/30">
+    <div className="p-3 border-b border-primary/20 bg-primary/10">
       <div className="font-medium flex items-center gap-2">
-        <Languages className="h-4 w-4 text-blue-600" />
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Google_Translate_logo.svg/1024px-Google_Translate_logo.svg.png" 
+          alt="Translation" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.translation', 'Translation')}</span>
         <button className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1" onClick={onToggleEdit}>
           {isEditing ? <><EyeOff className="h-3 w-3" />{t('flow_builder.translation_node.hide', 'Hide')}</> : <><Eye className="h-3 w-3" />{t('flow_builder.translation_node.edit', 'Edit')}</>}
@@ -100,7 +104,7 @@ const TranslationNodeSummary: FC<Pick<TranslationNodeData, 'enabled' | 'targetLa
   const modeName = getTranslationModes(t).find(m => m.id === translationMode)?.name || t('flow_builder.translation_node.separate_message', 'Separate');
   
   return (
-    <div className="text-sm p-3 bg-secondary/40 rounded border border-border">
+    <div className="text-sm p-3  rounded border border-border">
       <div className="flex items-center gap-1 mb-2">
         <Settings className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="font-medium">{t('flow_builder.translation_node.openai_translation', 'OpenAI Translation')}</span>
@@ -111,9 +115,9 @@ const TranslationNodeSummary: FC<Pick<TranslationNodeData, 'enabled' | 'targetLa
       </div>
       {enabled && (
         <div className="flex flex-wrap gap-1">
-          <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">{t('flow_builder.translation_node.target_label', 'Target:')} {targetLanguageName}</span>
-          <span className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">{t('flow_builder.translation_node.mode_label', 'Mode:')} {modeName}</span>
-          {detectLanguage && <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full">{t('flow_builder.translation_node.auto_detect', 'Auto-detect')}</span>}
+          <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full">{t('flow_builder.translation_node.target_label', 'Target:')} {targetLanguageName}</span>
+          <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full">{t('flow_builder.translation_node.mode_label', 'Mode:')} {modeName}</span>
+          {detectLanguage && <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full">{t('flow_builder.translation_node.auto_detect', 'Auto-detect')}</span>}
         </div>
       )}
     </div>
@@ -130,9 +134,13 @@ const TranslationNodeSettings: FC<{
   const getApiDocUrl = () => 'https://platform.openai.com/api-keys';
 
   return (
-    <div className="border rounded-lg p-3 bg-gradient-to-r from-blue-50 to-cyan-50">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-        <Languages className="h-4 w-4" /> {t('flow_builder.translation_node.configuration', 'Translation Configuration')}
+    <div className="border rounded-lg p-3 bg-primary/10">
+      <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Google_Translate_logo.svg/1024px-Google_Translate_logo.svg.png" 
+          alt="Translation" 
+          className="h-4 w-4"
+        /> {t('flow_builder.translation_node.configuration', 'Translation Configuration')}
       </h3>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -143,14 +151,14 @@ const TranslationNodeSettings: FC<{
           <Switch checked={enabled} onCheckedChange={value => setState({ enabled: value })} />
         </div>
         {enabled && (
-          <div className="pl-4 border-l-2 border-blue-200 space-y-3">
+          <div className="pl-4 border-l-2 border-primary/20 space-y-3">
             <div>
-              <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.translation_node.openai_api_key', 'OpenAI API Key')}</Label>
+              <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.translation_node.openai_api_key', 'OpenAI API Key')}</Label>
               <Input type="password" placeholder={t('flow_builder.translation_node.api_key_placeholder', 'Enter your OpenAI API key')} value={apiKey} onChange={e => setState({ apiKey: e.target.value })} className="text-xs h-7 mt-1" />
-              <a href={getApiDocUrl()} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline mt-1 block">{t('flow_builder.translation_node.get_api_key', 'Get your API key here')}</a>
+              <a href={getApiDocUrl()} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline mt-1 block">{t('flow_builder.translation_node.get_api_key', 'Get your API key here')}</a>
             </div>
             <div>
-              <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.translation_node.target_language', 'Target Language')}</Label>
+              <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.translation_node.target_language', 'Target Language')}</Label>
               <Select value={targetLanguage} onValueChange={value => setState({ targetLanguage: value })}>
                 <SelectTrigger className="text-xs h-7 mt-1"><SelectValue placeholder={t('flow_builder.translation_node.select_language', 'Select language...')} /></SelectTrigger>
                 <SelectContent className="max-h-48">
@@ -159,7 +167,7 @@ const TranslationNodeSettings: FC<{
               </Select>
             </div>
             <div>
-              <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.translation_node.translation_mode', 'Translation Mode')}</Label>
+              <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.translation_node.translation_mode', 'Translation Mode')}</Label>
               <Select value={translationMode} onValueChange={value => setState({ translationMode: value })}>
                 <SelectTrigger className="text-xs h-7 mt-1"><SelectValue placeholder={t('flow_builder.translation_node.select_mode', 'Select mode...')} /></SelectTrigger>
                 <SelectContent>
@@ -169,7 +177,7 @@ const TranslationNodeSettings: FC<{
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-[10px] font-medium text-gray-700">{t('flow_builder.translation_node.auto_language_detection', 'Auto Language Detection')}</Label>
+                <Label className="text-[10px] font-medium text-foreground">{t('flow_builder.translation_node.auto_language_detection', 'Auto Language Detection')}</Label>
                 <p className="text-[9px] text-muted-foreground">{t('flow_builder.translation_node.auto_detect_desc', 'Only translate if source ≠ target language')}</p>
               </div>
               <Switch checked={detectLanguage} onCheckedChange={value => setState({ detectLanguage: value })} className="scale-75" />
@@ -215,7 +223,7 @@ export function TranslationNode({ id, data, isConnectable }: TranslationNodeProp
   const handleDuplicate = () => onDuplicateNode?.(id);
 
   return (
-    <div className="node-translation rounded-lg bg-white border border-blue-200 shadow-sm min-w-[380px] max-w-[480px] group relative">
+    <div className="node-translation rounded-lg bg-card border border-border shadow-sm min-w-[380px] max-w-[480px] group relative">
       <NodeToolbar onDelete={handleDelete} onDuplicate={handleDuplicate} />
       <NodeHeader isEditing={isEditing} onToggleEdit={() => setIsEditing(!isEditing)} />
       

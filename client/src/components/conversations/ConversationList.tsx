@@ -89,18 +89,18 @@ export default function ConversationList() {
     return (
       <div className={`
         ${isMobile ? 'w-full' : 'w-72 lg:w-80'}
-        border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col
+        border-r border-border bg-card flex-shrink-0 overflow-hidden flex flex-col
         ${isMobile ? 'h-full' : ''}
       `}>
-        <div className="p-3 sm:p-4 border-b border-gray-200">
+        <div className="p-3 sm:p-4 border-b border-border">
           <h2 className="text-lg font-medium">{t('inbox.conversations', 'Conversations')}</h2>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-pulse flex flex-col w-full p-3 sm:p-4 space-y-3">
-            <div className="h-10 sm:h-12 bg-gray-200 rounded w-full"></div>
-            <div className="h-16 sm:h-20 bg-gray-200 rounded w-full"></div>
-            <div className="h-16 sm:h-20 bg-gray-200 rounded w-full"></div>
-            <div className="h-16 sm:h-20 bg-gray-200 rounded w-full"></div>
+            <div className="h-10 sm:h-12 bg-muted rounded w-full"></div>
+            <div className="h-16 sm:h-20 bg-muted rounded w-full"></div>
+            <div className="h-16 sm:h-20 bg-muted rounded w-full"></div>
+            <div className="h-16 sm:h-20 bg-muted rounded w-full"></div>
           </div>
         </div>
       </div>
@@ -160,21 +160,21 @@ export default function ConversationList() {
     <div
       className={`
         ${isMobile ? 'w-full' : 'w-72 lg:w-80'}
-        border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col
+        border-r border-border bg-card flex-shrink-0 overflow-hidden flex flex-col
         ${isMobile ? 'h-full' : ''}
       `}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="p-3 sm:p-4 border-b border-gray-200 flex justify-between items-center">
+      <div className="p-3 sm:p-4 border-b border-border flex justify-between items-center">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             {isMobile && (
               <button
                 onClick={toggleConversationList}
-                className="p-2 rounded-md hover:bg-gray-100 lg:hidden"
+                className="p-2 rounded-md hover:bg-accent lg:hidden"
                 aria-label={t('inbox.close_conversations', 'Close conversations')}
               >
-                <i className="ri-close-line text-lg text-gray-600"></i>
+                <i className="ri-close-line text-lg text-muted-foreground"></i>
               </button>
             )}
           </div>
@@ -199,26 +199,26 @@ export default function ConversationList() {
         </div>
       </div>
 
-      <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center bg-gray-50">
+      <div className="p-3 sm:p-4 border-b border-border flex items-center bg-muted/50">
         <div className="relative flex-1">
           <input
             type="search"
             placeholder={t('inbox.search_conversations_enhanced', 'Search by name, tag, phone, email...')}
-            className="w-full pl-9 pr-4 py-3 sm:py-2 rounded-lg border border-gray-300 bg-white text-base sm:text-sm"
+            className="w-full pl-9 pr-4 py-3 sm:py-2 rounded-lg border border-input bg-background text-base sm:text-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <i className="ri-search-line absolute left-3 top-3.5 sm:top-2.5 text-gray-400"></i>
+          <i className="ri-search-line absolute left-3 top-3.5 sm:top-2.5 text-muted-foreground"></i>
         </div>
       </div>
 
-      <div className="flex px-3 sm:px-4 py-2 border-b border-gray-200 space-x-1 overflow-x-auto scrollbar-hide">
+      <div className="flex px-3 sm:px-4 py-2 border-b border-border space-x-1 overflow-x-auto scrollbar-hide">
         {(canViewAllConversations() || user?.isSuperAdmin) && (
           <button
             className={`px-3 sm:px-4 py-2 sm:py-1 rounded-full text-sm font-medium whitespace-nowrap min-h-[23px] sm:min-h-auto flex items-center ${
               filterStatus === 'all'
                 ? 'bg-primary-100 text-primary-700'
-                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                : 'bg-background border border-input text-foreground hover:bg-accent'
             }`}
             onClick={() => setFilterStatus('all')}
           >
@@ -231,7 +231,7 @@ export default function ConversationList() {
             className={`px-3 sm:px-4 py-2 sm:py-1 rounded-full text-sm font-medium whitespace-nowrap min-h-[23px] sm:min-h-auto flex items-center ${
               filterStatus === 'unassigned'
                 ? 'bg-primary-100 text-primary-700'
-                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                : 'bg-background border border-input text-foreground hover:bg-accent'
             }`}
             onClick={() => setFilterStatus('unassigned')}
           >
@@ -243,7 +243,7 @@ export default function ConversationList() {
           className={`px-3 sm:px-4 py-2 sm:py-1 rounded-full text-sm font-medium whitespace-nowrap min-h-[23px] sm:min-h-auto flex items-center ${
             filterStatus === 'assigned_to_me'
               ? 'bg-primary-100 text-primary-700'
-              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+              : 'bg-background border border-input text-foreground hover:bg-accent'
           }`}
           onClick={() => setFilterStatus('assigned_to_me')}
         >
@@ -255,7 +255,7 @@ export default function ConversationList() {
             className={`px-3 sm:px-4 py-2 sm:py-1 rounded-full text-sm font-medium whitespace-nowrap min-h-[23px] sm:min-h-auto flex items-center ${
               filterStatus === 'assigned'
                 ? 'bg-primary-100 text-primary-700'
-                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                : 'bg-background border border-input text-foreground hover:bg-accent'
             }`}
             onClick={() => setFilterStatus('assigned')}
           >
@@ -282,7 +282,7 @@ export default function ConversationList() {
         }}
       >
         {filteredConversations.length === 0 && !isLoadingConversations ? (
-          <div className="p-4 sm:p-6 text-center text-gray-500">
+          <div className="p-4 sm:p-6 text-center text-muted-foreground">
             <div className="text-sm sm:text-base">
               {t('inbox.no_conversations_found', 'No conversations found')}
             </div>
@@ -301,10 +301,10 @@ export default function ConversationList() {
 
             {/* Loading indicator for infinite scroll */}
             {conversationsPagination.loading && (
-              <div className="flex items-center justify-center p-6 border-t border-gray-100">
-                <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-full">
+              <div className="flex items-center justify-center p-6 border-t border-border">
+                <div className="flex items-center gap-3 px-4 py-2 bg-muted/50 rounded-full">
                   <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
-                  <span className="text-sm text-gray-600 font-medium">
+                  <span className="text-sm text-muted-foreground font-medium">
                     {t('inbox.loading_more_conversations', 'Loading more conversations...')}
                   </span>
                 </div>
@@ -313,14 +313,14 @@ export default function ConversationList() {
 
             {/* Manual load more button as fallback */}
             {!conversationsPagination.loading && conversationsPagination.hasMore && filteredConversations.length > 0 && (
-              <div className="p-4 border-t border-gray-100">
+              <div className="p-4 border-t border-border">
                 <button
                   onClick={loadMoreConversations}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200 group active:scale-[0.98]"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg border border-border hover:border-input hover:shadow-sm transition-all duration-200 group active:scale-[0.98]"
                 >
                   <i className="ri-arrow-down-line text-base group-hover:translate-y-0.5 transition-transform duration-200"></i>
                   {t('inbox.load_more_conversations', 'Load More Conversations')}
-                  <span className="text-xs text-gray-400 ml-1 bg-gray-100 px-2 py-0.5 rounded-full group-hover:bg-gray-200 transition-colors duration-200">
+                  <span className="text-xs text-muted-foreground ml-1 bg-muted px-2 py-0.5 rounded-full group-hover:bg-muted/80 transition-colors duration-200">
                     {conversationsPagination.total - filteredConversations.length} more
                   </span>
                 </button>
@@ -329,8 +329,8 @@ export default function ConversationList() {
 
             {/* End of list indicator */}
             {!conversationsPagination.hasMore && filteredConversations.length > 0 && (
-              <div className="p-4 border-t border-gray-100">
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
+              <div className="p-4 border-t border-border">
+                <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
                   <i className="ri-check-line text-base"></i>
                   <span>{t('inbox.all_conversations_loaded', 'All conversations loaded')}</span>
                   <span className="text-xs">({filteredConversations.length} total)</span>

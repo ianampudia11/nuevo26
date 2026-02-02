@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useCompanyUsage, useOverrideCompanyUsage, useResetBandwidthUsage } from '@/hooks/use-company-usage';
+import { useCompanyUsage, useOverrideCompanyUsage, useResetBandwidthUsage, useRecalculateCompanyUsage } from '@/hooks/use-company-usage';
 import { 
   formatStorageSize, 
   getUsageStatusColor, 
@@ -39,6 +39,7 @@ export function DataUsageTab({ companyId }: DataUsageTabProps) {
   const { data: usage, isLoading, error, refetch } = useCompanyUsage(companyId);
   const overrideUsageMutation = useOverrideCompanyUsage(companyId);
   const resetBandwidthMutation = useResetBandwidthUsage(companyId);
+  const recalculateUsageMutation = useRecalculateCompanyUsage(companyId);
 
   const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
   const [overrideValues, setOverrideValues] = useState({
@@ -98,6 +99,22 @@ export function DataUsageTab({ companyId }: DataUsageTabProps) {
       toast({
         title: "Reset Failed",
         description: error.message || "Failed to reset bandwidth usage",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRecalculateUsage = async () => {
+    try {
+      await recalculateUsageMutation.mutateAsync();
+      toast({
+        title: "Usage Recalculated",
+        description: "Company usage has been recalculated from actual files.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Recalculation Failed",
+        description: error.message || "Failed to recalculate usage",
         variant: "destructive",
       });
     }
@@ -170,24 +187,29 @@ export function DataUsageTab({ companyId }: DataUsageTabProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatStorageSize(usage.currentUsage.storage)}
+              {formatStorageSize(usage.currentUsage.storage ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              of {formatStorageSize(usage.limits.storage)} limit
+              of {usage.limits.storage > 0 ? formatStorageSize(usage.limits.storage) : 'Unlimited'} limit
             </p>
             <div className="mt-4">
               <Progress 
-                value={usage.percentages.storage} 
+                value={Math.min(100, Math.max(0, usage.percentages.storage ?? 0))} 
                 className="w-full h-2"
               />
               <div className="flex justify-between items-center mt-2">
-                <span className={`text-sm font-medium ${getUsageStatusColor(usage.percentages.storage)}`}>
-                  {usage.percentages.storage.toFixed(1)}%
+                <span className={`text-sm font-medium ${getUsageStatusColor(usage.percentages.storage ?? 0)}`}>
+                  {(usage.percentages.storage ?? 0).toFixed(1)}%
                 </span>
-                <Badge variant={usage.status.storageExceeded ? "destructive" : usage.status.storageNearLimit ? "secondary" : "default"}>
-                  {getUsageStatusText(usage.percentages.storage)}
+                <Badge variant={usage.status.storageExceeded ? "destructive" : usage.status.storageNearLimit ? "secondary" : "success"}>
+                  {getUsageStatusText(usage.percentages.storage ?? 0)}
                 </Badge>
               </div>
+              {usage.limits.storage === 0 && usage.currentUsage.storage > 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No plan limit configured
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -200,24 +222,29 @@ export function DataUsageTab({ companyId }: DataUsageTabProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatStorageSize(usage.currentUsage.bandwidth)}
+              {formatStorageSize(usage.currentUsage.bandwidth ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              of {formatStorageSize(usage.limits.bandwidth)} monthly limit
+              of {usage.limits.bandwidth > 0 ? formatStorageSize(usage.limits.bandwidth) : 'Unlimited'} monthly limit
             </p>
             <div className="mt-4">
               <Progress 
-                value={usage.percentages.bandwidth} 
+                value={Math.min(100, Math.max(0, usage.percentages.bandwidth ?? 0))} 
                 className="w-full h-2"
               />
               <div className="flex justify-between items-center mt-2">
-                <span className={`text-sm font-medium ${getUsageStatusColor(usage.percentages.bandwidth)}`}>
-                  {usage.percentages.bandwidth.toFixed(1)}%
+                <span className={`text-sm font-medium ${getUsageStatusColor(usage.percentages.bandwidth ?? 0)}`}>
+                  {(usage.percentages.bandwidth ?? 0).toFixed(1)}%
                 </span>
-                <Badge variant={usage.status.bandwidthExceeded ? "destructive" : usage.status.bandwidthNearLimit ? "secondary" : "default"}>
-                  {getUsageStatusText(usage.percentages.bandwidth)}
+                <Badge variant={usage.status.bandwidthExceeded ? "destructive" : usage.status.bandwidthNearLimit ? "secondary" : "success"}>
+                  {getUsageStatusText(usage.percentages.bandwidth ?? 0)}
                 </Badge>
               </div>
+              {usage.limits.bandwidth === 0 && usage.currentUsage.bandwidth > 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No plan limit configured
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -230,24 +257,29 @@ export function DataUsageTab({ companyId }: DataUsageTabProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {usage.currentUsage.files.toLocaleString()}
+              {(usage.currentUsage.files ?? 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              of {usage.limits.totalFiles.toLocaleString()} limit
+              of {usage.limits.totalFiles > 0 ? usage.limits.totalFiles.toLocaleString() : 'Unlimited'} limit
             </p>
             <div className="mt-4">
               <Progress 
-                value={usage.percentages.files} 
+                value={Math.min(100, Math.max(0, usage.percentages.files ?? 0))} 
                 className="w-full h-2"
               />
               <div className="flex justify-between items-center mt-2">
-                <span className={`text-sm font-medium ${getUsageStatusColor(usage.percentages.files)}`}>
-                  {usage.percentages.files.toFixed(1)}%
+                <span className={`text-sm font-medium ${getUsageStatusColor(usage.percentages.files ?? 0)}`}>
+                  {(usage.percentages.files ?? 0).toFixed(1)}%
                 </span>
-                <Badge variant={usage.status.filesExceeded ? "destructive" : usage.status.filesNearLimit ? "secondary" : "default"}>
-                  {getUsageStatusText(usage.percentages.files)}
+                <Badge variant={usage.status.filesExceeded ? "destructive" : usage.status.filesNearLimit ? "secondary" : "success"}>
+                  {getUsageStatusText(usage.percentages.files ?? 0)}
                 </Badge>
               </div>
+              {usage.limits.totalFiles === 0 && usage.currentUsage.files > 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No plan limit configured
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -392,6 +424,15 @@ export function DataUsageTab({ companyId }: DataUsageTabProps) {
             >
               <Calendar className="h-4 w-4 mr-2" />
               {resetBandwidthMutation.isPending ? "Resetting..." : "Reset Monthly Bandwidth"}
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={handleRecalculateUsage}
+              disabled={recalculateUsageMutation.isPending}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {recalculateUsageMutation.isPending ? "Recalculating..." : "Recalculate Usage"}
             </Button>
 
             <Button variant="outline" onClick={() => refetch()}>

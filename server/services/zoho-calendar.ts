@@ -1,6 +1,10 @@
 import axios, { AxiosInstance } from 'axios';
 import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { storage } from '../storage';
+import { CalendarBooking } from '@shared/schema';
+import type { CalendarAdvancedSettings } from '@shared/types/calendar-types';
+import { isValidAdvancedSettings, getDayName } from '@shared/types/calendar-types';
 
 const SCOPES = ['ZohoCalendar.event.ALL', 'ZohoCalendar.calendar.READ'];
 const ZOHO_CALENDAR_BASE_URL = 'https://calendar.zoho.com/api/v1';
@@ -458,12 +462,6 @@ class ZohoCalendarService {
    * Check if a time slot is available before booking
    * Uses listCalendarEvents to check for overlapping events
    * 
-   * NOTE: This method performs a non-atomic read-then-write check. In rare concurrent
-   * scenarios, overlapping bookings can still occur because availability is checked before
-   * event insertion. For stronger guarantees, consider implementing application-level
-   * locking or reservation mechanisms (e.g., a database record keyed by calendar/time slot)
-   * and enforce it in the flow before calling the calendar service.
-   * 
    * @param userId The user ID
    * @param companyId The company ID
    * @param startDateTime ISO string of the event start time
@@ -489,14 +487,73 @@ class ZohoCalendarService {
       }
 
 
+
       const startDate = new Date(startDateTime);
       const endDate = new Date(endDateTime);
-      startDate.setMinutes(startDate.getMinutes() - bufferMinutes);
-      endDate.setMinutes(endDate.getMinutes() + bufferMinutes);
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        console.error('Zoho Calendar Service: Invalid date format in availability check', { startDateTime, endDateTime });
+        return {
+          available: false,
+          error: 'Invalid date format provided'
+        };
+      }
 
-      const timeMin = startDate.toISOString();
-      const timeMax = endDate.toISOString();
+      if (startDate >= endDate) {
+        console.error('Zoho Calendar Service: Start time must be before end time', { startDateTime, endDateTime });
+        return {
+          available: false,
+          error: 'Start time must be before end time'
+        };
+      }
 
+
+      const bookingStartWithBuffer = new Date(startDate);
+      bookingStartWithBuffer.setMinutes(bookingStartWithBuffer.getMinutes() - bufferMinutes);
+      const bookingEndWithBuffer = new Date(endDate);
+      bookingEndWithBuffer.setMinutes(bookingEndWithBuffer.getMinutes() + bufferMinutes);
+
+      const existingBookings = await storage.getCalendarBookings(
+        userId,
+        companyId,
+        'zoho',
+        bookingStartWithBuffer,
+        bookingEndWithBuffer
+      );
+
+
+      const requestedStart = bookingStartWithBuffer.getTime();
+      const requestedEnd = bookingEndWithBuffer.getTime();
+
+      const conflictingBookings = existingBookings.filter((booking) => {
+        const bookingStart = new Date(booking.startDateTime).getTime();
+        const bookingEnd = new Date(booking.endDateTime).getTime();
+
+
+        const bookingStartWithBuffer = bookingStart - (bufferMinutes * 60 * 1000);
+        const bookingEndWithBuffer = bookingEnd + (bufferMinutes * 60 * 1000);
+
+        return (requestedStart <= bookingEndWithBuffer && requestedEnd >= bookingStartWithBuffer);
+      });
+
+      if (conflictingBookings.length > 0) {
+        return {
+          available: false,
+          conflictingEvents: conflictingBookings.map(booking => ({
+            start: booking.startDateTime.toISOString(),
+            end: booking.endDateTime.toISOString()
+          }))
+        };
+      }
+
+
+      const queryStartDate = new Date(startDate);
+      queryStartDate.setMinutes(queryStartDate.getMinutes() - bufferMinutes);
+      const queryEndDate = new Date(endDate);
+      queryEndDate.setMinutes(queryEndDate.getMinutes() + bufferMinutes);
+
+      const timeMin = queryStartDate.toISOString();
+      const timeMax = queryEndDate.toISOString();
 
       const eventsResult = await this.listCalendarEvents(
         userId,
@@ -507,23 +564,14 @@ class ZohoCalendarService {
       );
 
       if (!eventsResult.success) {
+
         return {
-          available: true, // Fail-open
+          available: true,
           error: eventsResult.error || 'Failed to list events for availability check'
         };
       }
 
       const existingEvents = eventsResult.items || [];
-      
-
-
-      const effectiveRequestedStart = new Date(startDateTime);
-      const effectiveRequestedEnd = new Date(endDateTime);
-      effectiveRequestedStart.setMinutes(effectiveRequestedStart.getMinutes() - bufferMinutes);
-      effectiveRequestedEnd.setMinutes(effectiveRequestedEnd.getMinutes() + bufferMinutes);
-
-      const requestedStart = effectiveRequestedStart.getTime();
-      const requestedEnd = effectiveRequestedEnd.getTime();
 
 
       const conflictingEvents = existingEvents.filter((event: any) => {
@@ -531,8 +579,10 @@ class ZohoCalendarService {
         const eventEnd = new Date(event.end?.dateTime || event.end).getTime();
 
 
+        const eventStartWithBuffer = eventStart - (bufferMinutes * 60 * 1000);
+        const eventEndWithBuffer = eventEnd + (bufferMinutes * 60 * 1000);
 
-        return (eventStart < requestedEnd && eventEnd > requestedStart);
+        return (requestedStart <= eventEndWithBuffer && requestedEnd >= eventStartWithBuffer);
       });
 
       if (conflictingEvents.length > 0) {
@@ -544,13 +594,7 @@ class ZohoCalendarService {
 
       return { available: true };
     } catch (error: any) {
-      console.error('Zoho Calendar Service: Error checking time slot availability:', {
-        error: error.message,
-        userId,
-        companyId,
-        startDateTime,
-        endDateTime
-      });
+      console.error('Zoho Calendar Service: Error checking time slot availability:', error.message);
 
       return {
         available: true,
@@ -561,16 +605,14 @@ class ZohoCalendarService {
 
   /**
    * Create a calendar event
-   * Now includes conflict detection to prevent double bookings
-   * 
-   * NOTE: Conflict detection is non-atomic (read-then-write). Concurrent requests can still
-   * result in overlapping bookings in rare scenarios. See checkTimeSlotAvailability() documentation
-   * for details on implementing stronger guarantees.
+   * Includes conflict detection to prevent double bookings
    * 
    * @param userId The user ID
    * @param companyId The company ID
    * @param eventData Event data including start, end, summary, etc.
    * @param eventData.bufferMinutes Optional buffer minutes to respect when checking for conflicts
+   *                                 CRITICAL: This is the single source of truth for buffer configuration.
+   *                                 Must match the bufferMinutes used in getAvailableTimeSlots for consistency.
    * @returns Success status with event ID and link, or error message
    */
   public async createCalendarEvent(
@@ -588,8 +630,43 @@ class ZohoCalendarService {
       return { success: false, error: 'Start and end times are required' };
     }
 
-
     const bufferMinutes = eventData.bufferMinutes || 0;
+    const startDate = new Date(startDateTime);
+    const endDate = new Date(endDateTime);
+    
+
+    const bookingStartWithBuffer = new Date(startDate);
+    bookingStartWithBuffer.setMinutes(bookingStartWithBuffer.getMinutes() - bufferMinutes);
+    const bookingEndWithBuffer = new Date(endDate);
+    bookingEndWithBuffer.setMinutes(bookingEndWithBuffer.getMinutes() + bufferMinutes);
+    
+    const hasConflict = await storage.checkBookingConflict(
+      userId,
+      companyId,
+      'zoho',
+      bookingStartWithBuffer,
+      bookingEndWithBuffer
+    );
+    
+    if (hasConflict) {
+
+      const conflictingBookings = await storage.getCalendarBookings(
+        userId,
+        companyId,
+        'zoho',
+        bookingStartWithBuffer,
+        bookingEndWithBuffer
+      );
+      
+      const conflictDetails = conflictingBookings.map(booking => 
+        `Booking ${booking.id} (${booking.startDateTime.toISOString()} - ${booking.endDateTime.toISOString()}, eventId: ${booking.eventId})`
+      ).join('; ');
+      
+      return {
+        success: false,
+        error: `Database conflict detected. Conflicting booking(s): ${conflictDetails}`
+      };
+    }
 
 
     const availabilityCheck = await this.checkTimeSlotAvailability(
@@ -601,20 +678,14 @@ class ZohoCalendarService {
     );
 
     if (!availabilityCheck.available) {
+      const conflictDetails = availabilityCheck.conflictingEvents?.map((event: any) => 
+        `Event (${event.start} - ${event.end})`
+      ).join('; ') || 'Unknown conflict';
       
       return {
         success: false,
-        error: 'The requested time slot is not available. Please choose a different time.'
+        error: `Zoho Calendar conflict detected. Conflicting event(s): ${conflictDetails}`
       };
-    }
-
-
-    if (availabilityCheck.error) {
-      console.warn('Zoho Calendar Service: Availability check failed, proceeding with creation', {
-        error: availabilityCheck.error,
-        userId,
-        companyId
-      });
     }
 
     try {
@@ -757,13 +828,37 @@ class ZohoCalendarService {
 
       if (response.status === 200 || response.status === 201) {
         const createdEvent = response.data.events?.[0];
+        const eventId = createdEvent?.uid || createdEvent?.id;
+
+
+        if (eventId) {
+          const bookingResult = await storage.createCalendarBooking({
+            userId,
+            companyId,
+            calendarType: 'zoho',
+            startDateTime: startDate,
+            endDateTime: endDate,
+            eventId: eventId,
+            eventLink: createdEvent?.viewEventURL || undefined
+          });
+
+          if (!bookingResult.success) {
+            console.warn('Zoho Calendar Service: Failed to save booking record, but event was created:', {
+              eventId: eventId,
+              error: bookingResult.error
+            });
+          }
+        }
 
         const result = {
           success: true,
-          eventId: createdEvent?.uid || createdEvent?.id,
+          eventId: eventId,
           eventLink: createdEvent?.viewEventURL
         };
 
+        if (result.eventLink) {
+
+        }
 
         return result;
       } else {
@@ -1092,7 +1187,9 @@ class ZohoCalendarService {
   public async deleteCalendarEvent(
     userId: number,
     companyId: number,
-    eventId: string
+    eventId: string,
+    sendUpdates: boolean = true,
+    eventLink?: string
   ): Promise<{ success: boolean, error?: string }> {
     try {
       const client = await this.getCalendarClient(userId, companyId);
@@ -1100,6 +1197,29 @@ class ZohoCalendarService {
       if (!client) {
         return { success: false, error: 'Zoho Calendar client not available' };
       }
+
+
+      let finalEventId: string | null = eventId || null;
+      if (eventLink && !eventId) {
+
+        const booking = await storage.getCalendarBookingByEventLink(userId, companyId, 'zoho', eventLink);
+        if (booking && booking.eventId) {
+          finalEventId = booking.eventId;
+        } else {
+
+          finalEventId = storage.extractEventIdFromLink(eventLink);
+          if (!finalEventId) {
+            return { success: false, error: 'Could not extract event ID from event link' };
+          }
+        }
+      }
+
+
+      if (!finalEventId) {
+        return { success: false, error: 'Event ID is required to delete the event' };
+      }
+
+
 
       const primaryCalendarResult = await this.getPrimaryCalendar(client);
       if (!primaryCalendarResult) {
@@ -1109,9 +1229,11 @@ class ZohoCalendarService {
       const { calendar: primaryCalendar } = primaryCalendarResult;
       const calendarUid = primaryCalendar.uid;
 
-      const response = await client.delete(`/calendars/${calendarUid}/events/${eventId}`);
+      const response = await client.delete(`/calendars/${calendarUid}/events/${finalEventId}`);
 
       if (response.status === 204 || response.status === 200) {
+
+        await storage.deleteCalendarBooking(userId, companyId, 'zoho', finalEventId);
         return { success: true };
       } else {
         return {
@@ -1125,6 +1247,34 @@ class ZohoCalendarService {
         success: false,
         error: error.response?.data?.message || error.message || 'Failed to delete calendar event'
       };
+    }
+  }
+
+  /**
+   * Get a calendar booking by event link
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param eventLink The Zoho Calendar event link
+   * @returns The calendar booking if found, null otherwise
+   */
+  public async getBookingByEventLink(userId: number, companyId: number, eventLink: string): Promise<CalendarBooking | null> {
+    try {
+
+      const booking = await storage.getCalendarBookingByEventLink(userId, companyId, 'zoho', eventLink);
+      if (booking) {
+        return booking;
+      }
+
+
+      const eventId = storage.extractEventIdFromLink(eventLink);
+      if (!eventId) {
+        return null;
+      }
+
+      return await storage.getCalendarBookingByEventId(userId, companyId, 'zoho', eventId);
+    } catch (error: any) {
+      console.error('Error getting booking by event link:', error);
+      return null;
     }
   }
 
@@ -1202,9 +1352,57 @@ class ZohoCalendarService {
   }
 
   /**
+   * Helper function to convert local time to UTC ISO string
+   * @param date Date string in YYYY-MM-DD format
+   * @param hour Hour (0-23)
+   * @param minute Minute (0-59)
+   * @param timeZone IANA timezone identifier
+   * @returns UTC ISO string representing that local time
+   */
+  private convertLocalTimeToUTC(date: string, hour: number, minute: number, timeZone: string): string {
+    try {
+      const dateTimeString = `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
+      const tempDate = new Date(dateTimeString + 'Z');
+      const parts = formatter.formatToParts(tempDate);
+      const partsMap = parts.reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      const localYear = parseInt(partsMap.year || '0');
+      const localMonth = parseInt(partsMap.month || '0');
+      const localDay = parseInt(partsMap.day || '0');
+      const localHour = parseInt(partsMap.hour || '0');
+      const localMinute = parseInt(partsMap.minute || '0');
+
+      const [year, month, day] = date.split('-').map(Number);
+      const wantedMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+      const gotMs = Date.UTC(localYear, localMonth - 1, localDay, localHour, localMinute, 0, 0);
+      const offsetMs = wantedMs - gotMs;
+
+      const result = new Date(tempDate.getTime() + offsetMs);
+      return result.toISOString();
+    } catch (error) {
+      console.error('[convertLocalTimeToUTC] Error converting timezone:', error);
+      return `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
+    }
+  }
+
+  /**
    * Get available time slots from a user's calendar
    * Note: Zoho Calendar API doesn't have a direct freebusy endpoint like Google,
    * so we'll simulate this by getting existing events and finding gaps
+   * @param advancedSettings Advanced settings with day-specific hours and off-days
    */
   public async getAvailableTimeSlots(
     userId: number,
@@ -1214,7 +1412,10 @@ class ZohoCalendarService {
     startDate?: string,
     endDate?: string,
     businessHoursStart: number = 9,
-    businessHoursEnd: number = 18
+    businessHoursEnd: number = 18,
+    timeZone: string = 'UTC',
+    bufferMinutes: number = 0,
+    advancedSettings?: CalendarAdvancedSettings
   ): Promise<{
     success: boolean,
     timeSlots?: Array<{
@@ -1272,7 +1473,34 @@ class ZohoCalendarService {
 
       const allAvailableSlots: Array<{date: string, slots: string[]}> = [];
 
+
+      const useAdvancedSettings = advancedSettings && isValidAdvancedSettings(advancedSettings);
+      
+      if (useAdvancedSettings) {
+
+
+        const enabledDays = advancedSettings.weeklySchedule.filter(day => day.enabled && !advancedSettings.offDays.includes(day.dayIndex));
+        if (enabledDays.length === 0) {
+          console.warn('Zoho Calendar: All days are disabled in advanced settings, falling back to simple settings');
+
+        }
+      } else {
+        if (advancedSettings) {
+          console.warn('Zoho Calendar: Advanced settings provided but validation failed, falling back to simple settings');
+        }
+
+      }
+
       for (const currentDate of dateArray) {
+
+        if (useAdvancedSettings && advancedSettings) {
+          const dayOfWeek = new Date(currentDate).getDay(); // 0 = Sunday, 6 = Saturday
+          if (advancedSettings.offDays.includes(dayOfWeek)) {
+
+            continue;
+          }
+        }
+        
         const availableSlots: string[] = [];
 
         const dayEvents = existingEvents.filter((event: any) => {
@@ -1283,21 +1511,140 @@ class ZohoCalendarService {
           return eventDate === currentDate;
         });
 
-        for (let hour = businessHoursStart; hour < businessHoursEnd; hour++) {
-          for (let minute = 0; minute < 60; minute += durationMinutes) {
-            const slotStart = new Date(`${currentDate}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`);
-            const slotEnd = new Date(slotStart.getTime() + (durationMinutes * 60 * 1000));
 
-            const hasConflict = dayEvents.some((event: any) => {
-              const eventStart = new Date(this.convertZohoToISODateTime(event.dateandtime?.start || event.start));
-              const eventEnd = new Date(this.convertZohoToISODateTime(event.dateandtime?.end || event.end));
+        let currentBusinessHoursStartHour: number;
+        let currentBusinessHoursStartMinute: number;
+        let currentBusinessHoursEndHour: number;
+        let currentBusinessHoursEndMinute: number;
+        
+        if (useAdvancedSettings && advancedSettings) {
+          const dayOfWeek = new Date(currentDate).getDay();
+          const dayConfig = advancedSettings.weeklySchedule[dayOfWeek];
+          
+          if (!dayConfig || !dayConfig.enabled) {
 
-              return (slotStart < eventEnd && slotEnd > eventStart);
+            continue;
+          }
+          
+
+          const [startHour, startMin] = dayConfig.startTime.split(':').map(Number);
+          const [endHour, endMin] = dayConfig.endTime.split(':').map(Number);
+          
+          currentBusinessHoursStartHour = startHour;
+          currentBusinessHoursStartMinute = startMin;
+          currentBusinessHoursEndHour = endHour;
+          currentBusinessHoursEndMinute = endMin;
+          
+
+        } else {
+          currentBusinessHoursStartHour = businessHoursStart;
+          currentBusinessHoursStartMinute = 0;
+          currentBusinessHoursEndHour = businessHoursEnd;
+          currentBusinessHoursEndMinute = 0;
+        }
+
+
+        let currentHour = currentBusinessHoursStartHour;
+        let currentMinute = currentBusinessHoursStartMinute;
+
+
+        const endTimeTotalMinutes = currentBusinessHoursEndHour * 60 + currentBusinessHoursEndMinute;
+
+        while (true) {
+          const slotEndHour = currentHour;
+          const slotEndMinute = currentMinute + durationMinutes;
+          const adjustedEndHour = slotEndHour + Math.floor(slotEndMinute / 60);
+          const adjustedEndMinute = slotEndMinute % 60;
+
+
+          const slotEndTotalMinutes = adjustedEndHour * 60 + adjustedEndMinute;
+          if (slotEndTotalMinutes > endTimeTotalMinutes) {
+            break;
+          }
+
+
+          const slotStartUTC = this.convertLocalTimeToUTC(currentDate, currentHour, currentMinute, timeZone);
+          const slotStart = new Date(slotStartUTC);
+
+
+
+          const nowInUserTimeZone = new Date().toLocaleDateString('sv-SE', { timeZone });
+          const isToday = nowInUserTimeZone === currentDate;
+          if (isToday) {
+
+             if (slotStart.getTime() < Date.now() + 5 * 60 * 1000) {
+
+                currentMinute += durationMinutes;
+                if (currentMinute >= 60) {
+                  currentHour += Math.floor(currentMinute / 60);
+                  currentMinute = currentMinute % 60;
+                }
+                continue;
+             }
+          }
+
+
+          const slotEndUTC = this.convertLocalTimeToUTC(currentDate, adjustedEndHour, adjustedEndMinute, timeZone);
+          const slotEnd = new Date(slotEndUTC);
+
+
+
+
+
+          const effectiveSlotStart = new Date(slotStart);
+          effectiveSlotStart.setMinutes(effectiveSlotStart.getMinutes() - bufferMinutes);
+          const effectiveSlotEnd = new Date(slotEnd);
+          effectiveSlotEnd.setMinutes(effectiveSlotEnd.getMinutes() + bufferMinutes);
+
+
+
+
+
+          const hasConflict = dayEvents.some((event: any) => {
+            const eventStart = new Date(this.convertZohoToISODateTime(event.dateandtime?.start || event.start));
+            const eventEnd = new Date(this.convertZohoToISODateTime(event.dateandtime?.end || event.end));
+
+
+            const conflicts = (
+              effectiveSlotStart.getTime() <= eventEnd.getTime() && 
+              effectiveSlotEnd.getTime() >= eventStart.getTime()
+            );
+
+            return conflicts;
+          });
+
+          if (!hasConflict) {
+
+
+            let formattedStart = slotStart.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+              timeZone: timeZone
             });
+            
 
-            if (!hasConflict) {
-              availableSlots.push(slotStart.toTimeString().substring(0, 5));
+
+            formattedStart = formattedStart.trim().replace(/\s+/g, ' ').toUpperCase();
+            
+
+            const formatPattern = /^\d{2}:\d{2} (AM|PM)$/;
+            if (!formatPattern.test(formattedStart)) {
+              console.warn('Zoho Calendar: Unexpected time format produced:', {
+                original: slotStart.toISOString(),
+                formatted: formattedStart,
+                timeZone
+              });
             }
+            
+            availableSlots.push(formattedStart);
+          }
+
+
+          currentMinute += durationMinutes;
+          if (currentMinute >= 60) {
+            currentHour += Math.floor(currentMinute / 60);
+            currentMinute = currentMinute % 60;
           }
         }
 
@@ -1319,6 +1666,45 @@ class ZohoCalendarService {
         error: error.response?.data?.message || error.message || 'Failed to get available time slots'
       };
     }
+  }
+
+  /**
+   * Deduplicate busy slots that exist in both database and Zoho Calendar
+   * Compares slots by start/end times with small tolerance for timezone rounding (±1 minute)
+   * 
+   * @param busySlots Array of busy slots with {start: string, end: string}
+   * @returns Deduplicated array of busy slots
+   */
+  private deduplicateBusySlots(busySlots: Array<{start: string, end: string}>): Array<{start: string, end: string}> {
+    if (busySlots.length === 0) {
+      return [];
+    }
+
+    const deduplicated: Array<{start: string, end: string}> = [];
+    const toleranceMs = 60 * 1000; // 1 minute tolerance for timezone rounding
+
+    for (const slot of busySlots) {
+      const slotStart = new Date(slot.start).getTime();
+      const slotEnd = new Date(slot.end).getTime();
+
+
+      const isDuplicate = deduplicated.some(existing => {
+        const existingStart = new Date(existing.start).getTime();
+        const existingEnd = new Date(existing.end).getTime();
+
+
+        const startDiff = Math.abs(slotStart - existingStart);
+        const endDiff = Math.abs(slotEnd - existingEnd);
+
+        return startDiff <= toleranceMs && endDiff <= toleranceMs;
+      });
+
+      if (!isDuplicate) {
+        deduplicated.push(slot);
+      }
+    }
+
+    return deduplicated;
   }
 }
 

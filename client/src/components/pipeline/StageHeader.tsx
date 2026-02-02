@@ -72,7 +72,7 @@ export default function StageHeader({ stage, deals, onEditStage, onDeleteStage }
 
   return (
     <div 
-      className="p-3 mb-3 rounded-lg shadow-sm border-l-4 bg-white"
+      className="p-3 mb-3 rounded-lg shadow-sm border-l-4 bg-card"
       style={{
         borderLeftColor: stage.color,
         backgroundColor: `${stage.color}08`,
@@ -81,7 +81,7 @@ export default function StageHeader({ stage, deals, onEditStage, onDeleteStage }
       {/* Stage Title and Actions */}
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-sm text-gray-900">{stage.name}</h3>
+          <h3 className="font-semibold text-sm text-foreground">{stage.name}</h3>
           <div className="flex items-center gap-1">
             <span 
               className="text-xs font-medium px-2 py-1 rounded-full"
@@ -97,7 +97,7 @@ export default function StageHeader({ stage, deals, onEditStage, onDeleteStage }
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-gray-100">
+            <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-accent">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -116,7 +116,7 @@ export default function StageHeader({ stage, deals, onEditStage, onDeleteStage }
 
       {/* Health Indicators */}
       {stageStats.count > 0 && (
-        <div className="flex items-center justify-between text-xs text-gray-600">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
           {/* Total Value */}
           <TooltipProvider>
             <Tooltip>

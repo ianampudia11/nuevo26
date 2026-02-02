@@ -3,7 +3,6 @@ import { BotDisableNode } from '@/components/flow-builder/BotDisableNode';
 import { BotResetNode } from '@/components/flow-builder/BotResetNode';
 import { DocumindNode } from '@/components/flow-builder/DocumindNode';
 import { ChatPdfNode } from '@/components/flow-builder/ChatPdfNode';
-import { FlowiseNode } from '@/components/flow-builder/FlowiseNode';
 import { GoogleSheetsNode } from '@/components/flow-builder/GoogleSheetsNode';
 import { DataCaptureNode } from '@/components/flow-builder/DataCaptureNode';
 import { VariableBrowser } from '@/components/flow-builder/VariableBrowser';
@@ -20,10 +19,13 @@ import { HTTPRequestNode } from '@/components/flow-builder/HTTPRequestNode';
 import { CodeExecutionNode } from '@/components/flow-builder/CodeExecutionNode';
 import { WhatsAppFlowsNode } from '@/components/flow-builder/WhatsAppFlowsNode';
 import { TranslationNode } from '@/components/flow-builder/TranslationNode';
-import { TypebotNode } from '@/components/flow-builder/TypebotNode';
 import UpdatePipelineStageNode from '@/components/flow-builder/UpdatePipelineStageNode';
+import MoveDealToPipelineNode from '@/components/flow-builder/MoveDealToPipelineNode';
+import ManageContactNode from '@/components/flow-builder/ManageContactNode';
 import { WebhookNode } from '@/components/flow-builder/WebhookNode';
-import BotIcon from '@/components/ui/bot-icon';
+import { ContactNotificationNode } from '@/components/flow-builder/ContactNotificationNode';
+import { StripeNode } from '@/components/flow-builder/StripeNode';
+import { CallAgentNode } from '@/components/flow-builder/CallAgentNode';
 import { Button } from '@/components/ui/button';
 import { Calendar } from "@/components/ui/calendar";
 import { FileUpload } from '@/components/ui/file-upload';
@@ -47,43 +49,33 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useTheme } from 'next-themes';
 import { getBrowserTimezone } from '@/utils/timezones';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
-  AlertCircle,
   ArrowRightCircle,
   Bot,
-  Brain,
   Calendar as CalendarIcon,
   Clock,
   Copy,
   Database,
-  ExternalLink,
   File,
   FileAudio, FileText, FileVideo,
   Globe,
-  Image,
-  Languages,
   LayoutGrid,
-  List,
-  ListOrdered,
   Loader2,
-  MapPin,
-  MessageCircle,
   MessageSquare,
   Network,
+  Phone,
   Plus,
   RefreshCw,
   Save,
   Search,
-  Smartphone,
-  Sheet,
   Trash2,
+  User,
   UserCheck,
   Variable,
-  Workflow,
   X,
-  Zap,
   Code
 } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -177,7 +169,7 @@ const AudioPreview = React.memo(({ url }: { url: string }) => {
   if (!url) return null;
 
   return (
-    <div className="mt-2 p-2 bg-secondary/20 rounded border">
+    <div className="mt-2 p-2 rounded border">
       <div className="flex items-center gap-2 mb-2">
         <FileAudio className="h-4 w-4 text-purple-500" />
         <span className="text-xs font-medium truncate">{fileName}</span>
@@ -259,7 +251,7 @@ const VideoPreview = React.memo(({ url }: { url: string }) => {
   if (!url) return null;
 
   return (
-    <div className="mt-2 p-2 bg-secondary/20 rounded border">
+    <div className="mt-2 p-2  rounded border">
       <div className="flex items-center gap-2 mb-2">
         <FileVideo className="h-4 w-4 text-red-500" />
         <span className="text-xs font-medium truncate">{fileName}</span>
@@ -395,7 +387,7 @@ const DocumentPreview = React.memo(({ url, fileName }: { url: string; fileName?:
   if (!url) return null;
 
   return (
-    <div className="mt-2 p-2 bg-secondary/20 rounded border">
+    <div className="mt-2 p-2  rounded border">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-lg">{getFileIcon(extension)}</span>
         <div className="flex-1 min-w-0">
@@ -426,7 +418,7 @@ const DocumentPreview = React.memo(({ url, fileName }: { url: string; fileName?:
           />
         </div>
       ) : (
-        <div className="flex items-center justify-between p-2 bg-secondary/30 rounded">
+        <div className="flex items-center justify-between p-2 rounded">
           <span className="text-xs text-muted-foreground">{t('flow_builder.preview.click_to_download', 'Click to download/view')}</span>
           <a
             href={url}
@@ -632,7 +624,7 @@ function MessageNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-message p-3 rounded-lg bg-white border border-border shadow-sm max-w-[350px] group">
+    <div className="node-message p-3 rounded-lg bg-card border border-border shadow-sm max-w-[350px] group">
       {flowContext && (
         <NodeToolbar
           id={id}
@@ -641,7 +633,7 @@ function MessageNode({ data, isConnectable, id }: any) {
         />
       )}
       <div className="font-medium flex items-center gap-2 mb-2">
-        <MessageSquare className="h-4 w-4 text-primary" />
+        <img src="https://cdn-icons-png.flaticon.com/128/811/811476.png" alt="Text Message" className="h-4 w-4" />
         <span>{t('flow_builder.send_message', 'Send Message')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -669,7 +661,7 @@ function MessageNode({ data, isConnectable, id }: any) {
                 {availableVariables.map((variable) => (
                   <button
                     key={variable.name}
-                    className="text-xs px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                    className="text-xs px-2 py-1 rounded "
                     title={variable.description}
                     onClick={() => insertVariable(variable.name)}
                   >
@@ -792,7 +784,7 @@ function MessageNode({ data, isConnectable, id }: any) {
         </div>
       ) : (
         <div className="space-y-2">
-          <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+          <div className="text-sm p-2 rounded border border-border">
             {formatMessage(message)}
           </div>
 
@@ -828,7 +820,7 @@ function MessageNode({ data, isConnectable, id }: any) {
 
                 {/* No match handle */}
                 <div className="flex items-center gap-2 relative mt-2 pt-2 border-t border-border/50">
-                  <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-400 text-white flex items-center justify-center text-[10px] font-medium">
+                  <div className="flex-shrink-0 w-4 h-4 rounded bg-muted-foreground text-primary-foreground flex items-center justify-center text-[10px] font-medium">
                     ?
                   </div>
                   <div className="flex-1 text-muted-foreground">
@@ -1165,7 +1157,7 @@ function ConditionNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-condition p-3 rounded-lg bg-white border border-border shadow-sm max-w-[280px] group">
+    <div className="node-condition p-3 rounded-lg bg-card border border-border shadow-sm max-w-[280px] group">
       {flowContext && (
         <NodeToolbar
           id={id}
@@ -1174,7 +1166,11 @@ function ConditionNode({ data, isConnectable, id }: any) {
         />
       )}
       <div className="font-medium flex items-center gap-2 mb-2">
-        <AlertCircle className="h-4 w-4 text-amber-500" />
+        <img 
+          src="https://cdn-icons-png.flaticon.com/128/17359/17359067.png" 
+          alt="Condition" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.condition', 'Condition')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -1213,7 +1209,7 @@ function ConditionNode({ data, isConnectable, id }: any) {
           {renderConditionInputs()}
         </div>
       ) : (
-        <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+        <div className="text-sm p-2  rounded border border-border">
           {formatConditionDisplay()}
         </div>
       )}
@@ -1514,7 +1510,7 @@ function ImageNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-image p-3 rounded-lg bg-white border border-border shadow-sm max-w-[350px] relative group">
+    <div className="node-image p-3 rounded-lg bg-card border border-border shadow-sm max-w-[350px] relative group">
       {flowContext && (
         <NodeToolbar
           id={id}
@@ -1524,7 +1520,7 @@ function ImageNode({ data, isConnectable, id }: any) {
       )}
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <Image className="h-4 w-4 text-blue-500" />
+        <img src="https://cdn-icons-png.flaticon.com/128/17320/17320313.png" alt="Image Message" className="h-4 w-4" />
         <span>{t('flow_builder.send_image', 'Send Image')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -1561,7 +1557,7 @@ function ImageNode({ data, isConnectable, id }: any) {
 
               {imageUrl && (
                 <button
-                  className="w-full mt-2 px-3 py-1 text-xs bg-red-100 text-red-700 border border-red-300 rounded hover:bg-red-200 transition-colors"
+                  className="w-full mt-2 px-3 py-1 text-xs bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800 rounded hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors"
                   onClick={handleRemoveImage}
                 >
                   {t('flow_builder.remove_image', 'Remove Image')}
@@ -1587,7 +1583,7 @@ function ImageNode({ data, isConnectable, id }: any) {
               {availableVariables.map((variable) => (
                 <button
                   key={variable.name}
-                  className="text-xs px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                  className="text-xs px-2 py-1  rounded hover:"
                   title={variable.description}
                   onClick={() => insertVariable(variable.name)}
                 >
@@ -1706,7 +1702,7 @@ function ImageNode({ data, isConnectable, id }: any) {
       ) : (
         <div className="space-y-2">
           {imageUrl ? (
-            <div className="relative aspect-video bg-secondary/40 rounded overflow-hidden flex items-center justify-center">
+            <div className="relative aspect-video  rounded overflow-hidden flex items-center justify-center">
               <img
                 src={imageUrl}
                 alt="Message attachment"
@@ -1717,7 +1713,7 @@ function ImageNode({ data, isConnectable, id }: any) {
               />
             </div>
           ) : (
-            <div className="aspect-video bg-secondary/40 rounded flex items-center justify-center text-muted-foreground">
+            <div className="aspect-video  rounded flex items-center justify-center text-muted-foreground">
               <div className="text-center text-xs">{t('flow_builder.no_image_provided', 'No image provided')}</div>
             </div>
           )}
@@ -1725,7 +1721,7 @@ function ImageNode({ data, isConnectable, id }: any) {
           {caption && (
             <>
               <div className="text-xs text-muted-foreground">{t('flow_builder.caption_label', 'Caption:')}</div>
-              <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+              <div className="text-sm p-2  rounded border border-border">
                 {formatText(caption)}
               </div>
             </>
@@ -1763,7 +1759,7 @@ function ImageNode({ data, isConnectable, id }: any) {
 
                 {/* No match handle */}
                 <div className="flex items-center gap-2 relative mt-2 pt-2 border-t border-border/50">
-                  <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-400 text-white flex items-center justify-center text-[10px] font-medium">
+                  <div className="flex-shrink-0 w-4 h-4 rounded bg-muted-foreground text-primary-foreground flex items-center justify-center text-[10px] font-medium">
                     ?
                   </div>
                   <div className="flex-1 text-muted-foreground">
@@ -1989,7 +1985,7 @@ function VideoNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-video p-3 rounded-lg bg-white border border-border shadow-sm max-w-[350px] relative group">
+    <div className="node-video p-3 rounded-lg bg-card border border-border shadow-sm max-w-[350px] relative group">
       {flowContext && (
         <NodeToolbar
           id={id}
@@ -1999,7 +1995,11 @@ function VideoNode({ data, isConnectable, id }: any) {
       )}
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <FileVideo className="h-4 w-4 text-red-500" />
+        <img 
+          src="https://cdn-icons-png.flaticon.com/128/2839/2839026.png" 
+          alt="Video Message" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.send_video', 'Send Video')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -2031,7 +2031,7 @@ function VideoNode({ data, isConnectable, id }: any) {
             </div>
             {videoUrl && (
               <button
-                className="w-full mt-2 px-3 py-2 text-xs bg-red-100 text-red-700 border border-red-300 rounded hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
+                className="w-full mt-2 px-3 py-2 text-xs bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800 rounded hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors flex items-center justify-center gap-2"
                 onClick={() => setShowPreview(!showPreview)}
               >
                 <FileVideo className="h-3 w-3" />
@@ -2058,7 +2058,7 @@ function VideoNode({ data, isConnectable, id }: any) {
               {availableVariables.map((variable) => (
                 <button
                   key={variable.name}
-                  className="text-xs px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                  className="text-xs px-2 py-1  rounded hover:"
                   title={variable.description}
                   onClick={() => insertVariable(variable.name)}
                 >
@@ -2177,12 +2177,12 @@ function VideoNode({ data, isConnectable, id }: any) {
       ) : (
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground">{t('flow_builder.video_url_label', 'Video URL:')}</div>
-          <div className="text-sm p-2 bg-secondary/40 rounded border border-border truncate">
+          <div className="text-sm p-2  rounded border border-border truncate">
             {videoUrl || t('flow_builder.no_url_provided', 'No URL provided')}
           </div>
           {videoUrl && (
             <button
-              className="w-full mt-2 px-3 py-2 text-xs bg-red-100 text-red-700 border border-red-300 rounded hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
+              className="w-full mt-2 px-3 py-2 text-xs bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-800 rounded hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors flex items-center justify-center gap-2"
               onClick={() => setShowPreview(!showPreview)}
             >
               <FileVideo className="h-3 w-3" />
@@ -2194,7 +2194,7 @@ function VideoNode({ data, isConnectable, id }: any) {
           {caption && (
             <>
               <div className="text-xs text-muted-foreground">{t('flow_builder.caption_label', 'Caption:')}</div>
-              <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+              <div className="text-sm p-2  rounded border border-border">
                 {formatText(caption)}
               </div>
             </>
@@ -2232,7 +2232,7 @@ function VideoNode({ data, isConnectable, id }: any) {
 
                 {/* No match handle */}
                 <div className="flex items-center gap-2 relative mt-2 pt-2 border-t border-border/50">
-                  <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-400 text-white flex items-center justify-center text-[10px] font-medium">
+                  <div className="flex-shrink-0 w-4 h-4 rounded bg-muted-foreground text-primary-foreground flex items-center justify-center text-[10px] font-medium">
                     ?
                   </div>
                   <div className="flex-1 text-muted-foreground">
@@ -2396,7 +2396,7 @@ function AudioNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-audio p-3 rounded-lg bg-white border border-border shadow-sm max-w-[350px] relative group">
+    <div className="node-audio p-3 rounded-lg bg-card border border-border shadow-sm max-w-[350px] relative group">
       {flowContext && (
         <NodeToolbar
           id={id}
@@ -2406,7 +2406,11 @@ function AudioNode({ data, isConnectable, id }: any) {
       )}
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <FileAudio className="h-4 w-4 text-purple-500" />
+        <img 
+          src="https://cdn-icons-png.flaticon.com/128/5320/5320910.png" 
+          alt="Audio Message" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.send_audio', 'Send Audio')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -2557,7 +2561,7 @@ function AudioNode({ data, isConnectable, id }: any) {
       ) : (
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground">{t('flow_builder.audio_url_label', 'Audio URL:')}</div>
-          <div className="text-sm p-2 bg-secondary/40 rounded border border-border truncate">
+          <div className="text-sm p-2  rounded border border-border truncate">
             {audioUrl || t('flow_builder.no_url_provided', 'No URL provided')}
           </div>
           {audioUrl && (
@@ -2603,7 +2607,7 @@ function AudioNode({ data, isConnectable, id }: any) {
 
                 {/* No match handle */}
                 <div className="flex items-center gap-2 relative mt-2 pt-2 border-t border-border/50">
-                  <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-400 text-white flex items-center justify-center text-[10px] font-medium">
+                  <div className="flex-shrink-0 w-4 h-4 rounded bg-muted-foreground text-primary-foreground flex items-center justify-center text-[10px] font-medium">
                     ?
                   </div>
                   <div className="flex-1 text-muted-foreground">
@@ -2843,7 +2847,7 @@ function DocumentNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-document p-3 rounded-lg bg-white border border-border shadow-sm max-w-[350px] relative group">
+    <div className="node-document p-3 rounded-lg bg-card border border-border shadow-sm max-w-[350px] relative group">
       {flowContext && (
         <NodeToolbar
           id={id}
@@ -2853,7 +2857,11 @@ function DocumentNode({ data, isConnectable, id }: any) {
       )}
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <File className="h-4 w-4 text-amber-600" />
+        <img 
+          src="https://cdn-icons-png.flaticon.com/128/136/136522.png" 
+          alt="Document Message" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.send_document', 'Send Document')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -2885,7 +2893,7 @@ function DocumentNode({ data, isConnectable, id }: any) {
             </div>
             {documentUrl && (
               <button
-                className="w-full mt-2 px-3 py-2 text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded hover:bg-amber-200 transition-colors flex items-center justify-center gap-2"
+                className="w-full mt-2 px-3 py-2 text-xs bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800 rounded hover:bg-amber-200 dark:hover:bg-amber-900/30 transition-colors flex items-center justify-center gap-2"
                 onClick={() => setShowPreview(!showPreview)}
               >
                 <File className="h-3 w-3" />
@@ -2922,7 +2930,7 @@ function DocumentNode({ data, isConnectable, id }: any) {
               {availableVariables.map((variable) => (
                 <button
                   key={variable.name}
-                  className="text-xs px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                  className="text-xs px-2 py-1  rounded hover:"
                   title={variable.description}
                   onClick={() => insertVariable(variable.name)}
                 >
@@ -3041,7 +3049,7 @@ function DocumentNode({ data, isConnectable, id }: any) {
       ) : (
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground">{t('flow_builder.document_url_label', 'Document URL:')}</div>
-          <div className="text-sm p-2 bg-secondary/40 rounded border border-border truncate">
+          <div className="text-sm p-2  rounded border border-border truncate">
             {documentUrl || t('flow_builder.no_url_provided', 'No URL provided')}
           </div>
           {documentUrl && (
@@ -3058,7 +3066,7 @@ function DocumentNode({ data, isConnectable, id }: any) {
           {fileName && (
             <>
               <div className="text-xs text-muted-foreground">{t('flow_builder.file_name_label', 'File Name:')}</div>
-              <div className="text-sm p-2 bg-secondary/40 rounded border border-border truncate">
+              <div className="text-sm p-2  rounded border border-border truncate">
                 {fileName}
               </div>
             </>
@@ -3067,7 +3075,7 @@ function DocumentNode({ data, isConnectable, id }: any) {
           {caption && (
             <>
               <div className="text-xs text-muted-foreground">{t('flow_builder.caption_label', 'Caption:')}</div>
-              <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+              <div className="text-sm p-2  rounded border border-border">
                 {formatText(caption)}
               </div>
             </>
@@ -3105,7 +3113,7 @@ function DocumentNode({ data, isConnectable, id }: any) {
 
                 {/* No match handle */}
                 <div className="flex items-center gap-2 relative mt-2 pt-2 border-t border-border/50">
-                  <div className="flex-shrink-0 w-4 h-4 rounded bg-gray-400 text-white flex items-center justify-center text-[10px] font-medium">
+                  <div className="flex-shrink-0 w-4 h-4 rounded bg-muted-foreground text-primary-foreground flex items-center justify-center text-[10px] font-medium">
                     ?
                   </div>
                   <div className="flex-1 text-muted-foreground">
@@ -3147,11 +3155,32 @@ function DocumentNode({ data, isConnectable, id }: any) {
 function TriggerNode({ data, isConnectable, id }: any) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [triggerType, setTriggerType] = useState(data.triggerType || 'message_received');
   const [localConditionType, setLocalConditionType] = useState(data.conditionType || 'any');
   const [localConditionValue, setLocalConditionValue] = useState(data.conditionValue || '');
   const [selectedChannelType, setSelectedChannelType] = useState<string>(
     Array.isArray(data.channelTypes) ? data.channelTypes[0] || 'whatsapp_unofficial' : data.channelTypes || 'whatsapp_unofficial'
   );
+  
+  interface Pipeline {
+    id: number;
+    name: string;
+    description: string | null;
+    icon: string | null;
+    color: string | null;
+    isDefault: boolean;
+    orderNum: number;
+  }
+
+  const { data: pipelines } = useQuery<Pipeline[]>({
+    queryKey: ['/api/pipelines'],
+    queryFn: async () => {
+      const response = await fetch('/api/pipelines');
+      if (!response.ok) throw new Error('Failed to fetch pipelines');
+      return response.json() as Promise<Pipeline[]>;
+    },
+    staleTime: 60 * 1000,
+  });
   const [hardResetKeyword, setHardResetKeyword] = useState(data.hardResetKeyword || '');
   const [hardResetConfirmationMessage, setHardResetConfirmationMessage] = useState(
     data.hardResetConfirmationMessage || t('flow_builder.trigger_default_reset_message', 'Bot has been reactivated. Starting fresh conversation...')
@@ -3182,11 +3211,12 @@ function TriggerNode({ data, isConnectable, id }: any) {
   };
 
   const channelTypes = [
-    { value: 'whatsapp_unofficial', label: t('flow_builder.trigger_channel_whatsapp_unofficial', 'WhatsApp (Unofficial)'), icon: 'fab fa-whatsapp', color: 'text-green-600' },
-    { value: 'whatsapp_official', label: t('flow_builder.trigger_channel_whatsapp_official', 'WhatsApp (Official)'), icon: 'fab fa-whatsapp', color: 'text-green-700' },
-    { value: 'messenger', label: t('flow_builder.trigger_channel_messenger', 'Facebook Messenger'), icon: 'fab fa-facebook-messenger', color: 'text-blue-500' },
-    { value: 'instagram', label: t('flow_builder.trigger_channel_instagram', 'Instagram'), icon: 'fab fa-instagram', color: 'text-pink-500' },
-    { value: 'email', label: t('flow_builder.trigger_channel_email', 'Email'), icon: 'fas fa-envelope', color: 'text-gray-600' }
+    { value: 'whatsapp_unofficial', label: t('flow_builder.trigger_channel_whatsapp_unofficial', 'WhatsApp (Unofficial)'), icon: 'fab fa-whatsapp', color: 'text-green-600 dark:text-green-400' },
+    { value: 'whatsapp_official', label: t('flow_builder.trigger_channel_whatsapp_official', 'WhatsApp (Official)'), icon: 'fab fa-whatsapp', color: 'text-green-700 dark:text-green-400' },
+    { value: 'messenger', label: t('flow_builder.trigger_channel_messenger', 'Facebook Messenger'), icon: 'fab fa-facebook-messenger', color: 'text-blue-500 dark:text-blue-400' },
+    { value: 'instagram', label: t('flow_builder.trigger_channel_instagram', 'Instagram'), icon: 'fab fa-instagram', color: 'text-pink-500 dark:text-pink-400' },
+    { value: 'email', label: t('flow_builder.trigger_channel_email', 'Email'), icon: 'fas fa-envelope', color: 'text-muted-foreground' },
+    { value: 'webchat', label: t('flow_builder.trigger_channel_webchat', 'WebChat'), color: 'text-indigo-600 dark:text-indigo-400' }
   ];
 
   const getConditionTypesForChannels = (channels: string[]) => {
@@ -3198,7 +3228,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
 
 
     const supportsMedia = channels.some(ch =>
-      ['whatsapp_unofficial', 'whatsapp_official', 'messenger', 'instagram'].includes(ch)
+      ['whatsapp_unofficial', 'whatsapp_official', 'messenger', 'instagram', 'webchat'].includes(ch)
     );
     if (supportsMedia) {
       baseConditions.push({ value: 'media', label: t('flow_builder.has_media', 'Has Media') });
@@ -3347,7 +3377,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-trigger p-3 rounded-lg bg-white border border-border shadow-sm max-w-[350px] min-w-[300px] group">
+    <div className="node-trigger p-3 rounded-lg bg-card border border-border shadow-sm max-w-[350px] min-w-[300px] group">
       {flowContext && (
         <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <TooltipProvider>
@@ -3370,11 +3400,11 @@ function TriggerNode({ data, isConnectable, id }: any) {
         </div>
       )}
       <div className="font-medium flex items-center gap-2 mb-2">
-        <MessageSquare className="h-4 w-4 text-green-500" />
+        <img src="https://cdn-icons-png.flaticon.com/128/5324/5324247.png" alt="Message Trigger" className="h-4 w-4" />
         {selectedChannelType && (
-          <i className={`${channelTypes.find(ct => ct.value === selectedChannelType)?.icon || 'fas fa-message'} text-green-600 text-sm`}></i>
+          <i className={`${channelTypes.find(ct => ct.value === selectedChannelType)?.icon || 'fas fa-message'} text-green-600 dark:text-green-400 text-sm`}></i>
         )}
-        <span>{t('flow_builder.message_received', 'Message Received')}</span>
+        <span>{t('flow_builder.trigger_node', 'Message Trigger')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
           onClick={() => setIsExpanded(!isExpanded)}
@@ -3386,7 +3416,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
 
       
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="text-xs text-muted-foreground mb-1">{t('flow_builder.when', 'When')}</div>
 
         <div className="flex items-center gap-1 flex-wrap">
@@ -3432,8 +3462,8 @@ function TriggerNode({ data, isConnectable, id }: any) {
 
         {data.hardResetKeyword && (
           <div className="mt-1 text-xs flex flex-wrap gap-1">
-            <span className="text-orange-600">{t('flow_builder.hard_reset_label', 'Hard Reset')}:</span>
-            <span className="font-medium bg-orange-100 text-orange-700 rounded px-1">
+            <span className="text-orange-600 dark:text-orange-400">{t('flow_builder.hard_reset_label', 'Hard Reset')}:</span>
+            <span className="font-medium bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded px-1">
               "{data.hardResetKeyword}"
             </span>
           </div>
@@ -3441,8 +3471,8 @@ function TriggerNode({ data, isConnectable, id }: any) {
 
         {data.enableSessionPersistence !== false && (
           <div className="mt-1 text-xs flex flex-wrap gap-1">
-            <span className="text-blue-600">{t('flow_builder.session_active', 'Session')}:</span>
-            <span className="font-medium bg-blue-100 text-blue-700 rounded px-1">
+            <span className="text-blue-600 dark:text-blue-400">{t('flow_builder.session_active', 'Session')}:</span>
+            <span className="font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded px-1">
               {data.sessionTimeout || 30} {data.sessionTimeoutUnit || 'minutes'}
             </span>
           </div>
@@ -3450,14 +3480,85 @@ function TriggerNode({ data, isConnectable, id }: any) {
       </div>
 
       {isExpanded && (
-        <div className="mt-3 text-xs space-y-2 p-2 border rounded bg-secondary/10">
+        <div className="mt-3 text-xs space-y-2 p-2 border rounded ">
           <div>
-            <label className="block mb-1 font-medium text-blue-600">
+            <label className="block mb-1 font-medium text-blue-600 dark:text-blue-400">
+              Trigger Type
+            </label>
+            <select
+              className="w-full p-1 border rounded bg-background text-xs"
+              value={triggerType}
+              onChange={(e) => {
+                setTriggerType(e.target.value);
+                updateNodeData({ triggerType: e.target.value });
+              }}
+            >
+              <option value="message_received">Message Received</option>
+              {/* <option value="webhook">Webhook</option>
+              <option value="schedule">Schedule</option>
+              <option value="manual">Manual</option>
+              <option value="deal_enters_pipeline">Deal Enters Pipeline</option>
+              <option value="deal_moves_between_pipelines">Deal Moves Between Pipelines</option>
+              <option value="deal_stage_changed">Deal Stage Changed</option> */}
+            </select>
+          </div>
+
+          {triggerType === 'deal_enters_pipeline' && (
+            <div>
+              <label className="block mb-1 font-medium">Target Pipeline</label>
+              <select
+                className="w-full p-1 border rounded bg-background text-xs"
+                value={data.pipelineId?.toString() || ''}
+                onChange={(e) => updateNodeData({ pipelineId: e.target.value ? parseInt(e.target.value) : null })}
+              >
+                <option value="">Select pipeline</option>
+                {pipelines?.map((p: Pipeline) => (
+                  <option key={p.id} value={p.id.toString()}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {triggerType === 'deal_moves_between_pipelines' && (
+            <>
+              <div>
+                <label className="block mb-1 font-medium">From Pipeline (Optional)</label>
+                <select
+                  className="w-full p-1 border rounded bg-background text-xs"
+                  value={data.fromPipelineId?.toString() || 'any'}
+                  onChange={(e) => updateNodeData({ fromPipelineId: e.target.value === 'any' ? null : parseInt(e.target.value) })}
+                >
+                  <option value="any">Any Pipeline</option>
+                  {pipelines?.map((p: Pipeline) => (
+                    <option key={p.id} value={p.id.toString()}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 font-medium">To Pipeline (Optional)</label>
+                <select
+                  className="w-full p-1 border rounded bg-background text-xs"
+                  value={data.toPipelineId?.toString() || 'any'}
+                  onChange={(e) => updateNodeData({ toPipelineId: e.target.value === 'any' ? null : parseInt(e.target.value) })}
+                >
+                  <option value="any">Any Pipeline</option>
+                  {pipelines?.map((p: Pipeline) => (
+                    <option key={p.id} value={p.id.toString()}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {triggerType === 'message_received' && (
+            <>
+          <div>
+            <label className="block mb-1 font-medium text-blue-600 dark:text-blue-400">
               {t('flow_builder.channel_types', 'Channel Types')}
             </label>
             <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto">
               {channelTypes.map(channelType => (
-                <label key={channelType.value} className="flex items-center space-x-1 p-1 hover:bg-secondary/20 rounded cursor-pointer">
+                <label key={channelType.value} className="flex items-center space-x-1 p-1 hover: rounded cursor-pointer">
                   <input
                     type="radio"
                     name="channelType"
@@ -3499,7 +3600,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
                 <div>
                   <input
                     className={`w-full p-1 border rounded bg-background text-xs ${
-                      multipleKeywords && !validateKeywords(multipleKeywords) ? 'border-red-300' : ''
+                      multipleKeywords && !validateKeywords(multipleKeywords) ? 'border-destructive' : ''
                     }`}
                     placeholder={getConditionPlaceholder(localConditionType)}
                     value={multipleKeywords}
@@ -3517,14 +3618,14 @@ function TriggerNode({ data, isConnectable, id }: any) {
                         {parseKeywords(multipleKeywords).map((keyword, index) => (
                           <span
                             key={index}
-                            className="inline-block bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.5 rounded"
+                            className="inline-block bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 text-[9px] px-1.5 py-0.5 rounded"
                           >
                             {keyword}
                           </span>
                         ))}
                       </div>
                       {!validateKeywords(multipleKeywords) && (
-                        <div className="text-[9px] text-red-600 mt-1">
+                        <div className="text-[9px] text-red-600 dark:text-red-400 mt-1">
                           {t('flow_builder.trigger_keywords_required', 'At least one keyword is required')}
                         </div>
                       )}
@@ -3555,7 +3656,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
           )}
 
           <div className="border-t pt-2 mt-2">
-            <label className="block mb-1 font-medium text-orange-600">
+            <label className="block mb-1 font-medium text-orange-600 dark:text-orange-400">
               {t('flow_builder.hard_reset_keyword', 'Hard Reset Keyword')}
             </label>
             <input
@@ -3588,7 +3689,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
 
           <div className="border-t pt-2 mt-2">
             <div className="flex items-center justify-between mb-2">
-              <label className="block font-medium text-blue-600">
+              <label className="block font-medium text-blue-600 dark:text-blue-400">
                 {t('flow_builder.session_persistence', 'Session-Based Triggering')}
               </label>
               <div className="flex items-center space-x-2">
@@ -3600,7 +3701,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
                   disabled
                   className="w-3 h-3 opacity-50 cursor-not-allowed"
                 />
-                <label htmlFor={`session-persistence-${id}`} className="text-xs text-gray-500 cursor-not-allowed">{t('flow_builder.trigger_enable', 'Enable')}</label>
+                <label htmlFor={`session-persistence-${id}`} className="text-xs text-muted-foreground cursor-not-allowed">{t('flow_builder.trigger_enable', 'Enable')}</label>
               </div>
             </div>
             <div className="text-[9px] text-muted-foreground mb-2">
@@ -3640,6 +3741,8 @@ function TriggerNode({ data, isConnectable, id }: any) {
               </div>
             )}
           </div>
+            </>
+          )}
 
           <div className="text-[10px] text-muted-foreground mt-2">
             {t('flow_builder.changes_saved_automatically', 'Changes are saved automatically when you save the flow.')}
@@ -3665,7 +3768,7 @@ function TriggerNode({ data, isConnectable, id }: any) {
                 }}
                 isConnectable={isConnectable}
               />
-              <div className="absolute top-5 left-1/2 transform -translate-x-1/2 text-[8px] text-muted-foreground whitespace-nowrap bg-white px-1 rounded border">
+              <div className="absolute top-5 left-1/2 transform -translate-x-1/2 text-[8px] text-muted-foreground whitespace-nowrap bg-background px-1 rounded border">
                 {keyword}
               </div>
             </div>
@@ -3776,11 +3879,15 @@ function WaitNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-wait p-3 rounded-lg bg-white border border-border shadow-sm max-w-[250px] group">
+    <div className="node-wait p-3 rounded-lg bg-card border border-border shadow-sm max-w-[250px] group">
       <NodeToolbar id={id} onDuplicate={onDuplicateNode} onDelete={onDeleteNode} />
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <Clock className="h-4 w-4 text-orange-500" />
+        <img 
+          src="https://cdn-icons-png.flaticon.com/128/717/717815.png" 
+          alt="Wait" 
+          className="h-4 w-4"
+        />
         <span>{t('flow_builder.wait_node_title', 'Wait')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -3900,7 +4007,7 @@ function WaitNode({ data, isConnectable, id }: any) {
           )}
         </div>
       ) : (
-        <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+        <div className="text-sm p-2  rounded border border-border">
           {getWaitDescription()}
         </div>
       )}
@@ -4250,7 +4357,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
       if (showPreview && previewValue) {
 
         parts.push(
-          <span key={match.index} className="bg-green-100 text-green-800 px-1 rounded font-medium">
+          <span key={match.index} className="bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 px-1 rounded font-medium">
             {previewValue}
           </span>
         );
@@ -4262,7 +4369,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
             className={`px-1 rounded ${
               isValid
                 ? 'bg-primary/10 text-primary'
-                : 'bg-red-100 text-red-600 border border-red-200'
+                : 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
             }`}
             title={isValid ? `Variable: ${variableName}` : `Invalid variable: ${variableName}`}
           >
@@ -4282,7 +4389,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-quickreply p-3 rounded-lg bg-white border border-border shadow-sm max-w-[380px] group">
+    <div className="node-quickreply p-3 rounded-lg bg-card border border-border shadow-sm max-w-[380px] group">
       {flowContext && (
         <NodeToolbar
           id={id}
@@ -4292,7 +4399,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
       )}
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <ListOrdered className="h-4 w-4 text-blue-500" />
+        <img src="https://cdn-icons-png.flaticon.com/128/14669/14669047.png" alt="Quick Reply Options" className="h-4 w-4" />
         <span>{t('flow_builder.quick_reply_node_title', 'Quick Reply Options')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -4318,7 +4425,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
             {(() => {
               const issues = validateVariables(message);
               return issues.length > 0 && (
-                <div className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2">
                   <div className="font-medium mb-1">Variable Issues:</div>
                   <ul className="list-disc list-inside space-y-0.5">
                     {issues.map((issue, index) => (
@@ -4335,7 +4442,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
                 {availableVariables.map((variable) => (
                   <button
                     key={variable.name}
-                    className="text-xs px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                    className="text-xs px-2 py-1  rounded hover:"
                     title={variable.description}
                     onClick={() => insertVariable(variable.name)}
                   >
@@ -4363,14 +4470,14 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
 
             {/* 🔧 NEW: Bulk operations controls */}
             {options.length > 1 && (
-              <div className="mb-3 p-2 bg-secondary/30 rounded border">
+              <div className="mb-3 p-2  rounded border">
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">
                       {selectedOptions.size > 0 ? `${selectedOptions.size} selected` : 'Bulk actions:'}
                     </span>
                     <button
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-500"
                       onClick={selectedOptions.size === options.length ? deselectAllOptions : selectAllOptions}
                     >
                       {selectedOptions.size === options.length ? 'Deselect All' : 'Select All'}
@@ -4389,7 +4496,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 text-xs px-2 text-red-600 hover:text-red-800"
+                        className="h-6 text-xs px-2 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-500"
                         onClick={bulkDeleteOptions}
                         disabled={options.length - selectedOptions.size < 1}
                       >
@@ -4407,7 +4514,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
                   key={index}
                   className={`space-y-2 relative border rounded-lg p-2 transition-all ${
                     draggedIndex === index
-                      ? 'opacity-50 scale-95 border-blue-300'
+                      ? 'opacity-50 scale-95 border-primary/50'
                       : 'border-transparent hover:border-border'
                   }`}
                   draggable
@@ -4421,7 +4528,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
                     {options.length > 1 && (
                       <input
                         type="checkbox"
-                        className="flex-shrink-0 w-4 h-4 rounded border-gray-300"
+                        className="flex-shrink-0 w-4 h-4 rounded border-input"
                         checked={selectedOptions.has(index)}
                         onChange={() => toggleOptionSelection(index)}
                       />
@@ -4432,7 +4539,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
                         <path d="M7 2a2 2 0 1 1 .001 4.001A2 2 0 0 1 7 2zM7 8a2 2 0 1 1 .001 4.001A2 2 0 0 1 7 8zM7 14a2 2 0 1 1 .001 4.001A2 2 0 0 1 7 14zM13 2a2 2 0 1 1 .001 4.001A2 2 0 0 1 13 2zM13 8a2 2 0 1 1 .001 4.001A2 2 0 0 1 13 8zM13 14a2 2 0 1 1 .001 4.001A2 2 0 0 1 13 14z"/>
                       </svg>
                     </div>
-                    <div className="flex-shrink-0 w-6 h-6 rounded-md bg-blue-500 text-white flex items-center justify-center text-xs font-medium">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
                       {index + 1}
                     </div>
                     <div className="flex-1 font-medium text-xs">Option {index + 1}</div>
@@ -4511,7 +4618,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
             {(() => {
               const issues = validateVariables(invalidResponseMessage);
               return issues.length > 0 && (
-                <div className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2">
                   <div className="font-medium mb-1">Variable Issues:</div>
                   <ul className="list-disc list-inside space-y-0.5">
                     {issues.map((issue, index) => (
@@ -4528,7 +4635,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
                 {availableVariables.map((variable) => (
                   <button
                     key={variable.name}
-                    className="text-xs px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                    className="text-xs px-2 py-1  rounded hover:"
                     title={variable.description}
                     onClick={() => insertVariableIntoInvalidMessage(variable.name)}
                   >
@@ -4559,7 +4666,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
             </div>
             
             {enableGoBack && (
-              <div className="space-y-2 p-3 border rounded-lg bg-secondary/20">
+              <div className="space-y-2 p-3 border rounded-lg ">
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">Display Text:</label>
                   <input
@@ -4628,14 +4735,14 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
             <div className="flex items-center justify-between">
               <div className="text-xs font-medium text-muted-foreground">Message</div>
               <button
-                className="text-xs px-2 py-1 rounded bg-secondary hover:bg-secondary/80 transition-colors"
+                className="text-xs px-2 py-1 rounded  hover: transition-colors"
                 onClick={() => setShowPreview(!showPreview)}
                 title={showPreview ? "Show variables" : "Show preview values"}
               >
                 {showPreview ? "Variables" : "Preview"}
               </button>
             </div>
-            <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+            <div className="text-sm p-2  rounded border border-border">
               {formatMessage(message, showPreview)}
             </div>
             {/* 🔧 NEW: Validation warnings */}
@@ -4683,7 +4790,7 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
             {/* 🔧 NEW: Go Back Option Display */}
             {enableGoBack && (
               <div className="flex items-center gap-2 relative">
-                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-gray-500 text-white flex items-center justify-center text-xs font-medium">
+                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-muted-foreground text-primary-foreground flex items-center justify-center text-xs font-medium">
                   ←
                 </div>
                 <div className="text-sm flex-1 pr-6">
@@ -4711,11 +4818,11 @@ function QuickReplyNode({ data, isConnectable, id }: any) {
 
           {/* 🔧 NEW: Invalid Response Indicator in View Mode */}
           <div className="flex items-center gap-2 relative mt-3 pt-2 border-t border-border/50">
-            <div className="flex-shrink-0 w-6 h-6 rounded-md bg-orange-500 text-white flex items-center justify-center text-xs font-medium">
+            <div className="flex-shrink-0 w-6 h-6 rounded-md bg-orange-500 dark:bg-orange-400 text-white flex items-center justify-center text-xs font-medium">
               !
             </div>
             <div className="text-sm flex-1 pr-6">
-              <div className="text-orange-700 font-medium">Invalid Response</div>
+              <div className="text-orange-700 dark:text-orange-400 font-medium">Invalid Response</div>
               <div className="text-xs text-muted-foreground">
                 {invalidResponseMessage.length > 50
                   ? `${invalidResponseMessage.substring(0, 50)}...`
@@ -4768,12 +4875,13 @@ const nodeTypes: NodeTypes = {
   ai_assistant: AIAssistantNode,
   translation: TranslationNode,
   update_pipeline_stage: UpdatePipelineStageNode,
+  move_deal_to_pipeline: MoveDealToPipelineNode,
+  manage_contact: ManageContactNode,
+  contactNotification: ContactNotificationNode,
   webhook: WebhookNode,
   http_request: HTTPRequestNode,
   code_execution: CodeExecutionNode,
   whatsapp_flows: WhatsAppFlowsNode,
-  typebot: TypebotNode,
-  flowise: FlowiseNode,
   n8n: N8nNode,
   make: MakeNode,
   google_sheets: GoogleSheetsNode,
@@ -4781,7 +4889,9 @@ const nodeTypes: NodeTypes = {
   documind: DocumindNode,
   chat_pdf: ChatPdfNode,
   bot_disable: BotDisableNode,
-  bot_reset: BotResetNode
+  bot_reset: BotResetNode,
+  stripe: StripeNode,
+  call_agent: CallAgentNode
 };
 
 const CustomEdge = ({
@@ -4825,7 +4935,7 @@ const CustomEdge = ({
             className="nodrag nopan"
           >
             <button
-              className="flex items-center justify-center w-6 h-6 rounded-full bg-white border border-red-500 text-red-500 hover:bg-red-50 transition-colors"
+              className="flex items-center justify-center w-6 h-6 rounded-full bg-background border border-red-500 dark:border-red-400 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               onClick={handleDelete}
             >
               <Trash2 size={12} />
@@ -4879,20 +4989,8 @@ function NodeSelector({ onAdd, nodes }: { onAdd: (type: string) => void; nodes: 
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const hasTypebotNode = nodes.some(node => node.type === 'typebot');
-
-
-
   const getSingletonNodeState = (nodeType: string) => {
     switch (nodeType) {
-      
-      case 'typebot':
-        return {
-          disabled: hasTypebotNode,
-          tooltip: hasTypebotNode ? t('flow_builder.singleton_errors.typebot_exists', 'Only one Typebot node allowed per flow') : ''
-        };
-
-
       default:
         return { disabled: false, tooltip: '' };
     }
@@ -4901,45 +4999,55 @@ function NodeSelector({ onAdd, nodes }: { onAdd: (type: string) => void; nodes: 
   const allNodes = [
     {
       type: 'trigger',
-      name: t('flow_builder.node_types.message_received', 'Message Received'),
+      name: t('flow_builder.node_types.trigger_node', 'Message Trigger'),
       section: t('flow_builder.sections.triggers', 'Triggers'),
-      icon: MessageSquare,
+      icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/5324/5324247.png" alt="Message Trigger" className={className} />,
       color: 'text-green-500',
       ...getSingletonNodeState('trigger')
     },
 
-    { type: 'message', name: t('flow_builder.node_types.text_message', 'Text Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: MessageSquare, color: 'text-secondry', disabled: false },
-    { type: 'quickreply', name: t('flow_builder.node_types.quick_reply_options', 'Quick Reply Options'), section: t('flow_builder.sections.messages', 'Messages'), icon: ListOrdered, color: 'text-blue-500', disabled: false },
-    { type: 'whatsapp_poll', name: t('flow_builder.node_types.whatsapp_poll', 'WhatsApp Poll'), section: t('flow_builder.sections.messages', 'Messages'), icon: ListOrdered, color: 'text-green-600', disabled: false },
-    { type: 'whatsapp_interactive_buttons', name: t('flow_builder.node_types.whatsapp_interactive_buttons', 'WhatsApp Buttons'), section: t('flow_builder.sections.messages', 'Messages'), icon: Smartphone, color: 'text-green-600', disabled: false },
-    { type: 'whatsapp_interactive_list', name: t('flow_builder.node_types.whatsapp_interactive_list', 'WhatsApp List'), section: t('flow_builder.sections.messages', 'Messages'), icon: List, color: 'text-green-600', disabled: false },
-    { type: 'whatsapp_cta_url', name: t('flow_builder.node_types.whatsapp_cta_url', 'WhatsApp CTA URL'), section: t('flow_builder.sections.messages', 'Messages'), icon: ExternalLink, color: 'text-green-600', disabled: false },
-    { type: 'whatsapp_location_request', name: t('flow_builder.node_types.whatsapp_location_request', 'WA Location Request'), section: t('flow_builder.sections.messages', 'Messages'), icon: MapPin, color: 'text-green-600', disabled: false },
-    { type: 'whatsapp_flows', name: t('flow_builder.node_types.whatsapp_flows', 'WhatsApp Flows'), section: t('flow_builder.sections.messages', 'Messages'), icon: MessageSquare, color: 'text-green-600', disabled: false },
-    { type: 'image', name: t('flow_builder.node_types.image_message', 'Image Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: Image, color: 'text-blue-500', disabled: false },
-    { type: 'video', name: t('flow_builder.node_types.video_message', 'Video Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: FileVideo, color: 'text-red-500', disabled: false },
-    { type: 'audio', name: t('flow_builder.node_types.audio_message', 'Audio Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: FileAudio, color: 'text-purple-500', disabled: false },
-    { type: 'document', name: t('flow_builder.node_types.document_message', 'Document Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: File, color: 'text-amber-600', disabled: false },
+    { type: 'message', name: t('flow_builder.node_types.text_message', 'Text Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/811/811476.png" alt="Text Message" className={className} />, color: 'text-secondry', disabled: false },
+    { type: 'quickreply', name: t('flow_builder.node_types.quick_reply_options', 'Quick Reply Options'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/14669/14669047.png" alt="Quick Reply Options" className={className} />, color: 'text-blue-500', disabled: false },
+    { type: 'whatsapp_poll', name: t('flow_builder.node_types.whatsapp_poll', 'WhatsApp Poll'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/12482/12482449.png" alt="WhatsApp Poll" className={className} />, color: 'text-green-600', disabled: false },
+    { type: 'whatsapp_interactive_buttons', name: t('flow_builder.node_types.whatsapp_interactive_buttons', 'WhatsApp Buttons'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/1516/1516938.png" alt="WhatsApp Buttons" className={className} />, color: 'text-green-600', disabled: false },
+    { type: 'whatsapp_interactive_list', name: t('flow_builder.node_types.whatsapp_interactive_list', 'WhatsApp List'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/8428/8428362.png" alt="WhatsApp List" className={className} />, color: 'text-green-600', disabled: false },
+    { type: 'whatsapp_cta_url', name: t('flow_builder.node_types.whatsapp_cta_url', 'WhatsApp CTA URL'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/3305/3305847.png" alt="WhatsApp CTA URL" className={className} />, color: 'text-green-600', disabled: false },
+    { type: 'whatsapp_location_request', name: t('flow_builder.node_types.whatsapp_location_request', 'WA Location Request'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/535/535137.png" alt="WA Location Request" className={className} />, color: 'text-green-600', disabled: false },
+    { type: 'whatsapp_flows', name: t('flow_builder.node_types.whatsapp_flows', 'WhatsApp Flows'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/1587/1587495.png" alt="WhatsApp Flows" className={className} />, color: 'text-green-600', disabled: false },
+    { type: 'image', name: t('flow_builder.node_types.image_message', 'Image Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/17320/17320313.png" alt="Image Message" className={className} />, color: 'text-blue-500', disabled: false },
+    { type: 'video', name: t('flow_builder.node_types.video_message', 'Video Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/2839/2839026.png" alt="Video Message" className={className} />, color: 'text-red-500', disabled: false },
+    { type: 'audio', name: t('flow_builder.node_types.audio_message', 'Audio Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/5320/5320910.png" alt="Audio Message" className={className} />, color: 'text-purple-500', disabled: false },
+    { type: 'document', name: t('flow_builder.node_types.document_message', 'Document Message'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/136/136522.png" alt="Document Message" className={className} />, color: 'text-amber-600', disabled: false },
 
 
 
-    { type: 'condition', name: t('flow_builder.node_types.condition', 'Condition'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: AlertCircle, color: 'text-amber-500', disabled: false },
-    { type: 'wait', name: t('flow_builder.node_types.wait', 'Wait'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: Clock, color: 'text-orange-500', disabled: false },
-    { type: 'ai_assistant', name: t('flow_builder.node_types.ai_assistant', 'AI Assistant'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <BotIcon className={className} size={16} />, color: 'text-violet-500', ...getSingletonNodeState('ai_assistant') },
-    { type: 'translation', name: t('flow_builder.node_types.translation', 'Translation'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: Languages, color: 'text-blue-600', disabled: false },
-    { type: 'update_pipeline_stage', name: t('flow_builder.node_types.pipeline', 'Pipeline'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ArrowRightCircle, color: 'text-teal-500', disabled: false },
-    { type: 'bot_disable', name: t('flow_builder.node_types.agent_handoff', 'Agent Handoff'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: UserCheck, color: 'text-orange-600', disabled: false },
-    { type: 'n8n', name: t('flow_builder.node_types.n8n', 'n8n'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Workflow, color: 'text-orange-600', disabled: false },
-    { type: 'make', name: t('flow_builder.node_types.make_com', 'Make.com'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Zap, color: 'text-blue-600', disabled: false },
-    { type: 'http_request', name: t('flow_builder.node_types.http_request', 'HTTP Request'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Network, color: 'text-purple-500', disabled: false },
-    { type: 'code_execution', name: t('flow_builder.node_types.code_execution', 'Code Execution'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: Code, color: 'text-gray-700', disabled: false },
-    { type: 'google_sheets', name: t('flow_builder.node_types.google_sheets', 'Google Sheets'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Sheet, color: 'text-green-600', disabled: false },
-    { type: 'data_capture', name: t('flow_builder.node_types.data_capture', 'Data Capture'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: Database, color: 'text-blue-600', disabled: false },
-    { type: 'webhook', name: t('flow_builder.node_types.webhook', 'Webhook'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Globe, color: 'text-blue-500', disabled: false },
-    { type: 'typebot', name: t('flow_builder.node_types.typebot', 'Typebot'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: MessageCircle, color: 'text-blue-600', ...getSingletonNodeState('typebot') },
-    { type: 'flowise', name: t('flow_builder.node_types.flowise', 'Flowise'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: Brain, color: 'text-purple-600', ...getSingletonNodeState('flowise') },
-    { type: 'documind', name: t('flow_builder.node_types.documind_pdf_chat', 'Documind PDF Chat'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: FileText, color: 'text-orange-600', disabled: false },
-    { type: 'chat_pdf', name: t('flow_builder.node_types.chat_pdf_ai', 'Chat PDF AI'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: FileText, color: 'text-blue-600', disabled: false },
+    { type: 'ai_assistant', name: t('flow_builder.node_types.ai_assistant', 'AI Assistant'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/512/14958/14958196.png" alt="AI Assistant" className={className} />, color: 'text-violet-500', ...getSingletonNodeState('ai_assistant') },
+    { type: 'condition', name: t('flow_builder.node_types.condition', 'Condition'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/17359/17359067.png" alt="Condition" className={className} />, color: 'text-amber-500', disabled: false },
+    { type: 'wait', name: t('flow_builder.node_types.wait', 'Wait'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/717/717815.png" alt="Wait" className={className} />, color: 'text-orange-500', disabled: false },
+    { type: 'translation', name: t('flow_builder.node_types.translation', 'Translation'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Google_Translate_logo.svg/1024px-Google_Translate_logo.svg.png" alt="Translation" className={className} />, color: 'text-blue-600', disabled: false },
+    { type: 'update_pipeline_stage', name: t('flow_builder.node_types.pipeline', 'Pipeline'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/10215/10215964.png" alt="Pipeline" className={className} />, color: 'text-teal-500', disabled: false },
+    { type: 'move_deal_to_pipeline', name: 'Move Deal to Pipeline', section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/10215/10215964.png" alt="Move Deal to Pipeline" className={className} />, color: 'text-purple-500', disabled: false },
+    { type: 'manage_contact', name: t('flow_builder.node_types.manage_contact', 'Manage Contact'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/9722/9722917.png" alt="Manage Contact" className={className} />, color: 'text-indigo-500', disabled: false },
+    { type: 'bot_disable', name: t('flow_builder.node_types.agent_handoff', 'Agent Handoff'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/8898/8898827.png" alt="Agent Handoff" className={className} />, color: 'text-orange-600', disabled: false },
+    { type: 'n8n', name: t('flow_builder.node_types.n8n', 'n8n'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.75.0/files/dark/n8n-color.png" alt="n8n" className={className} />, color: 'text-orange-600', disabled: false },
+    { type: 'make', name: t('flow_builder.node_types.make_com', 'Make.com'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.75.0/files/dark/make-color.png" alt="Make.com" className={className} />, color: 'text-blue-600', disabled: false },
+    { type: 'http_request', name: t('flow_builder.node_types.http_request', 'HTTP Request'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/1674/1674969.png" alt="HTTP Request" className={className} />, color: 'text-purple-500', disabled: false },
+    { type: 'code_execution', name: t('flow_builder.node_types.code_execution', 'Code Execution'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/4205/4205106.png" alt="Code Execution" className={className} />, color: 'text-foreground', disabled: false },
+    { type: 'google_sheets', name: t('flow_builder.node_types.google_sheets', 'Google Sheets'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://cdn.activepieces.com/pieces/google-sheets.png" alt="Google Sheets" className={className} />, color: 'text-green-600', disabled: false },
+    { type: 'data_capture', name: t('flow_builder.node_types.data_capture', 'Data Capture'), section: t('flow_builder.sections.flow_control', 'Flow Control'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/2920/2920349.png" alt="Data Capture" className={className} />, color: 'text-blue-600', disabled: false },
+    { type: 'webhook', name: t('flow_builder.node_types.webhook', 'Webhook'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/919/919829.png" alt="Webhook" className={className} />, color: 'text-blue-500', disabled: false },
+    { type: 'stripe', name: t('flow_builder.node_types.stripe', 'Stripe'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://cdn.activepieces.com/pieces/stripe.png" alt="Stripe" className={className} />, color: 'text-blue-600', disabled: false },
+    { 
+      type: 'call_agent', 
+      name: t('flow_builder.node_types.call_agent', 'Call Agent'), 
+      section: t('flow_builder.sections.integrations', 'Integrations'), 
+      icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/8898/8898892.png" alt="Call Agent" className={className} />, 
+      color: 'text-blue-500', 
+      disabled: false 
+    },
+    { type: 'contactNotification', name: t('flow_builder.contact_notification', 'Contact Notification'), section: t('flow_builder.sections.messages', 'Messages'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/4325/4325930.png" alt="Contact Notification" className={className} />, color: 'text-purple-600', disabled: false },
+    { type: 'documind', name: t('flow_builder.node_types.documind_pdf_chat', 'Documind PDF Chat'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/136/136522.png" alt="Documind PDF Chat" className={className} />, color: 'text-orange-600', disabled: false },
+    { type: 'chat_pdf', name: t('flow_builder.node_types.chat_pdf_ai', 'Chat PDF AI'), section: t('flow_builder.sections.integrations', 'Integrations'), icon: ({ className }: { className?: string }) => <img src="https://cdn-icons-png.flaticon.com/128/136/136522.png" alt="Chat PDF AI" className={className} />, color: 'text-blue-600', disabled: false },
   ];
 
   const filteredNodes = searchTerm.trim() === '' ? allNodes : allNodes.filter(node => {
@@ -5003,7 +5111,6 @@ function NodeSelector({ onAdd, nodes }: { onAdd: (type: string) => void; nodes: 
         className="flex-1 overflow-y-auto custom-scrollbar"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: '#cbd5e1 #f1f5f9',
           maxHeight: 'calc(100vh - 200px)',
           overflowY: 'auto',
           paddingRight: '4px'
@@ -5046,7 +5153,7 @@ function NodeSelector({ onAdd, nodes }: { onAdd: (type: string) => void; nodes: 
                         <span className="flex items-center gap-2 flex-1">
                           {node.name}
                           {(node.type === 'whatsapp_flows' || node.type === 'whatsapp_interactive_buttons' || node.type === 'whatsapp_interactive_list' || node.type === 'whatsapp_cta_url' || node.type === 'whatsapp_location_request') && (
-                            <span className="px-1.5 py-0.5 text-[8px] font-medium bg-green-100 text-green-700 rounded border border-green-200">
+                            <span className="px-1.5 py-0.5 text-[8px] font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded border border-green-200 dark:border-green-900">
                               Official API
                             </span>
                           )}
@@ -5066,6 +5173,7 @@ function NodeSelector({ onAdd, nodes }: { onAdd: (type: string) => void; nodes: 
 
 function FlowEditor() {
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const [match, params] = useRoute('/flows/:id');
   const flowId = match ? parseInt(params.id) : null;
   const isEditMode = flowId !== null;
@@ -5081,7 +5189,7 @@ function FlowEditor() {
       type: 'trigger',
       position: { x: 250, y: 50 },
       data: {
-        label: 'Message Received',
+        label: 'Message Trigger',
         channelTypes: ['whatsapp_unofficial'],
         conditionType: 'any',
         conditionValue: '',
@@ -5212,23 +5320,6 @@ function FlowEditor() {
       const nodeToDuplicate = nodes.find((node) => node.id === nodeId);
       if (!nodeToDuplicate) return;
 
-      const singletonNodes = ['typebot', 'flowise'];
-      if (singletonNodes.includes(nodeToDuplicate.type || '')) {
-        const nodeTypeNames: Record<string, string> = {
-          typebot: t('flow_builder.typebot', 'Typebot'),
-          flowise: t('flow_builder.flowise', 'Flowise')
-        };
-
-        const nodeTypeName = nodeTypeNames[nodeToDuplicate.type || ''] || 'This';
-
-        toast({
-          title: t('flow_builder.cannot_duplicate_singleton', 'Cannot Duplicate Node'),
-          description: t('flow_builder.singleton_node_unique', `${nodeTypeName} nodes cannot be duplicated. Only one instance is allowed per flow.`),
-          variant: 'destructive'
-        });
-        return;
-      }
-
       const newNodeId = `node_${nanoid()}`;
 
       const duplicateNode: Node = {
@@ -5271,26 +5362,6 @@ function FlowEditor() {
   const onAddNode = useCallback(
     (type: string) => {
       if (!reactFlowWrapper.current) return;
-
-      const singletonNodes = ['typebot', 'flowise'];
-      if (singletonNodes.includes(type)) {
-        const existingNode = nodes.find(node => node.type === type);
-        if (existingNode) {
-          const nodeTypeNames: Record<string, string> = {
-            typebot: t('flow_builder.typebot', 'Typebot'),
-            flowise: t('flow_builder.flowise', 'Flowise')
-          };
-
-          const nodeTypeName = nodeTypeNames[type] || 'This';
-
-          toast({
-            title: t('flow_builder.singleton_node_exists_title', `${nodeTypeName} Already Exists`),
-            description: t('flow_builder.singleton_node_exists_description', `Only one ${nodeTypeName} node is allowed per flow. Please use the existing node.`),
-            variant: 'destructive'
-          });
-          return;
-        }
-      }
 
       const triggerNode = nodes.find(node => node.type === 'trigger');
       const triggerNodeId = triggerNode?.id || '';
@@ -5393,7 +5464,7 @@ function FlowEditor() {
             provider: 'openai',
             model: 'gpt-4o',
             apiKey: '',
-            prompt: 'You are a helpful assistant. Answer user questions concisely and accurately.\n\nWhen users request calendar-related tasks, you can:\n- Book appointments and meetings\n- Check availability for scheduling\n- Update or modify appointments\n- Cancel appointments when needed\n\nFor appointment booking:\n1. First check availability\n2. Collect necessary details (title, date, time, attendees,email, location)\n3. Confirm all details with the user before booking\n4. Provide confirmation with event details\n\nAlways be professional and ensure you have all required information before making calendar changes. Also make sure to ask the user about their email if they wish to know the previous appointments. So that we can fetch the previous appointments from the  calendar. Also make sure to not share any sensitive information with the user like appointemnts made by other users etc. Only give info to the user if they are the owner of the event.',
+            prompt: 'You are a helpful assistant. Answer user questions concisely and accurately.\n\nWhen users request calendar-related tasks, you can:\n- Book appointments and meetings\n- Check availability for scheduling\n- Update or modify appointments\n- Cancel appointments when needed\n\nFor appointment booking:\n1. First check availability\n2. Collect necessary details (title, date, time, attendees,email, location)\n3. Confirm all details with the user before booking\n4. Provide confirmation with event details\n\nAlways be professional and ensure you have all required information before making calendar changes. Also make sure to ask the user about their email if they wish to know the previous appointments. So that we can fetch the previous appointments from the  calendar. Also make sure to not share any sensitive information with the user like appointemnts made by other users etc. Only give info to the user if they are the owner of the event.\n\n Note: Always check available slots before responding when a user requests an appointment. For example, if the user asks to book 10 AM on a specific date, verify availability first, then reply based on the result.',
             enableHistory: true,
             enableAudio: false,
             enableTaskExecution: false,
@@ -5491,36 +5562,6 @@ function FlowEditor() {
                 }
               }]
             },
-            onDeleteNode: onDeleteNode,
-            onDuplicateNode: onDuplicateNode
-          };
-          break;
-        case 'typebot':
-          nodeData = {
-            ...nodeData,
-            apiToken: '',
-            workspaceId: '',
-            typebotId: '',
-            botName: '',
-            operation: 'start_conversation',
-            config: {},
-            variableMappings: [],
-            sessionTimeout: 3600,
-            onDeleteNode: onDeleteNode,
-            onDuplicateNode: onDuplicateNode
-          };
-          break;
-        case 'flowise':
-          nodeData = {
-            ...nodeData,
-            instanceUrl: '',
-            apiKey: '',
-            chatflowId: '',
-            chatflowName: '',
-            operation: 'start_chatflow',
-            config: {},
-            variableMappings: [],
-            sessionTimeout: 3600,
             onDeleteNode: onDeleteNode,
             onDuplicateNode: onDuplicateNode
           };
@@ -5988,21 +6029,29 @@ function FlowEditor() {
               defaultEdgeOptions={{
           animated: true,
           type: 'smoothstep',
-          style: { stroke: '#64748b' }
+          style: { stroke: 'hsl(var(--muted-foreground))' }
               }}
             >
               <Background />
               <Controls />
-              <MiniMap />
-              <Panel position="top-right" className="bg-background p-2 rounded-md shadow-sm border">
+              <MiniMap
+                nodeColor={() => 'hsl(var(--primary))'}
+                maskColor={theme === 'dark' ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)'}
+                style={{
+                  backgroundColor: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))'
+                }}
+                className="react-flow__minimap"
+              />
+              <Panel position="top-right" className="bg-background p-2 rounded-md shadow-sm border border-border">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="text-xs flex items-center gap-1">
             <div className={`w-2 h-2 rounded-full ${
               isEditMode ? (
-                flowData?.status === 'active' ? 'bg-green-500' : 'bg-amber-500'
-              ) : 'bg-blue-500'
+                flowData?.status === 'active' ? 'bg-primary' : 'bg-muted-foreground'
+              ) : 'bg-primary'
             }`} />
             {isEditMode ? (
               flowData?.status === 'active' ? t('flow_builder.active', 'Active') : t('flow_builder.draft', 'Draft')

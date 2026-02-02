@@ -113,7 +113,7 @@ export function ProcessorStatus({
     return (
       <Card className={compact ? "p-3" : ""}>
         <CardContent className={compact ? "p-0" : ""}>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <RefreshCw className="w-4 h-4 animate-spin" />
             {t('knowledge_base.processor.checking', 'Checking processor capabilities...')}
           </div>

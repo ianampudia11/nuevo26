@@ -127,22 +127,22 @@ export function CompanyDeletionDialog({
     if (!preview) return null;
 
     const dataItems = [
-      { icon: Users, label: t('admin.company_deletion.data_types.users', 'Users'), count: preview.dataToDelete.users, color: 'text-blue-600' },
-      { icon: MessageSquare, label: t('admin.company_deletion.data_types.conversations', 'Conversations'), count: preview.dataToDelete.conversations, color: 'text-green-600' },
-      { icon: MessageSquare, label: t('admin.company_deletion.data_types.messages', 'Messages'), count: preview.dataToDelete.messages, color: 'text-green-500' },
-      { icon: Database, label: t('admin.company_deletion.data_types.contacts', 'Contacts'), count: preview.dataToDelete.contacts, color: 'text-purple-600' },
-      { icon: Settings, label: t('admin.company_deletion.data_types.flows', 'Flows'), count: preview.dataToDelete.flows, color: 'text-orange-600' },
-      { icon: Database, label: t('admin.company_deletion.data_types.deals', 'Deals'), count: preview.dataToDelete.deals, color: 'text-red-600' },
-      { icon: CreditCard, label: t('admin.company_deletion.data_types.payment_records', 'Payment Records'), count: preview.dataToDelete.paymentTransactions, color: 'text-yellow-600' },
-      { icon: Files, label: t('admin.company_deletion.data_types.media_files', 'Media Files'), count: preview.dataToDelete.estimatedMediaFiles, color: 'text-indigo-600' },
-      { icon: Settings, label: t('admin.company_deletion.data_types.whatsapp_sessions', 'WhatsApp Sessions'), count: preview.dataToDelete.estimatedWhatsappSessions, color: 'text-pink-600' },
+      { icon: Users, label: t('admin.company_deletion.data_types.users', 'Users'), count: preview.dataToDelete.users, color: 'text-blue-600 dark:text-blue-400' },
+      { icon: MessageSquare, label: t('admin.company_deletion.data_types.conversations', 'Conversations'), count: preview.dataToDelete.conversations, color: 'text-green-600 dark:text-green-400' },
+      { icon: MessageSquare, label: t('admin.company_deletion.data_types.messages', 'Messages'), count: preview.dataToDelete.messages, color: 'text-green-500 dark:text-green-400' },
+      { icon: Database, label: t('admin.company_deletion.data_types.contacts', 'Contacts'), count: preview.dataToDelete.contacts, color: 'text-purple-600 dark:text-purple-400' },
+      { icon: Settings, label: t('admin.company_deletion.data_types.flows', 'Flows'), count: preview.dataToDelete.flows, color: 'text-orange-600 dark:text-orange-400' },
+      { icon: Database, label: t('admin.company_deletion.data_types.deals', 'Deals'), count: preview.dataToDelete.deals, color: 'text-red-600 dark:text-red-400' },
+      { icon: CreditCard, label: t('admin.company_deletion.data_types.payment_records', 'Payment Records'), count: preview.dataToDelete.paymentTransactions, color: 'text-yellow-600 dark:text-yellow-400' },
+      { icon: Files, label: t('admin.company_deletion.data_types.media_files', 'Media Files'), count: preview.dataToDelete.estimatedMediaFiles, color: 'text-indigo-600 dark:text-indigo-400' },
+      { icon: Settings, label: t('admin.company_deletion.data_types.whatsapp_sessions', 'WhatsApp Sessions'), count: preview.dataToDelete.estimatedWhatsappSessions, color: 'text-pink-600 dark:text-pink-400' },
     ];
 
     return (
       <div className="grid grid-cols-2 gap-3 mt-4">
         {dataItems.map(({ icon: Icon, label, count, color }) => (
           count > 0 && (
-            <div key={label} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div key={label} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Icon className={`h-4 w-4 ${color}`} />
                 <span className="text-sm font-medium">{label}</span>
@@ -161,7 +161,7 @@ export function CompanyDeletionDialog({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center text-red-600">
+          <DialogTitle className="flex items-center text-red-600 dark:text-red-400">
             <Trash2 className="h-5 w-5 mr-2" />
             {t('admin.company_deletion.title', 'Delete Company')}: {companyName}
           </DialogTitle>
@@ -175,10 +175,10 @@ export function CompanyDeletionDialog({
         <div className="py-4">
           {step === 'preview' && (
             <div className="space-y-4">
-              <Alert className="border-red-200 bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <AlertTitle className="text-red-800">{t('admin.company_deletion.preview.warning_title', 'Warning: Irreversible Action')}</AlertTitle>
-                <AlertDescription className="text-red-700">
+              <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertTitle className="text-red-800 dark:text-red-300">{t('admin.company_deletion.preview.warning_title', 'Warning: Irreversible Action')}</AlertTitle>
+                <AlertDescription className="text-red-700 dark:text-red-400">
                   {t('admin.company_deletion.preview.warning_description', 'This will permanently delete the company and ALL associated data. This action cannot be undone.')}
                 </AlertDescription>
               </Alert>
@@ -194,10 +194,10 @@ export function CompanyDeletionDialog({
 
                   {preview.warnings.length > 0 && (
                     <div className="mt-4">
-                      <h4 className="font-medium mb-2 text-red-800">{t('admin.company_deletion.preview.warnings_title', 'Critical Warnings')}:</h4>
+                      <h4 className="font-medium mb-2 text-red-800 dark:text-red-300">{t('admin.company_deletion.preview.warnings_title', 'Critical Warnings')}:</h4>
                       <ul className="space-y-1">
                         {preview.warnings.map((warning, index) => (
-                          <li key={index} className="text-sm text-red-700 flex items-start">
+                          <li key={index} className="text-sm text-red-700 dark:text-red-400 flex items-start">
                             <AlertTriangle className="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
                             {warning}
                           </li>
@@ -207,7 +207,7 @@ export function CompanyDeletionDialog({
                   )}
                 </div>
               ) : (
-                <div className="text-center py-4 text-red-600">
+                <div className="text-center py-4 text-red-600 dark:text-red-400">
                   {t('admin.company_deletion.preview.load_error', 'Failed to load deletion preview')}
                 </div>
               )}
@@ -216,10 +216,10 @@ export function CompanyDeletionDialog({
 
           {step === 'confirm' && (
             <div className="space-y-4">
-              <Alert className="border-red-200 bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <AlertTitle className="text-red-800">{t('admin.company_deletion.confirm.title', 'Type Company Name to Continue')}</AlertTitle>
-                <AlertDescription className="text-red-700">
+              <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertTitle className="text-red-800 dark:text-red-300">{t('admin.company_deletion.confirm.title', 'Type Company Name to Continue')}</AlertTitle>
+                <AlertDescription className="text-red-700 dark:text-red-400">
                   {t('admin.company_deletion.confirm.description', 'To confirm deletion, type the exact company name')}: <strong>{companyName}</strong>
                 </AlertDescription>
               </Alert>
@@ -231,7 +231,7 @@ export function CompanyDeletionDialog({
                   value={confirmationName}
                   onChange={(e) => setConfirmationName(e.target.value)}
                   placeholder={t('admin.company_deletion.confirm.placeholder', 'Type "{{name}}" to confirm', { name: companyName })}
-                  className="border-red-300 focus:border-red-500"
+                  className="border-red-300 focus:border-red-500 dark:border-red-700 dark:focus:border-red-500"
                 />
               </div>
             </div>
@@ -239,17 +239,17 @@ export function CompanyDeletionDialog({
 
           {step === 'final' && (
             <div className="space-y-4">
-              <Alert className="border-red-200 bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <AlertTitle className="text-red-800">{t('admin.company_deletion.final.title', 'Final Confirmation')}</AlertTitle>
-                <AlertDescription className="text-red-700">
+              <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertTitle className="text-red-800 dark:text-red-300">{t('admin.company_deletion.final.title', 'Final Confirmation')}</AlertTitle>
+                <AlertDescription className="text-red-700 dark:text-red-400">
                   {t('admin.company_deletion.final.description', 'You are about to permanently delete {{name}} and all its data. This action is irreversible and will immediately remove all associated information.', { name: companyName })}
                 </AlertDescription>
               </Alert>
 
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">{t('admin.company_deletion.final.consequences_title', 'What happens next')}:</h4>
-                <ul className="text-sm space-y-1 text-gray-700">
+                <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
                   <li>• {t('admin.company_deletion.final.consequence_users', 'All user accounts will be deleted')}</li>
                   <li>• {t('admin.company_deletion.final.consequence_conversations', 'All conversations and messages will be removed')}</li>
                   <li>• {t('admin.company_deletion.final.consequence_contacts', 'All contacts and their data will be deleted')}</li>
@@ -315,7 +315,7 @@ export function CompanyDeletionDialog({
                   variant="destructive"
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
                 >
                   {isDeleting ? (
                     <>

@@ -638,6 +638,7 @@ export default function PaymentsPage() {
                         <SelectItem value="all">{t('admin.payments.transactions.filter.all_methods', 'All Methods')}</SelectItem>
                         <SelectItem value="stripe">Stripe</SelectItem>
                         <SelectItem value="paypal">PayPal</SelectItem>
+                        <SelectItem value="paystack">Paystack</SelectItem>
                         <SelectItem value="mercadopago">Mercado Pago</SelectItem>
                         <SelectItem value="moyasar">Moyasar</SelectItem>
                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
@@ -1176,6 +1177,7 @@ export default function PaymentsPage() {
                     <SelectContent>
                       <SelectItem value="stripe">Stripe</SelectItem>
                       <SelectItem value="paypal">PayPal</SelectItem>
+                    <SelectItem value="paystack">Paystack</SelectItem>
                       <SelectItem value="mercado_pago">Mercado Pago</SelectItem>
                       <SelectItem value="moyasar">Moyasar</SelectItem>
                       <SelectItem value="bank_transfer">Bank Transfer</SelectItem>

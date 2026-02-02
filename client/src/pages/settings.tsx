@@ -8,9 +8,12 @@ import { ScrollableTabs } from "@/components/ui/scrollable-tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useGeneralSettings } from '@/hooks/use-general-settings';
+import { Switch } from '@/components/ui/switch';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { TwilioIcon } from '@/components/icons/TwilioIcon';
 import { useAvailablePlans, Plan } from "@/hooks/use-available-plans";
@@ -41,7 +44,8 @@ import {
   Key,
   Plus,
   Trash,
-  Edit
+  Edit,
+  Paintbrush
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -58,18 +62,17 @@ import { WhatsAppEmbeddedSignup } from '@/components/settings/WhatsAppEmbeddedSi
 import { WhatsAppBusinessApiForm } from '@/components/settings/WhatsAppBusinessApiForm';
 import { MetaWhatsAppIntegratedOnboarding } from '@/components/settings/MetaWhatsAppIntegratedOnboarding';
 import { ApiAccessTab } from '@/components/settings/ApiAccessTab';
-import { WhatsAppTwilioForm } from '@/components/settings/WhatsAppTwilioForm';
-import { Unified360DialogSetup } from '@/components/settings/Unified360DialogSetup';
 import { InstagramConnectionForm } from '@/components/settings/InstagramConnectionForm';
 import { TwilioSmsConnectionForm } from '@/components/settings/TwilioSmsConnectionForm';
 import { EnhancedInstagramConnectionForm } from '@/components/settings/EnhancedInstagramConnectionForm';
 import { MessengerConnectionForm } from '@/components/settings/MessengerConnectionForm';
+import { MessengerEmbeddedSignup } from '@/components/settings/MessengerEmbeddedSignup';
+import { InstagramEmbeddedSignup } from '@/components/settings/InstagramEmbeddedSignup';
 import { TikTokConnectionForm } from '@/components/settings/TikTokConnectionForm';
 import { TelegramConnectionForm } from '@/components/settings/TelegramConnectionForm';
 import { TeamMembersList } from '@/components/settings/TeamMembersList';
 import { RolesAndPermissions } from '@/components/settings/RolesAndPermissions';
 import { SmtpConfiguration } from '@/components/settings/SmtpConfiguration';
-import { PartnerConfigurationForm } from '@/components/settings/PartnerConfigurationForm';
 import { TikTokPlatformConfigForm } from '@/components/settings/TikTokPlatformConfigForm';
 import { WhatsAppBehaviorSettings } from '@/components/settings/WhatsAppBehaviorSettings';
 import { InboxSettings } from '@/components/settings/InboxSettings';
@@ -80,6 +83,8 @@ import { EditMessengerConnectionForm } from '@/components/settings/EditMessenger
 import { EditInstagramConnectionForm } from '@/components/settings/EditInstagramConnectionForm';
 import { EditTikTokConnectionForm } from '@/components/settings/EditTikTokConnectionForm';
 import { EditTwilioSmsConnectionForm } from '@/components/settings/EditTwilioSmsConnectionForm';
+import { TwilioVoiceConnectionForm } from '@/components/settings/TwilioVoiceConnectionForm';
+import { EditTwilioVoiceConnectionForm } from '@/components/settings/EditTwilioVoiceConnectionForm';
 import { WebChatConnectionForm } from '@/components/settings/WebChatConnectionForm';
 import { EditWebChatConnectionForm } from '@/components/settings/EditWebChatConnectionForm';
 import ConnectionControl from '@/components/whatsapp/ConnectionControl';
@@ -116,6 +121,127 @@ interface ChannelConnection {
   updatedAt: string;
 }
 
+function GeneralSettingsTab() {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const [autoAddToPipeline, setAutoAddToPipeline] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+
+  const { data: companySetting, refetch: refetchCompanySetting } = useQuery({
+    queryKey: ['/api/company-settings/auto-add-to-pipeline'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/company-settings/auto-add-to-pipeline');
+      if (!res.ok) {
+        throw new Error('Failed to fetch setting');
+      }
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (companySetting) {
+      setAutoAddToPipeline(companySetting.autoAddContactToPipeline || false);
+      setIsLoading(false);
+    }
+  }, [companySetting]);
+
+  const saveCompanySettingMutation = useMutation({
+    mutationFn: async (value: boolean) => {
+      const res = await apiRequest('POST', '/api/company-settings/auto-add-to-pipeline', {
+        autoAddContactToPipeline: value
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to save setting');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/company-settings/auto-add-to-pipeline'] });
+      refetchCompanySetting();
+      toast({
+        title: t('settings.general_settings_saved', 'General Settings Saved'),
+        description: t('settings.general_settings_saved_success', 'The setting has been saved successfully.'),
+      });
+      setIsSaving(false);
+    },
+    onError: (error: any) => {
+      console.error('Error saving setting:', error);
+      toast({
+        title: t('settings.error_saving', 'Error Saving Settings'),
+        description: error.message,
+        variant: 'destructive'
+      });
+      setIsSaving(false);
+    }
+  });
+
+  const handleSave = () => {
+    setIsSaving(true);
+    saveCompanySettingMutation.mutate(autoAddToPipeline);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('settings.general_settings.title', 'General Settings')}</CardTitle>
+        <CardDescription>
+          {t('settings.general_settings.description', 'Configure general application behavior')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium mb-4">{t('settings.general_settings.pipeline_settings', 'Pipeline Settings')}</h3>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1 flex-1">
+                    <Label htmlFor="auto-add-pipeline" className="text-base font-medium">
+                      {t('settings.general_settings.auto_add_to_pipeline', 'Auto-add contacts to pipeline')}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.general_settings.auto_add_to_pipeline_description', 'Automatically create a deal in the initial pipeline stage when a new contact is created')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-add-pipeline"
+                    checked={autoAddToPipeline}
+                    onCheckedChange={setAutoAddToPipeline}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || saveCompanySettingMutation.isPending}
+              >
+                {isSaving || saveCompanySettingMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('settings.saving', 'Saving...')}
+                  </>
+                ) : (
+                  t('settings.save', 'Save')
+                )}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [location] = useLocation();
   const { t } = useTranslation();
@@ -138,21 +264,29 @@ export default function Settings() {
   const [showBusinessApiModal, setShowBusinessApiModal] = useState(false);
   const [showEmbeddedSignupModal, setShowEmbeddedSignupModal] = useState(false);
   const [showMetaIntegratedOnboardingModal, setShowMetaIntegratedOnboardingModal] = useState(false);
-  const [showTwilioModal, setShowTwilioModal] = useState(false);
-  const [showUnified360DialogSetup, setShowUnified360DialogSetup] = useState(false);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [showEnhancedInstagramModal, setShowEnhancedInstagramModal] = useState(false);
   const [showMessengerModal, setShowMessengerModal] = useState(false);
+  const [showMessengerEmbeddedSignupModal, setShowMessengerEmbeddedSignupModal] = useState(false);
+  const [showInstagramEmbeddedSignupModal, setShowInstagramEmbeddedSignupModal] = useState(false);
   const [showTikTokModal, setShowTikTokModal] = useState(false);
   const [showTelegramModal, setShowTelegramModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showTwilioSmsModal, setShowTwilioSmsModal] = useState(false);
+  const [showTwilioVoiceModal, setShowTwilioVoiceModal] = useState(false);
+  const [showEditTwilioVoiceModal, setShowEditTwilioVoiceModal] = useState(false);
+  const [editTwilioVoiceConnectionId, setEditTwilioVoiceConnectionId] = useState<number | null>(null);
   const [showWebChatModal, setShowWebChatModal] = useState(false);
   const [showPartnerConfigModal, setShowPartnerConfigModal] = useState(false);
   const [showTikTokPlatformConfigModal, setShowTikTokPlatformConfigModal] = useState(false);
   const [isUpdatingCredentials, setIsUpdatingCredentials] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
+  const [customCssForm, setCustomCssForm] = useState({
+    enabled: false,
+    css: '',
+    lastModified: ''
+  });
   const { toast } = useToast();
 
   const { plans, isLoading: isLoadingPlans } = useAvailablePlans();
@@ -222,6 +356,60 @@ export default function Settings() {
     enabled: googleCalendarCredentials?.configured === true
   });
 
+
+  const { data: companyCssData } = useQuery({
+    queryKey: ['/api/company-settings/custom-css'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/company-settings/custom-css');
+      if (!res.ok) {
+        return {
+          enabled: false,
+          css: '',
+          lastModified: new Date().toISOString()
+        };
+      }
+      return res.json();
+    },
+    enabled: currentUser?.role === 'admin' || currentUser?.isSuperAdmin,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (companyCssData) {
+      setCustomCssForm({
+        enabled: companyCssData.enabled || false,
+        css: companyCssData.css || '',
+        lastModified: companyCssData.lastModified || ''
+      });
+    }
+  }, [companyCssData]);
+
+  const saveCustomCssMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/company-settings/custom-css', customCssForm);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to save custom CSS settings');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/company-settings/custom-css'] });
+      toast({
+        title: t('settings.custom_css_saved', 'Custom CSS settings saved'),
+        description: t('settings.custom_css_saved_success', 'Custom CSS configuration has been saved successfully.')
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t('settings.error_saving', 'Error Saving Settings'),
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
   const disconnectGoogleCalendarMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/google/calendar/disconnect');
@@ -273,7 +461,12 @@ export default function Settings() {
   }, [fetchedConnections]);
 
   const handleConnectionSuccess = () => {
+    
+
     queryClient.invalidateQueries({ queryKey: ['/api/channel-connections'] });
+    refetchConnections().catch(() => {
+
+    });
   };
 
   const handleSaveAccount = () => {
@@ -368,6 +561,10 @@ export default function Settings() {
   const [renameConnectionId, setRenameConnectionId] = useState<number | null>(null);
   const [newChannelName, setNewChannelName] = useState('');
 
+  const [disconnectConnectionId, setDisconnectConnectionId] = useState<number | null>(null);
+  const [isDisconnectingEmbedded, setIsDisconnectingEmbedded] = useState(false);
+  const [showDisconnectWarning, setShowDisconnectWarning] = useState(false);
+
   const [showEditEmailModal, setShowEditEmailModal] = useState(false);
   const [editEmailConnectionId, setEditEmailConnectionId] = useState<number | null>(null);
 
@@ -450,7 +647,6 @@ export default function Settings() {
         }
 
         else if (data.type === 'whatsappConnectionError' && currentActiveConnectionId && data.connectionId === currentActiveConnectionId) {
-          console.error('WhatsApp connection error:', data.error);
           setConnectionStatus('error');
           toast({
             title: t('settings.connection_error', 'Connection Error'),
@@ -459,7 +655,7 @@ export default function Settings() {
           });
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+
       }
     };
 
@@ -486,8 +682,8 @@ export default function Settings() {
 
           newSocket.onmessage = handleWebSocketMessage;
 
-          newSocket.onerror = (error) => {
-            console.error('WebSocket error:', error);
+          newSocket.onerror = () => {
+
           };
 
           newSocket.onclose = () => {
@@ -499,8 +695,6 @@ export default function Settings() {
           socketRef.current = newSocket;
         }, reconnectInterval);
       } else {
-        console.error('Max reconnection attempts reached');
-
         setTimeout(() => {
           reconnectAttempts = 0;
         }, 60000);
@@ -520,8 +714,8 @@ export default function Settings() {
 
     socket.onmessage = handleWebSocketMessage;
 
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    socket.onerror = () => {
+
     };
 
     socket.onclose = () => {
@@ -553,14 +747,16 @@ export default function Settings() {
         setShowBusinessApiModal(true);
       } else if (channelType === 'WhatsApp Business Embedded') {
         setShowEmbeddedSignupModal(true);
-      } else if (channelType === 'WhatsApp Business API (Twilio)') {
-        setShowTwilioModal(true);
-      } else if (channelType === 'WhatsApp Business API (360Dialog)') {
-        setShowUnified360DialogSetup(true);
       } else if (channelType === 'Instagram') {
         setShowInstagramModal(true);
+      } else if (channelType === 'Instagram Embedded') {
+        setShowInstagramEmbeddedSignupModal(true);
       } else if (channelType === 'Messenger') {
         setShowMessengerModal(true);
+      } else if (channelType === 'Messenger Embedded') {
+        setShowMessengerEmbeddedSignupModal(true);
+      } else if (channelType === 'Twilio Calls') {
+        setShowTwilioVoiceModal(true);
       } else if (channelType === 'Twilio SMS') {
         setShowTwilioSmsModal(true);
       } else if (channelType === 'TikTok') {
@@ -579,7 +775,6 @@ export default function Settings() {
         });
       }
     } catch (error: any) {
-      console.error('Error connecting to channel:', error);
       toast({
         title: "Connection Error",
         description: error.message || "Failed to connect to channel",
@@ -591,6 +786,7 @@ export default function Settings() {
 
   const generateQRCode = async (isManual: boolean = false, connectionId?: number) => {
     let targetConnectionId = connectionId || activeConnectionId;
+    let connectionJustCreated = false;
     
 
     if (!targetConnectionId) {
@@ -606,6 +802,7 @@ export default function Settings() {
             accountName: 'WhatsApp Personal',
             proxyServerId: selectedProxyId,
             connectionData: {}
+
           })
         });
 
@@ -616,6 +813,9 @@ export default function Settings() {
         const connection = await response.json();
         targetConnectionId = connection.id;
         setActiveConnectionId(connection.id);
+
+        activeConnectionIdRef.current = connection.id;
+        connectionJustCreated = true;
       } catch (error: any) {
         toast({
           title: t('settings.error', 'Error'),
@@ -648,7 +848,6 @@ export default function Settings() {
 
           queryClient.invalidateQueries({ queryKey: ['/api/channel-connections'] });
         } catch (error: any) {
-          console.error('Error updating proxy selection:', error);
 
         }
       }
@@ -694,16 +893,19 @@ export default function Settings() {
       setQrGenerationTimeout(timeout);
 
 
-      const response = await fetch(`/api/whatsapp/connect/${targetConnectionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to connect to WhatsApp');
+      if (!connectionJustCreated) {
+        const response = await fetch(`/api/whatsapp/connect/${targetConnectionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to connect to WhatsApp');
+        }
       }
 
 
@@ -716,7 +918,6 @@ export default function Settings() {
         });
       }
     } catch (error: any) {
-      console.error('Error connecting to WhatsApp:', error);
       setConnectionStatus('error');
       setAwaitingManualQr(false);setQrGenerationInProgress(false);
 
@@ -773,9 +974,7 @@ export default function Settings() {
         description: t('settings.generating_new_qr', 'Generating a new QR code...'),
       });
 
-
     } catch (error: any) {
-      console.error('Error refreshing QR code:', error);
       setConnectionStatus('error');
       toast({
         title: t('settings.refresh_failed', 'Refresh Failed'),
@@ -802,12 +1001,46 @@ export default function Settings() {
         description: "The channel has been disconnected successfully",
       });
     } catch (error: any) {
-      console.error('Error disconnecting channel:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to disconnect channel",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleDisconnectEmbeddedSignup = async (connectionId: number) => {
+    try {
+      setIsDisconnectingEmbedded(true);
+
+      const response = await fetch(`/api/channel-connections/${connectionId}/disconnect-embedded-signup`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to disconnect WhatsApp number');
+      }
+
+      const result = await response.json();
+
+      queryClient.invalidateQueries({ queryKey: ['/api/channel-connections'] });
+
+      toast({
+        title: "WhatsApp Number Disconnected",
+        description: result.message || "WhatsApp number disconnected successfully",
+      });
+
+      setShowDisconnectWarning(false);
+      setDisconnectConnectionId(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to disconnect WhatsApp number",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDisconnectingEmbedded(false);
     }
   };
 
@@ -832,7 +1065,6 @@ export default function Settings() {
         description: "The channel connection has been permanently deleted",
       });
     } catch (error: any) {
-      console.error('Error deleting channel:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to delete channel connection",
@@ -861,13 +1093,7 @@ export default function Settings() {
       }
       
       setShowQrModal(true);
-      
-
-
-      
     } catch (error) {
-      console.error('Error opening reconnect modal:', error);
-
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : 'An error occurred',
@@ -915,7 +1141,6 @@ export default function Settings() {
         });
       }
     } catch (error: any) {
-      console.error('Error connecting email channel:', error);
       toast({
         title: "Connection Error",
         description: error.message || "Failed to connect email channel",
@@ -970,6 +1195,11 @@ export default function Settings() {
     setShowEditTwilioSmsModal(true);
   };
 
+  const handleOpenEditTwilioVoiceModal = (connectionId: number) => {
+    setEditTwilioVoiceConnectionId(connectionId);
+    setShowEditTwilioVoiceModal(true);
+  };
+
   const handleOpenEditWebChatModal = (connectionId: number) => {
     setEditWebChatConnectionId(connectionId);
     setShowEditWebChatModal(true);
@@ -1001,7 +1231,7 @@ export default function Settings() {
           setProxyServers(proxies);
         }
       } catch (e) {
-        console.error('Failed to load proxy servers:', e);
+
       } finally {
         setIsLoadingProxies(false);
       }
@@ -1015,7 +1245,9 @@ export default function Settings() {
       apiRequest('GET', '/api/whatsapp-proxy-servers')
         .then(res => res.json())
         .then(proxies => setProxyServers(proxies))
-        .catch(err => console.error('Failed to load proxies:', err));
+        .catch(() => {
+
+        });
     }
   }, [showQrModal]);
 
@@ -1191,7 +1423,6 @@ export default function Settings() {
         description: "The channel has been renamed successfully",
       });
     } catch (error: any) {
-      console.error('Error renaming channel:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to rename channel",
@@ -1211,9 +1442,11 @@ export default function Settings() {
       case 'instagram':
         return { icon: 'ri-instagram-line', color: '#E4405F', name: 'Instagram' };
       case 'tiktok':
-        return { icon: 'ri-tiktok-line', color: '#000000', name: 'TikTok Business' };
+        return { icon: 'ri-tiktok-line dark:text-white', color: '#000000', name: 'TikTok Business' };
       case 'telegram':
         return { icon: 'ri-telegram-line', color: '#0088CC', name: 'Telegram' };
+      case 'twilio_voice':
+        return { icon: <TwilioIcon className="h-6 w-6 sm:h-6 sm:w-6 mb-2" style={{ color: '#F22F46' }} />, color: '#F22F46', name: 'Twilio Calls' };
       case 'twilio_sms':
         return { icon: <TwilioIcon className="h-6 w-6 sm:h-6 sm:w-6 mb-2" style={{ color: '#F22F46' }} />, color: '#F22F46', name: 'Twilio SMS' };
       case 'email':
@@ -1223,7 +1456,13 @@ export default function Settings() {
       default:
         return { icon: 'ri-message-3-line', color: '#333235', name: 'Chat' };
     }
-  };  const handleQrModalClose = async () => {    setQrGenerationInProgress(false);
+  };
+
+  const isEmbeddedSignupConnection = (connection: ChannelConnection): boolean => {
+    return connection.channelType === 'whatsapp_official' && (connection.connectionData as any)?.partnerManaged === true;
+  };
+
+  const handleQrModalClose = async () => {    setQrGenerationInProgress(false);
     setQrRetryCount(0);
     
 
@@ -1256,14 +1495,13 @@ export default function Settings() {
           queryClient.invalidateQueries({ queryKey: ['/api/channel-connections'] });
         }
       } catch (error) {
-        console.error('Error cleaning up WhatsApp connection:', error);
         try {
           await fetch(`/api/whatsapp/disconnect/${activeConnectionId}`, {
             method: 'POST'
           });
           queryClient.invalidateQueries({ queryKey: ['/api/channel-connections'] });
         } catch (disconnectError) {
-          console.error('Error disconnecting WhatsApp:', disconnectError);
+
         }
       }
     }
@@ -1283,7 +1521,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Dialog open={showRenameModal} onOpenChange={setShowRenameModal}>
         <DialogContent className="w-[95vw] max-w-md mx-auto">
           <DialogHeader>
@@ -1328,6 +1566,57 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showDisconnectWarning} onOpenChange={setShowDisconnectWarning}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">Disconnect WhatsApp Number?</DialogTitle>
+            <DialogDescription className="text-sm">
+              <div className="space-y-2 mt-2">
+                <p>Disconnecting will permanently deregister the phone number from WhatsApp Business API.</p>
+                <p>Messaging via this number will stop immediately after disconnection.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowDisconnectWarning(false);
+                setDisconnectConnectionId(null);
+              }}
+              className="w-full sm:w-auto"
+              disabled={isDisconnectingEmbedded}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                if (disconnectConnectionId) {
+                  handleDisconnectEmbeddedSignup(disconnectConnectionId);
+                }
+              }}
+              className="w-full sm:w-auto"
+              disabled={isDisconnectingEmbedded || !disconnectConnectionId}
+            >
+              {isDisconnectingEmbedded ? (
+                <>
+                  <span className="mr-2">Disconnecting...</span>
+                  <svg className="animate-spin h-4 w-4 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </>
+              ) : (
+                'Disconnect'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showCredentialsModal} onOpenChange={setShowCredentialsModal}>
         <DialogContent className="w-[95vw] max-w-lg mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1357,7 +1646,7 @@ export default function Settings() {
                         />
                       </FormControl>
                       <FormMessage />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Client ID from Google Cloud Console OAuth credentials
                       </p>
                     </FormItem>
@@ -1379,7 +1668,7 @@ export default function Settings() {
                         />
                       </FormControl>
                       <FormMessage />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Client Secret from Google Cloud Console OAuth credentials
                       </p>
                     </FormItem>
@@ -1400,14 +1689,14 @@ export default function Settings() {
                         />
                       </FormControl>
                       <FormMessage />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         This should match the authorized redirect URI in your Google Cloud Console
                       </p>
                     </FormItem>
                   )}
                 />
 
-                <div className="pt-2 border-t border-gray-100">
+                <div className="pt-2 border-t border-border">
                   <Alert className="mb-4 bg-amber-50 border-amber-200">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Important</AlertTitle>
@@ -1498,7 +1787,7 @@ export default function Settings() {
               </DialogHeader>
 
               {!connectionStatus && (
-                <div className="px-4 py-3 bg-gray-50 rounded-lg">
+                <div className="px-4 py-3 bg-muted/30 rounded-lg">
                   <Label htmlFor="proxySelector" className="text-sm font-medium mb-2 block">
                     Proxy Server (optional)
                   </Label>
@@ -1515,7 +1804,7 @@ export default function Settings() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Select a proxy server to route this connection through, or use direct connection.
                   </p>
                 </div>
@@ -1524,13 +1813,13 @@ export default function Settings() {
               <div className="flex justify-center items-center py-4">
                 {!connectionStatus && (
                   <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
+                      <svg className="w-8 h-8 text-muted-foreground/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                       </svg>
                     </div>
                     <p className="mb-4 text-lg font-medium">{t('settings.ready_to_connect', 'Ready to Connect')}</p>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <p className="text-sm text-muted-foreground mb-4">
                       {t('settings.select_proxy_and_connect', 'Select a proxy server (optional) and click "Generate QR Code" to start the connection process')}
                     </p>
                   </div>
@@ -1541,11 +1830,11 @@ export default function Settings() {
                     <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
                     <p className="mb-4">{t('settings.preparing_connection', 'Preparing WhatsApp connection...')}</p>
                     {qrGenerationInProgress && (
-                      <p className="text-sm text-blue-600 mb-2">
+                      <p className="text-sm text-primary mb-2">
                         {t('settings.generating_qr_progress', 'Generating QR code... Please wait')}
                       </p>
                     )}
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {t('settings.qr_delay_message', 'If QR code doesn\'t appear automatically, use the Generate QR Code button below')}
                     </p>
                   </div>
@@ -1555,7 +1844,7 @@ export default function Settings() {
                   <div className="text-center py-8">
                     <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
                     <p className="text-lg font-medium mb-2">{t('settings.qr_not_received', 'QR Code Not Received')}</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {t('settings.qr_generation_issue', 'The QR code is taking longer than expected. Use the Generate QR Code button below.')}
                     </p>
                   </div>
@@ -1566,11 +1855,11 @@ export default function Settings() {
                     <div className="border-8 border-white inline-block rounded-lg shadow-md">
                       {memoizedWhatsAppQR}
                     </div>
-                    <div className="mt-4 mb-2 flex items-center justify-center gap-2 text-sm text-amber-600 bg-amber-50 py-2 px-4 rounded-lg mx-4">
+                    <div className="mt-4 mb-2 flex items-center justify-center gap-2 text-sm  bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900 rounded-md py-2 px-4 rounded-lg mx-4">
                       <AlertTriangle className="h-4 w-4" />
                       <span>{t('settings.qr_expires', 'QR code expires after 30 seconds. Use Generate QR Code button if needed.')}</span>
                     </div>
-                    <p className="mt-3 text-sm text-gray-500 px-2">
+                    <p className="mt-3 text-sm text-muted-foreground px-2">
                       {t('settings.whatsapp_scan_steps_1', '1. Open WhatsApp on your phone')}<br />
                       {t('settings.whatsapp_scan_steps_2', '2. Tap Menu or Settings and select WhatsApp Web')}<br />
                       {t('settings.whatsapp_scan_steps_3', '3. Point your phone to this screen to scan the code')}
@@ -1580,16 +1869,16 @@ export default function Settings() {
 
                 {connectionStatus === 'connected' && (
                   <div className="text-center py-8">
-                    <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                    <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-500 mx-auto mb-4" />
                     <p className="text-lg font-medium">{t('settings.connection_successful', 'Connection Successful!')}</p>
                   </div>
                 )}
 
                 {connectionStatus === 'error' && (
                   <div className="text-center py-8">
-                    <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                    <p className="text-lg font-medium text-red-600">{t('settings.connection_failed', 'Connection Failed')}</p>
-                    <p className="text-sm text-gray-500 mt-2">{t('settings.try_again', 'Please try again')}</p>
+                    <XCircle className="h-16 w-16 text-red-500 dark:text-red-400 mx-auto mb-4" />
+                    <p className="text-lg font-medium text-red-600 dark:text-red-400">{t('settings.connection_failed', 'Connection Failed')}</p>
+                    <p className="text-sm text-muted-foreground mt-2">{t('settings.try_again', 'Please try again')}</p>
                   </div>
                 )}
               </div>
@@ -1616,7 +1905,7 @@ export default function Settings() {
                   <Button 
                     onClick={handleManualConnect}
                     disabled={qrGenerationInProgress}
-                    className="gap-2 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="gap-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`h-4 w-4 ${qrGenerationInProgress ? 'animate-spin' : ''}`} />
                     {qrGenerationInProgress ? t('settings.generating', 'Generating...') : t('settings.generate_qr', 'Generate QR Code')}
@@ -1626,7 +1915,7 @@ export default function Settings() {
                   <Button 
                     onClick={handleManualConnect}
                     disabled={qrGenerationInProgress}
-                    className="gap-2 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="gap-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`h-4 w-4 ${qrGenerationInProgress ? 'animate-spin' : ''}`} />
                     {qrGenerationInProgress ? t('settings.generating', 'Generating...') : t('settings.generate_qr', 'Generate QR Code')}
@@ -1645,7 +1934,7 @@ export default function Settings() {
                   <Button 
                     onClick={handleManualConnect}
                     disabled={qrGenerationInProgress}
-                    className="gap-2 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="gap-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`h-4 w-4 ${qrGenerationInProgress ? 'animate-spin' : ''}`} />
                     {qrGenerationInProgress ? t('settings.generating', 'Generating...') : t('settings.generate_qr', 'Generate QR Code')}
@@ -1774,36 +2063,9 @@ export default function Settings() {
             onSuccess={handleConnectionSuccess}
           />
 
-          {/* WhatsApp Twilio Modal */}
-          <WhatsAppTwilioForm
-            isOpen={showTwilioModal}
-            onClose={() => setShowTwilioModal(false)}
-            onSuccess={handleConnectionSuccess}
-          />
-
-          {/* Unified 360Dialog Setup Modal */}
-          <Unified360DialogSetup
-            isOpen={showUnified360DialogSetup}
-            onClose={() => setShowUnified360DialogSetup(false)}
-            onSuccess={handleConnectionSuccess}
-          />
-
           {/* Partner Configuration Modal - Super Admin Only */}
           {currentUser?.isSuperAdmin && (
             <>
-              <PartnerConfigurationForm
-                isOpen={showPartnerConfigModal}
-                onClose={() => setShowPartnerConfigModal(false)}
-                onSuccess={() => {
-
-                  toast({
-                    title: "Success",
-                    description: "Partner configuration updated successfully",
-                  });
-                }}
-                provider="360dialog"
-              />
-
               <TikTokPlatformConfigForm
                 isOpen={showTikTokPlatformConfigModal}
                 onClose={() => setShowTikTokPlatformConfigModal(false)}
@@ -1842,6 +2104,20 @@ export default function Settings() {
           <MessengerConnectionForm
             isOpen={showMessengerModal}
             onClose={() => setShowMessengerModal(false)}
+            onSuccess={handleConnectionSuccess}
+          />
+
+          {/* Messenger Embedded Signup Modal */}
+          <MessengerEmbeddedSignup
+            isOpen={showMessengerEmbeddedSignupModal}
+            onClose={() => setShowMessengerEmbeddedSignupModal(false)}
+            onSuccess={handleConnectionSuccess}
+          />
+
+          {/* Instagram Embedded Signup Modal */}
+          <InstagramEmbeddedSignup
+            isOpen={showInstagramEmbeddedSignupModal}
+            onClose={() => setShowInstagramEmbeddedSignupModal(false)}
             onSuccess={handleConnectionSuccess}
           />
 
@@ -2010,6 +2286,10 @@ export default function Settings() {
                     <span className="hidden sm:inline">WhatsApp Proxy</span>
                     <span className="sm:hidden">Proxy</span>
                   </TabsTrigger>
+                  <TabsTrigger value="general" className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3 flex-shrink-0">
+                    <span className="hidden sm:inline">{t('settings.tabs.general_settings', 'General Settings')}</span>
+                    <span className="sm:hidden">{t('settings.tabs.general', 'General')}</span>
+                  </TabsTrigger>
 
                   <TabsTrigger value="billing" className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3 flex-shrink-0">
                     <span className="hidden sm:inline">{t('settings.tabs.billing', 'Billing')}</span>
@@ -2031,6 +2311,13 @@ export default function Settings() {
                     <span className="hidden sm:inline">{t('settings.tabs.ai_usage', 'AI Usage')}</span>
                     <span className="sm:hidden">{t('settings.tabs.usage', 'Usage')}</span>
                   </TabsTrigger>
+                  {(currentUser?.role === 'admin' || currentUser?.isSuperAdmin) && (
+                    <TabsTrigger value="custom-css" className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3 flex-shrink-0">
+                      <Paintbrush className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">{t('settings.tabs.custom_css', 'Custom CSS')}</span>
+                      <span className="sm:hidden">CSS</span>
+                    </TabsTrigger>
+                  )}
                   {currentUser?.isSuperAdmin && (
                     <TabsTrigger value="platform" className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3 flex-shrink-0">
                       <span className="hidden sm:inline">{t('settings.tabs.platform', 'Platform')}</span>
@@ -2061,30 +2348,30 @@ export default function Settings() {
                           const channelInfo = getChannelInfo(connection.channelType);
 
                           return (
-                            <div key={connection.id} className="border border-gray-200 rounded-lg p-3 sm:p-4">
+                            <div key={connection.id} className="border border-border rounded-lg p-3 sm:p-4">
                               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                                 <div className="flex items-center">
                                   {typeof channelInfo.icon === 'string' ? (
                                     <i
                                       className={channelInfo.icon + " text-xl sm:text-2xl mr-3"}
-                                      style={{ color: channelInfo.color }}
+                                      style={channelInfo.icon.includes('tiktok') ? undefined : { color: channelInfo.color }}
                                     />
                                   ) : (
-                                    <span className="text-xl sm:text-2xl mr-3" style={{ color: channelInfo.color }}>
+                                    <span className="text-xl sm:text-2xl mr-3">
                                       {channelInfo.icon}
                                     </span>
                                   )}
                                   <div>
                                     <h4 className="font-medium text-sm sm:text-base">{connection.accountName}</h4>
-                                    <p className="text-xs sm:text-sm text-gray-500">{channelInfo.name}</p>
-                                    <p className="text-xs text-gray-500">{connection.accountId}</p>
+                                    <p className="text-xs sm:text-sm text-muted-foreground">{channelInfo.name}</p>
+                                    <p className="text-xs text-muted-foreground">{connection.accountId}</p>
                                     {connection.channelType === 'whatsapp_unofficial' && (() => {
                                       if (connection.proxyServerId) {
                                         const proxyServer = proxyServers.find(p => p.id === connection.proxyServerId);
                                         if (proxyServer) {
                                           return (
                                             <div className="flex items-center gap-1 mt-1">
-                                              <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">
+                                              <Badge variant="outline" className="text-xs bg-primary/10 dark:bg-primary/20 border-primary/30 text-primary dark:text-primary/90">
                                                 <i className="ri-shield-line mr-1"></i>
                                                 Proxy: {proxyServer.name} ({proxyServer.type.toUpperCase()})
                                               </Badge>
@@ -2094,7 +2381,7 @@ export default function Settings() {
                                       } else {
                                         return (
                                           <div className="flex items-center gap-1 mt-1">
-                                            <Badge variant="outline" className="text-xs bg-gray-50 border-gray-200 text-gray-600">
+                                            <Badge variant="outline" className="text-xs bg-muted/30 border-border text-muted-foreground">
                                               <i className="ri-global-line mr-1"></i>
                                               Direct Connection
                                             </Badge>
@@ -2104,27 +2391,27 @@ export default function Settings() {
                                       return null;
                                     })()}
                                     {connection.channelType === 'email' && connection.lastSyncAt && (
-                                      <p className="text-xs text-gray-400">
+                                      <p className="text-xs text-muted-foreground/70">
                                         Last sync: {new Date(connection.lastSyncAt).toLocaleString()}
                                       </p>
                                     )}
                                     {connection.channelType === 'tiktok' && connection.connectionData && (
                                       <div className="mt-1 space-y-1">
                                         {connection.connectionData.displayName && (
-                                          <p className="text-xs text-gray-600">
+                                          <p className="text-xs text-muted-foreground">
                                             {connection.connectionData.displayName}
                                             {connection.connectionData.isVerified && (
-                                              <span className="ml-1 text-blue-500">âœ“</span>
+                                              <span className="ml-1 text-blue-500 dark:text-blue-400">âœ"</span>
                                             )}
                                           </p>
                                         )}
                                         {connection.connectionData.username && (
-                                          <p className="text-xs text-gray-500">
+                                          <p className="text-xs text-muted-foreground">
                                             @{connection.connectionData.username}
                                           </p>
                                         )}
                                         {connection.connectionData.lastSyncAt && (
-                                          <p className="text-xs text-gray-400">
+                                          <p className="text-xs text-muted-foreground/70">
                                             Last sync: {new Date(connection.connectionData.lastSyncAt).toLocaleString()}
                                           </p>
                                         )}
@@ -2135,7 +2422,7 @@ export default function Settings() {
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
 
                                   <div className="flex flex-wrap gap-2 items-center">
-                                    {(connection.channelType === 'whatsapp_unofficial' || connection.channelType === 'whatsapp_official' || connection.channelType === 'whatsapp_twilio' || connection.channelType === 'whatsapp_360dialog') && (() => {
+                                    {(connection.channelType === 'whatsapp_unofficial' || connection.channelType === 'whatsapp_official') && (() => {
                                       return (
                                         <ConnectionControl
                                           connectionId={connection.id}
@@ -2153,7 +2440,7 @@ export default function Settings() {
                                       <Button
                                         variant="brand"
                                         size="sm"
-                                        className="btn-brand-primary text-green-500 hover:text-green-700 text-xs sm:text-sm"
+                                        className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
                                         onClick={() => handleOpenEditEmailModal(connection.id)}
                                       >
                                         <span className="hidden sm:inline">Edit</span>
@@ -2186,12 +2473,12 @@ export default function Settings() {
                                       </Button>
                                     )}
 
-                                    {/* Edit button for WhatsApp Business API channels */}
-                                    {connection.channelType === 'whatsapp_official' && (
+                                    {/* Edit button for WhatsApp Business API channels - Hide for partner-managed (embedded signup) connections */}
+                                    {connection.channelType === 'whatsapp_official' && !(connection.connectionData as any)?.partnerManaged && (
                                       <Button
                                         variant="brand"
                                         size="sm"
-                                        className="btn-brand-primary text-green-500 hover:text-green-700 text-xs sm:text-sm"
+                                        className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
                                         onClick={() => handleOpenEditWhatsAppModal(connection.id)}
                                       >
                                         <span className="hidden sm:inline">Edit</span>
@@ -2205,7 +2492,7 @@ export default function Settings() {
                                       <Button
                                         variant="brand"
                                         size="sm"
-                                        className="btn-brand-primary text-green-500 hover:text-green-700 text-xs sm:text-sm"
+                                        className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
                                         onClick={() => handleOpenEditMessengerModal(connection.id)}
                                       >
                                         <span className="hidden sm:inline">Edit</span>
@@ -2219,7 +2506,7 @@ export default function Settings() {
                                         <Button
                                           variant="brand"
                                           size="sm"
-                                          className="btn-brand-primary text-green-500 hover:text-green-700 text-xs sm:text-sm"
+                                          className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
                                           onClick={() => handleOpenEditWebChatModal(connection.id)}
                                         >
                                           <span className="hidden sm:inline">Edit</span>
@@ -2228,7 +2515,7 @@ export default function Settings() {
                                         <Button
                                           variant="brand"
                                           size="sm"
-                                          className="btn-brand-primary text-blue-500 hover:text-blue-700 text-xs sm:text-sm"
+                                          className="btn-brand-primary text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-500 text-xs sm:text-sm"
                                           onClick={() => handleCopyWebChatEmbed(connection.id)}
                                         >
                                           <span className="hidden sm:inline">Copy Embed</span>
@@ -2242,7 +2529,7 @@ export default function Settings() {
                                       <Button
                                         variant="brand"
                                         size="sm"
-                                        className="btn-brand-primary text-green-500 hover:text-green-700 text-xs sm:text-sm"
+                                        className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
                                         onClick={() => handleOpenEditInstagramModal(connection.id)}
                                       >
                                         <span className="hidden sm:inline">Edit</span>
@@ -2250,12 +2537,36 @@ export default function Settings() {
                                       </Button>
                                     )}
 
+                                    {/* Status badge for TikTok channels */}
+                                    {connection.channelType === 'tiktok' && (
+                                      <div className="flex items-center gap-2">
+                                        {connection.status === 'active' && (
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400">
+                                            <span className="w-2 h-2 mr-1 bg-green-500 dark:bg-green-400 rounded-full"></span>
+                                            Active
+                                          </span>
+                                        )}
+                                        {connection.status === 'error' && (
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400">
+                                            <span className="w-2 h-2 mr-1 bg-red-500 dark:bg-red-400 rounded-full"></span>
+                                            Error
+                                          </span>
+                                        )}
+                                        {connection.status === 'disconnected' && (
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                                            <span className="w-2 h-2 mr-1 bg-muted-foreground rounded-full"></span>
+                                            Disconnected
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+
                                     {/* Edit button for TikTok channels */}
                                     {connection.channelType === 'tiktok' && (
                                       <Button
                                         variant="brand"
                                         size="sm"
-                                        className="btn-brand-primary text-green-500 hover:text-green-700 text-xs sm:text-sm"
+                                        className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
                                         onClick={() => handleOpenEditTikTokModal(connection.id)}
                                       >
                                         <span className="hidden sm:inline">View Details</span>
@@ -2268,7 +2579,7 @@ export default function Settings() {
                                       <Button
                                         variant="brand"
                                         size="sm"
-                                        className="btn-brand-primary text-green-500 hover:text-green-700 text-xs sm:text-sm"
+                                        className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
                                         onClick={() => handleOpenEditTwilioSmsModal(connection.id)}
                                       >
                                         <span className="hidden sm:inline">Edit</span>
@@ -2276,29 +2587,20 @@ export default function Settings() {
                                       </Button>
                                     )}
 
-                                    {/* Status badge for TikTok channels */}
-                                    {connection.channelType === 'tiktok' && (
-                                      <div className="flex items-center gap-2">
-                                        {connection.status === 'active' && (
-                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            <span className="w-2 h-2 mr-1 bg-green-500 rounded-full"></span>
-                                            Active
-                                          </span>
-                                        )}
-                                        {connection.status === 'error' && (
-                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            <span className="w-2 h-2 mr-1 bg-red-500 rounded-full"></span>
-                                            Error
-                                          </span>
-                                        )}
-                                        {connection.status === 'disconnected' && (
-                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                            <span className="w-2 h-2 mr-1 bg-gray-500 rounded-full"></span>
-                                            Disconnected
-                                          </span>
-                                        )}
-                                      </div>
+                                    {/* Edit button for Twilio Voice channels */}
+                                    {connection.channelType === 'twilio_voice' && (
+                                      <Button
+                                        variant="brand"
+                                        size="sm"
+                                        className="btn-brand-primary text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500 text-xs sm:text-sm"
+                                        onClick={() => handleOpenEditTwilioVoiceModal(connection.id)}
+                                      >
+                                        <span className="hidden sm:inline">Edit</span>
+                                        <span className="sm:hidden">Edit</span>
+                                      </Button>
                                     )}
+
+                                  
 
                                     <Button
                                       variant="brand"
@@ -2310,12 +2612,43 @@ export default function Settings() {
                                       <span className="sm:hidden">Rename</span>
                                     </Button>
 
-                                    {/* Legacy disconnect button for non-WhatsApp connections */}
-                                    {connection.channelType !== 'whatsapp_unofficial' && connection.channelType !== 'whatsapp_official' && connection.channelType !== 'whatsapp_twilio' && connection.channelType !== 'whatsapp_360dialog' && (
+                                    {/* Disconnect button for embedded signup WhatsApp connections */}
+                                    {isEmbeddedSignupConnection(connection) && (
                                       <Button
                                         variant="brand"
                                         size="sm"
-                                        className="btn-brand-primary text-orange-500 hover:text-orange-700 text-xs sm:text-sm"
+                                        className="btn-brand-primary text-orange-500 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-500 text-xs sm:text-sm"
+                                        onClick={() => {
+                                          setDisconnectConnectionId(connection.id);
+                                          setShowDisconnectWarning(true);
+                                        }}
+                                        disabled={isDisconnectingEmbedded}
+                                      >
+                                        {isDisconnectingEmbedded && disconnectConnectionId === connection.id ? (
+                                          <>
+                                            <svg className="animate-spin h-4 w-4 inline-block mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span className="hidden sm:inline">Disconnecting...</span>
+                                            <span className="sm:hidden">Disconnecting...</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="hidden sm:inline">Disconnect</span>
+                                            <span className="sm:hidden">Disconnect</span>
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
+
+
+                                    {/* Legacy disconnect button for non-WhatsApp connections */}
+                                    {connection.channelType !== 'whatsapp_unofficial' && connection.channelType !== 'whatsapp_official' && connection.channelType !== 'tiktok' && (
+                                      <Button
+                                        variant="brand"
+                                        size="sm"
+                                        className="btn-brand-primary text-orange-500 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-500 text-xs sm:text-sm"
                                         onClick={() => handleDisconnectChannel(connection.id)}
                                       >
                                         <span className="hidden sm:inline">Disconnect</span>
@@ -2337,12 +2670,12 @@ export default function Settings() {
                               </div>
 
                               {connection.channelType === 'whatsapp_unofficial' && (
-                                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900 rounded-md">
                                   <div className="flex items-start">
-                                    <i className="ri-error-warning-line text-yellow-500 mr-2 mt-0.5"></i>
+                                    <i className="ri-error-warning-line text-yellow-500 dark:text-yellow-400 mr-2 mt-0.5"></i>
                                     <div>
-                                      <p className="text-sm text-yellow-700 font-medium">Unofficial Connection</p>
-                                      <p className="text-xs text-yellow-600">
+                                      <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">Unofficial Connection</p>
+                                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
                                         This connection is not using the official WhatsApp Business API.
                                         It may have limitations and could be subject to blocking by WhatsApp.
                                         Configure proxy settings via the Edit button to improve connection stability and reduce blocking risks.
@@ -2353,12 +2686,12 @@ export default function Settings() {
                               )}
 
                               {connection.channelType === 'whatsapp_official' && (
-                                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 rounded-md">
                                   <div className="flex items-start">
-                                    <i className="ri-check-line text-green-500 mr-2 mt-0.5"></i>
+                                    <i className="ri-check-line text-green-500 dark:text-green-400 mr-2 mt-0.5"></i>
                                     <div>
-                                      <p className="text-sm text-green-700 font-medium">Official WhatsApp Business API (Meta)</p>
-                                      <p className="text-xs text-green-600">
+                                      <p className="text-sm text-green-700 dark:text-green-400 font-medium">Official WhatsApp Business API (Meta)</p>
+                                      <p className="text-xs text-green-600 dark:text-green-400">
                                         This connection uses the official WhatsApp Business API from Meta.
                                         It provides reliable messaging with advanced features and compliance.
                                       </p>
@@ -2368,20 +2701,6 @@ export default function Settings() {
                               )}
 
 
-                              {connection.channelType === 'whatsapp_360dialog' && (
-                                <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-md">
-                                  <div className="flex items-start">
-                                    <i className="ri-check-line text-purple-500 mr-2 mt-0.5"></i>
-                                    <div>
-                                      <p className="text-sm text-purple-700 font-medium">Official WhatsApp Business API (360Dialog Partner)</p>
-                                      <p className="text-xs text-purple-600">
-                                        This connection uses 360Dialog's Partner API with Integrated Onboarding.
-                                        It provides enterprise-grade WhatsApp Business API access with streamlined setup.
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           );
                         })}
@@ -2391,10 +2710,10 @@ export default function Settings() {
                     <div>
                       <h3 className="text-base sm:text-lg font-medium mb-4">Add New Channel</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('WhatsApp Business API')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('WhatsApp Business API')}>
                           <i className="ri-whatsapp-line text-2xl sm:text-3xl mb-2" style={{ color: '#25D366' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">WhatsApp Business API (Meta)</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">Official Meta WhatsApp Business API</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Official Meta WhatsApp Business API</p>
                           <Button className="mt-3 w-full text-xs py-1" variant="outline" onClick={(e) => {
                             e.stopPropagation();
                             handleConnectChannel('WhatsApp Business Embedded');
@@ -2407,61 +2726,82 @@ export default function Settings() {
                         {/* <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('WhatsApp Business API (360Dialog)')}>
                           <i className="ri-whatsapp-line text-2xl sm:text-3xl mb-2" style={{ color: '#25D366' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">WhatsApp Business API (360Dialog)</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">Integrated Onboarding via 360Dialog</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Integrated Onboarding via 360Dialog</p>
                         </div> */}
 
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('WhatsApp Unofficial')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('WhatsApp Unofficial')}>
                           <i className="ri-whatsapp-line text-2xl sm:text-3xl mb-2" style={{ color: '#25D366' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">WhatsApp QR Code</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">
+                          <p className="text-xs text-muted-foreground text-center mt-1">
                             <i className="ri-error-warning-line mr-1"></i>
                             Non-official connection
                           </p>
                         </div>
                         
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('Messenger')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('Messenger')}>
                           <i className="ri-messenger-line text-2xl sm:text-3xl mb-2" style={{ color: '#1877F2' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">Facebook Messenger</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">Via Facebook Pages</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Via Facebook Pages</p>
+                          <Button className="mt-3 w-full text-xs py-1" variant="outline" onClick={(e) => {
+                            e.stopPropagation();
+                            handleConnectChannel('Messenger Embedded');
+                          }}>
+                            Easy Setup
+                          </Button>
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('Instagram')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('Instagram')}>
                           <i className="ri-instagram-line text-2xl sm:text-3xl mb-2" style={{ color: '#E4405F' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">Instagram</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">Business Account Integration</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Business Account Integration</p>
+                          <Button className="mt-3 w-full text-xs py-1" variant="outline" onClick={(e) => {
+                            e.stopPropagation();
+                            handleConnectChannel('Instagram Embedded');
+                          }}>
+                            Easy Setup
+                          </Button>
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('TikTok')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('TikTok')}>
                           <i className="ri-tiktok-line text-2xl sm:text-3xl mb-2"></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">TikTok</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">Business Messaging</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Business Messaging</p>
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('Telegram')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('Telegram')}>
                           <i className="ri-telegram-line text-2xl sm:text-3xl mb-2" style={{ color: '#0088CC' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">Telegram</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">Bot Integration</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Bot Integration</p>
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('Email')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('Email')}>
                           <i className="ri-mail-line text-2xl sm:text-3xl mb-2" style={{ color: '#3B82F6' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">Email</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">IMAP/SMTP Email Integration</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">IMAP/SMTP Email Integration</p>
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => handleConnectChannel('WebChat')}>
+                        <div className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors" onClick={() => handleConnectChannel('WebChat')}>
                           <i className="ri-message-3-line text-2xl sm:text-3xl mb-2" style={{ color: '#6366f1' }}></i>
                           <h4 className="font-medium text-sm sm:text-base text-center">WebChat</h4>
-                          <p className="text-xs text-gray-500 text-center mt-1">Chat widget for your website</p>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Chat widget for your website</p>
                         </div>
-                        
+
+                        <div
+                          className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors"
+                          onClick={() => handleConnectChannel('Twilio Calls')}
+                        >
+                          <TwilioIcon className="h-6 w-6 sm:h-6 sm:w-6 mb-2" style={{ color: '#F22F46' }} />
+                          <h4 className="font-medium text-sm sm:text-base text-center">Twilio Calls</h4>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Voice Calls (Basic & AI-Powered)</p>
+                        </div>
+
                           <div
-                            className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-gray-50 cursor-pointer transition-colors"
+                            className="border border-border rounded-lg p-3 sm:p-4 flex flex-col items-center hover:bg-accent cursor-pointer transition-colors"
                             onClick={() => handleConnectChannel('Twilio SMS')}
                           >
                             <TwilioIcon className="h-6 w-6 sm:h-6 sm:w-6 mb-2" style={{ color: '#F22F46' }} />
                             <h4 className="font-medium text-sm sm:text-base text-center">Twilio SMS</h4>
-                            <p className="text-xs text-gray-500 text-center mt-1">Programmable Messaging (SMS/MMS)</p>
+                            <p className="text-xs text-muted-foreground text-center mt-1">Programmable Messaging (SMS/MMS)</p>
                           </div>
                       </div>
                     </div>
@@ -2493,7 +2833,7 @@ export default function Settings() {
                       <Loader2 className="h-8 w-8 animate-spin mx-auto" />
                     </div>
                   ) : proxyServers.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-muted-foreground">
                       <p>No proxy servers configured.</p>
                       <p className="text-sm mt-2">Add a proxy server to route WhatsApp connections through it.</p>
                     </div>
@@ -2506,24 +2846,24 @@ export default function Settings() {
                               <div className="flex items-center gap-2 mb-2">
                                 <h3 className="font-medium">{proxy.name}</h3>
                                 {proxy.enabled ? (
-                                  <Badge className="bg-green-100 text-green-800">Enabled</Badge>
+                                  <Badge className="bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400">Enabled</Badge>
                                 ) : (
-                                  <Badge variant="secondary">Disabled</Badge>
+                                  <Badge variant="secondary" className="!bg-muted !text-muted-foreground">Disabled</Badge>
                                 )}
                                 {proxy.testStatus === 'working' && (
-                                  <Badge className="bg-blue-100 text-blue-800">Working</Badge>
+                                  <Badge className="bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400">Working</Badge>
                                 )}
                                 {proxy.testStatus === 'failed' && (
                                   <Badge variant="destructive">Failed</Badge>
                                 )}
                               </div>
-                              <div className="text-sm text-gray-600 space-y-1">
+                              <div className="text-sm text-muted-foreground space-y-1">
                                 <p><span className="font-medium">Type:</span> {proxy.type.toUpperCase()}</p>
                                 <p><span className="font-medium">Host:</span> {proxy.host}:{proxy.port}</p>
                                 {proxy.username && <p><span className="font-medium">Username:</span> {proxy.username}</p>}
                                 {proxy.description && <p><span className="font-medium">Description:</span> {proxy.description}</p>}
                                 {proxy.lastTested && (
-                                  <p className="text-xs text-gray-500">
+                                  <p className="text-xs text-muted-foreground">
                                     Last tested: {new Date(proxy.lastTested).toLocaleString()}
                                   </p>
                                 )}
@@ -2575,8 +2915,9 @@ export default function Settings() {
               <WhatsAppBehaviorSettings />
             </TabsContent>
 
-
-
+            <TabsContent value="general">
+              <GeneralSettingsTab />
+            </TabsContent>
 
             <TabsContent value="billing">
               <Card>
@@ -2599,7 +2940,7 @@ export default function Settings() {
 
 
                     <div id="available-plans">
-                      <h3 className="text-base sm:text-lg font-medium mb-4">Available Plans</h3>
+                      <h3 className="text-base sm:text-lg font-medium mb-4 text-foreground">Available Plans</h3>
                       {isLoadingPlans ? (
                         <div className="flex justify-center py-8">
                           <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
@@ -2620,14 +2961,14 @@ export default function Settings() {
                           })}
                         </div>
                       ) : (
-                        <div className="text-center py-8 text-gray-500 text-sm sm:text-base">
+                        <div className="text-center py-8 text-muted-foreground text-sm sm:text-base">
                           No plans available at the moment
                         </div>
                       )}
                     </div>
 
                     <div>
-                      <h3 className="text-base sm:text-lg font-medium mb-4">Payment History</h3>
+                      <h3 className="text-base sm:text-lg font-medium mb-4 text-foreground">Payment History</h3>
 
                       {(() => {
                         const { data: transactions, isLoading } = useQuery({
@@ -2649,50 +2990,50 @@ export default function Settings() {
 
                         if (!transactions || transactions.length === 0) {
                           return (
-                            <div className="text-center py-4 text-gray-500 text-sm sm:text-base">
+                            <div className="text-center py-4 text-muted-foreground text-sm sm:text-base">
                               No payment history available
                             </div>
                           );
                         }
 
                         return (
-                          <div className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="border border-border rounded-lg overflow-hidden">
                             <div className="overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                              <table className="min-w-full divide-y divide-border">
+                                <thead className="bg-muted">
                                   <tr>
-                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                       Date
                                     </th>
-                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                       Description
                                     </th>
-                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                       Amount
                                     </th>
-                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                       Status
                                     </th>
                                   </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className="bg-background divide-y divide-border">
                                   {transactions.map((transaction: any) => (
                                     <tr key={transaction.id}>
-                                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-muted-foreground">
                                         {new Date(transaction.createdAt).toLocaleDateString()}
                                       </td>
-                                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
+                                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-foreground">
                                         {transaction.planName || 'Subscription Payment'}
                                       </td>
-                                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 font-medium">
+                                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-muted-foreground font-medium">
                                         ${transaction.amount.toFixed(2)}
                                       </td>
                                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 py-1 text-xs rounded-full ${transaction.status === 'completed'
-                                            ? 'bg-green-100 text-green-800'
+                                            ? 'bg-primary/10 text-primary border border-primary/20'
                                             : transaction.status === 'pending'
-                                              ? 'bg-yellow-100 text-yellow-800'
-                                              : 'bg-red-100 text-red-800'
+                                              ? 'bg-secondary/10 text-secondary border border-secondary/20'
+                                              : 'bg-destructive/10 text-destructive border border-destructive/20'
                                           }`}>
                                           {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
                                         </span>
@@ -2729,7 +3070,9 @@ export default function Settings() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-8">
-                    <TeamMembersList />
+                    <TeamMembersList 
+                      maxUsers={planInfo?.plan?.maxUsers ?? planInfo?.company?.maxUsers}
+                    />
 
                     <div className="border-t pt-6">
                       <RolesAndPermissions />
@@ -2764,36 +3107,11 @@ export default function Settings() {
                     <div className="space-y-6">
                       <div className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h3 className="text-lg font-medium">360Dialog Partner API</h3>
-                            <p className="text-sm text-gray-500">
-                              Configure 360Dialog Partner credentials for company onboarding
-                            </p>
-                          </div>
-                          <Button
-                            onClick={() => setShowPartnerConfigModal(true)}
-                            variant="outline"
-                            className="btn-brand-primary"
-                          >
-                            <Settings2 className="w-4 h-4 mr-2" />
-                            Configure
-                          </Button>
-                        </div>
-
-                        <div className="text-sm text-gray-600">
-                          <p>â€¢ Platform-wide Partner API integration</p>
-                          <p>â€¢ Enables Integrated Onboarding for companies</p>
-                          <p>â€¢ Manages client WhatsApp Business accounts</p>
-                        </div>
-                      </div>
-
-                      <div className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <i className="ri-tiktok-line text-2xl"></i>
                             <div>
                               <h3 className="text-lg font-medium">TikTok Business Messaging API</h3>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-sm text-muted-foreground">
                                 Configure TikTok Partner credentials for company messaging
                               </p>
                             </div>
@@ -2808,7 +3126,7 @@ export default function Settings() {
                           </Button>
                         </div>
 
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-muted-foreground">
                           <p>â€¢ Platform-wide TikTok Business API integration</p>
                           <p>â€¢ Enables TikTok messaging for companies</p>
                           <p>â€¢ Requires TikTok Messaging Partner approval</p>
@@ -2819,7 +3137,7 @@ export default function Settings() {
                         <div className="flex items-center justify-between mb-4">
                           <div>
                             <h3 className="text-lg font-medium">Additional Integrations</h3>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                               More platform-wide integrations coming soon
                             </p>
                           </div>
@@ -2829,6 +3147,98 @@ export default function Settings() {
                           </Button>
                         </div>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+            {(currentUser?.role === 'admin' || currentUser?.isSuperAdmin) && (
+              <TabsContent value="custom-css">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Paintbrush className="h-5 w-5" />
+                      {t('settings.custom_css', 'Custom CSS')}
+                    </CardTitle>
+                    <CardDescription>
+                      {t('settings.custom_css_description', 'Inject custom CSS styles to customize the appearance of your application interface.')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                  
+                    {/* Enable/Disable Toggle */}
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <Label className="text-base font-medium">{t('settings.enable_custom_css', 'Enable Custom CSS')}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t('settings.enable_custom_css_description', 'Toggle to enable or disable custom CSS injection for your company')}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={customCssForm.enabled}
+                        onCheckedChange={(checked) =>
+                          setCustomCssForm(prev => ({ ...prev, enabled: checked }))
+                        }
+                      />
+                    </div>
+
+                    {/* CSS Input */}
+                    <div className="space-y-3">
+                      <Label htmlFor="custom-css" className="text-base font-medium">
+                        {t('settings.custom_css', 'Custom CSS')}
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t('settings.custom_css_input_description', 'Paste your CSS code here. Styles will be injected into the <head> section of all pages.')}
+                      </p>
+                      <Textarea
+                        id="custom-css"
+                        placeholder={`Example:
+                              /* Custom button styles */
+                              .btn-brand-primary {
+                                border-radius: 8px;
+                                font-weight: 600;
+                              }
+
+                              /* Custom header styles */
+                              header {
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                              }
+
+                              /* Custom sidebar styles */
+                              .sidebar {
+                                background-color: #f5f5f5;
+                              }`}
+                        value={customCssForm.css}
+                        onChange={(e) =>
+                          setCustomCssForm(prev => ({ ...prev, css: e.target.value }))
+                        }
+                        className="min-h-[200px] font-mono text-sm"
+                        disabled={!customCssForm.enabled}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t('settings.custom_css_note', 'CSS will be applied globally. Use specific selectors to target elements without affecting the entire application.')}
+                      </p>
+                    </div>
+
+                    {/* Last Modified Info */}
+                    {customCssForm.lastModified && (
+                      <div className="text-sm text-muted-foreground">
+                        {t('settings.last_modified', 'Last modified')}: {new Date(customCssForm.lastModified).toLocaleString()}
+                      </div>
+                    )}
+
+                    {/* Save Button */}
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => saveCustomCssMutation.mutate()}
+                        disabled={saveCustomCssMutation.isPending}
+                        className="btn-brand-primary"
+                      >
+                        {saveCustomCssMutation.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        {t('settings.save_custom_css', 'Save Custom CSS')}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -2845,6 +3255,25 @@ export default function Settings() {
         onSuccess={handleConnectionSuccess}
       />
 
+      {/* Twilio Voice Connection Modal */}
+      <TwilioVoiceConnectionForm
+        isOpen={showTwilioVoiceModal}
+        onClose={() => setShowTwilioVoiceModal(false)}
+        onSuccess={handleConnectionSuccess}
+      />
+
+      {/* Edit Twilio Voice Connection Modal */}
+      {editTwilioVoiceConnectionId && (
+        <EditTwilioVoiceConnectionForm
+          isOpen={showEditTwilioVoiceModal}
+          onClose={() => {
+            setShowEditTwilioVoiceModal(false);
+            setEditTwilioVoiceConnectionId(null);
+          }}
+          onSuccess={handleConnectionSuccess}
+          connectionId={editTwilioVoiceConnectionId}
+        />
+      )}
     </div>
   );
 }

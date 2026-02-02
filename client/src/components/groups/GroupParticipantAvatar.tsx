@@ -25,7 +25,7 @@ export function GroupParticipantAvatar({
   if (!participantJid) {
     return (
       <Avatar className={cn("h-6 w-6 text-xs", className)}>
-        <AvatarFallback className="bg-gray-100 text-gray-700 text-xs">
+        <AvatarFallback className="bg-muted text-muted-foreground text-xs">
           ??
         </AvatarFallback>
       </Avatar>

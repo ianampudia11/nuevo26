@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
@@ -36,15 +37,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { Loader2, Upload, Check, CreditCard, Palette, Globe, FileImage, UserPlus, Mail, Database, RefreshCw, Settings, Key, Code, Copy, Eye, EyeOff, Trash2, Plus } from 'lucide-react';
+import { Loader2, Upload, Check, CreditCard, Palette, Globe, FileImage, UserPlus, Mail, Database, RefreshCw, Settings, Key, Code, Copy, Eye, EyeOff, Trash2, Plus, Paintbrush, Minus } from 'lucide-react';
 import BackupManagement from '@/components/admin/BackupManagement';
 import SystemUpdatesTab from '@/components/settings/SystemUpdatesTab';
 
-import { PartnerConfigurationForm } from '@/components/settings/PartnerConfigurationForm';
 import { MetaPartnerConfigurationForm } from '@/components/settings/MetaPartnerConfigurationForm';
 import { TikTokPlatformConfigForm } from '@/components/settings/TikTokPlatformConfigForm';
 import AiCredentialsTab from '@/components/admin/AiCredentialsTab';
 import SystemUsageAnalytics from '@/components/admin/SystemUsageAnalytics';
+import { AuthBackgroundPreviewModal } from '@/components/admin/AuthBackgroundPreviewModal';
 
 
 const BUILT_IN_CURRENCY_OPTIONS = [
@@ -67,6 +68,283 @@ const BUILT_IN_CURRENCY_OPTIONS = [
 
 const BUILT_IN_CURRENCY_CODES: string[] = BUILT_IN_CURRENCY_OPTIONS.map(opt => opt.code);
 
+interface GradientConfigProps {
+  mode: 'simple' | 'advanced';
+  simpleConfig: { startColor: string; endColor: string; direction: string };
+  advancedConfig: { stops: Array<{ color: string; position: number }>; angle: number };
+  onModeChange: (mode: 'simple' | 'advanced') => void;
+  onSimpleChange: (config: any) => void;
+  onAdvancedChange: (config: any) => void;
+  idPrefix?: string;
+}
+
+const GradientConfigUI = ({ mode, simpleConfig, advancedConfig, onModeChange, onSimpleChange, onAdvancedChange, idPrefix = 'gradient' }: GradientConfigProps) => {
+  const gradientDirections = [
+    { value: 'to-top', label: 'To Top' },
+    { value: 'to-tr', label: 'To Top Right' },
+    { value: 'to-right', label: 'To Right' },
+    { value: 'to-br', label: 'To Bottom Right' },
+    { value: 'to-bottom', label: 'To Bottom' },
+    { value: 'to-bl', label: 'To Bottom Left' },
+    { value: 'to-left', label: 'To Left' },
+    { value: 'to-tl', label: 'To Top Left' }
+  ];
+
+
+  const convertDirectionToCSS = (direction: string): string => {
+    const directionMap: Record<string, string> = {
+      'to-right': 'to right',
+      'to-left': 'to left',
+      'to-top': 'to top',
+      'to-bottom': 'to bottom',
+      'to-br': 'to bottom right',
+      'to-bl': 'to bottom left',
+      'to-tr': 'to top right',
+      'to-tl': 'to top left'
+    };
+    return directionMap[direction] || direction;
+  };
+
+  const getGradientPreview = () => {
+    if (mode === 'simple') {
+      const cssDirection = convertDirectionToCSS(simpleConfig.direction);
+      return `linear-gradient(${cssDirection}, ${simpleConfig.startColor}, ${simpleConfig.endColor})`;
+    } else {
+      const stops = advancedConfig.stops.map(s => `${s.color} ${s.position}%`).join(', ');
+      return `linear-gradient(${advancedConfig.angle}deg, ${stops})`;
+    }
+  };
+
+
+  const startColorInputRef = useRef<HTMLInputElement>(null);
+  const endColorInputRef = useRef<HTMLInputElement>(null);
+  const stopColorInputRefs = useRef<Record<number, HTMLInputElement>>({});
+
+  const addColorStop = () => {
+    const newStop = {
+      color: '#7C3AED',
+      position: advancedConfig.stops.length > 0
+        ? Math.min(100, advancedConfig.stops[advancedConfig.stops.length - 1].position + 20)
+        : 50
+    };
+    onAdvancedChange({
+      ...advancedConfig,
+      stops: [...advancedConfig.stops, newStop]
+    });
+  };
+
+  const removeColorStop = (index: number) => {
+    if (advancedConfig.stops.length <= 2) return;
+    onAdvancedChange({
+      ...advancedConfig,
+      stops: advancedConfig.stops.filter((_, i) => i !== index)
+    });
+  };
+
+  const updateColorStop = (index: number, field: 'color' | 'position', value: string | number) => {
+    const newStops = [...advancedConfig.stops];
+    newStops[index] = { ...newStops[index], [field]: value };
+    onAdvancedChange({
+      ...advancedConfig,
+      stops: newStops
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label>Gradient Mode</Label>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-muted-foreground">Simple</span>
+          <Switch
+            checked={mode === 'advanced'}
+            onCheckedChange={(checked) => onModeChange(checked ? 'advanced' : 'simple')}
+          />
+          <span className="text-sm text-muted-foreground">Advanced</span>
+        </div>
+      </div>
+
+      {/* Gradient Preview */}
+      <div className="border rounded-md p-4 bg-muted">
+        <div
+          className="w-full h-24 rounded"
+          style={{ background: getGradientPreview() }}
+        />
+      </div>
+
+      {mode === 'simple' ? (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Start Color</Label>
+            <div className="flex items-center space-x-2">
+              <div
+                className="w-10 h-10 rounded border cursor-pointer"
+                style={{ backgroundColor: simpleConfig.startColor }}
+                onClick={() => startColorInputRef.current?.click()}
+              />
+              <Input
+                ref={startColorInputRef}
+                id={`${idPrefix}-start-color`}
+                type="color"
+                value={simpleConfig.startColor}
+                onChange={(e) => onSimpleChange({ ...simpleConfig, startColor: e.target.value })}
+                className="w-16 h-10 p-1"
+              />
+              <Input
+                type="text"
+                value={simpleConfig.startColor}
+                onChange={(e) => onSimpleChange({ ...simpleConfig, startColor: e.target.value })}
+                placeholder="#4F46E5"
+                className="flex-1"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>End Color</Label>
+            <div className="flex items-center space-x-2">
+              <div
+                className="w-10 h-10 rounded border cursor-pointer"
+                style={{ backgroundColor: simpleConfig.endColor }}
+                onClick={() => endColorInputRef.current?.click()}
+              />
+              <Input
+                ref={endColorInputRef}
+                id={`${idPrefix}-end-color`}
+                type="color"
+                value={simpleConfig.endColor}
+                onChange={(e) => onSimpleChange({ ...simpleConfig, endColor: e.target.value })}
+                className="w-16 h-10 p-1"
+              />
+              <Input
+                type="text"
+                value={simpleConfig.endColor}
+                onChange={(e) => onSimpleChange({ ...simpleConfig, endColor: e.target.value })}
+                placeholder="#7C3AED"
+                className="flex-1"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Direction</Label>
+            <Select
+              value={simpleConfig.direction}
+              onValueChange={(value) => onSimpleChange({ ...simpleConfig, direction: value })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {gradientDirections.map((dir) => (
+                  <SelectItem key={dir.value} value={dir.value}>
+                    {dir.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Color Stops</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addColorStop}
+                disabled={advancedConfig.stops.length >= 10}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Stop
+              </Button>
+            </div>
+            {advancedConfig.stops.map((stop, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <div
+                  className="w-10 h-10 rounded border cursor-pointer"
+                  style={{ backgroundColor: stop.color }}
+                  onClick={() => stopColorInputRefs.current[index]?.click()}
+                />
+                <Input
+                  ref={(el) => {
+                    if (el) stopColorInputRefs.current[index] = el;
+                  }}
+                  id={`${idPrefix}-stop-color-${index}`}
+                  type="color"
+                  value={stop.color}
+                  onChange={(e) => updateColorStop(index, 'color', e.target.value)}
+                  className="w-16 h-10 p-1"
+                />
+                <Input
+                  type="text"
+                  value={stop.color}
+                  onChange={(e) => updateColorStop(index, 'color', e.target.value)}
+                  placeholder="#4F46E5"
+                  className="flex-1"
+                />
+                <div className="flex items-center space-x-2 flex-1">
+                  <Slider
+                    value={[stop.position]}
+                    onValueChange={(values) => updateColorStop(index, 'position', values[0])}
+                    min={0}
+                    max={100}
+                    step={1}
+                    className="flex-1"
+                  />
+                  <Input
+                    type="number"
+                    value={stop.position}
+                    onChange={(e) => updateColorStop(index, 'position', parseInt(e.target.value) || 0)}
+                    min={0}
+                    max={100}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeColorStop(index)}
+                  disabled={advancedConfig.stops.length <= 2}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Angle: {advancedConfig.angle}°</Label>
+            <div className="flex items-center space-x-2">
+              <Slider
+                value={[advancedConfig.angle]}
+                onValueChange={(values) => onAdvancedChange({ ...advancedConfig, angle: values[0] })}
+                min={0}
+                max={360}
+                step={1}
+                className="flex-1"
+              />
+              <Input
+                type="number"
+                value={advancedConfig.angle}
+                onChange={(e) => onAdvancedChange({ ...advancedConfig, angle: parseInt(e.target.value) || 0 })}
+                min={0}
+                max={360}
+                className="w-20"
+              />
+              <span className="text-sm text-muted-foreground">°</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdminSettingsPage() {
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -77,9 +355,53 @@ export default function AdminSettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
   const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
+  
+
+  const [adminAuthBgFile, setAdminAuthBgFile] = useState<File | null>(null);
+  const [adminAuthBgPreview, setAdminAuthBgPreview] = useState<string | null>(null);
+  const [adminAuthBgConfig, setAdminAuthBgConfig] = useState({
+    backgroundColor: '',
+    gradientMode: 'simple' as 'simple' | 'advanced',
+    simpleGradient: {
+      startColor: '#4F46E5',
+      endColor: '#7C3AED',
+      direction: 'to-br' as const
+    },
+    advancedGradient: {
+      stops: [
+        { color: '#4F46E5', position: 0 },
+        { color: '#7C3AED', position: 100 }
+      ],
+      angle: 135
+    },
+    priority: 'image' as 'image' | 'color' | 'layer'
+  });
+
+
+  const [userAuthBgFile, setUserAuthBgFile] = useState<File | null>(null);
+  const [userAuthBgPreview, setUserAuthBgPreview] = useState<string | null>(null);
+  const [userAuthBgConfig, setUserAuthBgConfig] = useState({
+    backgroundColor: '',
+    gradientMode: 'simple' as 'simple' | 'advanced',
+    simpleGradient: {
+      startColor: '#4F46E5',
+      endColor: '#7C3AED',
+      direction: 'to-br' as const
+    },
+    advancedGradient: {
+      stops: [
+        { color: '#4F46E5', position: 0 },
+        { color: '#7C3AED', position: 100 }
+      ],
+      angle: 135
+    },
+    priority: 'image' as 'image' | 'color' | 'layer'
+  });
+  
   const [showPartnerConfigModal, setShowPartnerConfigModal] = useState(false);
   const [showMetaPartnerConfigModal, setShowMetaPartnerConfigModal] = useState(false);
   const [showTikTokPlatformConfigModal, setShowTikTokPlatformConfigModal] = useState(false);
+  const [showAuthPreviewModal, setShowAuthPreviewModal] = useState(false);
   const [brandingUpdateKey, setBrandingUpdateKey] = useState(0);
 
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -105,12 +427,22 @@ export default function AdminSettingsPage() {
   const [brandingForm, setBrandingForm] = useState({
     appName: 'PowerChat',
     primaryColor: '#333235',
-    secondaryColor: '#4F46E5'
+    secondaryColor: '#4F46E5',
+    defaultTheme: '' as 'dark' | 'light' | ''
   });
 
   const [stripeForm, setStripeForm] = useState({
     publishableKey: '',
     secretKey: '',
+    webhookSecret: '',
+    testMode: true,
+    enabled: false
+  });
+
+  const [paystackForm, setPaystackForm] = useState({
+    publicKey: '',
+    secretKey: '',
+    subaccount: '',
     webhookSecret: '',
     testMode: true,
     enabled: false
@@ -168,6 +500,8 @@ export default function AdminSettingsPage() {
     client_secret: '',
     redirect_uri: ''
   });
+
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState('');
 
   const [mercadoPagoForm, setMercadoPagoForm] = useState({
     clientId: '',
@@ -243,6 +577,12 @@ export default function AdminSettingsPage() {
     lastModified: ''
   });
 
+  const [customCssForm, setCustomCssForm] = useState({
+    enabled: false,
+    css: '',
+    lastModified: ''
+  });
+
   const [showCustomCurrencyDialog, setShowCustomCurrencyDialog] = useState(false);
   const [customCurrencyForm, setCustomCurrencyForm] = useState({
     code: '',
@@ -313,6 +653,15 @@ export default function AdminSettingsPage() {
     }
   });
 
+  const { data: googleMapsSettings } = useQuery({
+    queryKey: ['/api/company-settings/google-maps'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/company-settings/google-maps');
+      if (!res.ok) throw new Error('Failed to fetch Google Maps API key');
+      return res.json();
+    }
+  });
+
 
 
   useEffect(() => {
@@ -330,6 +679,56 @@ export default function AdminSettingsPage() {
       const faviconSetting = settings.find((s: any) => s.key === 'branding_favicon');
       if (faviconSetting) {
         setFaviconPreview(faviconSetting.value);
+      }
+
+
+      const adminAuthBgSetting = settings.find((s: any) => s.key === 'branding_admin_auth_background');
+      if (adminAuthBgSetting) {
+        setAdminAuthBgPreview(adminAuthBgSetting.value);
+      }
+
+
+      const userAuthBgSetting = settings.find((s: any) => s.key === 'branding_user_auth_background');
+      if (userAuthBgSetting) {
+        setUserAuthBgPreview(userAuthBgSetting.value);
+      }
+
+
+      const authBgConfigSetting = settings.find((s: any) => s.key === 'auth_background_config');
+      if (authBgConfigSetting?.value) {
+        const config = authBgConfigSetting.value;
+
+        if (config.adminAuthBackground) {
+          const adminConfig = config.adminAuthBackground;
+          setAdminAuthBgConfig(prev => ({
+            ...prev,
+            backgroundColor: adminConfig.backgroundColor || '',
+            priority: adminConfig.priority || 'image',
+            gradientMode: adminConfig.gradientConfig?.mode === 'advanced' ? 'advanced' : 'simple',
+            simpleGradient: adminConfig.gradientConfig?.mode === 'simple' && adminConfig.gradientConfig?.simple
+              ? adminConfig.gradientConfig.simple
+              : prev.simpleGradient,
+            advancedGradient: adminConfig.gradientConfig?.mode === 'advanced' && adminConfig.gradientConfig?.advanced
+              ? adminConfig.gradientConfig.advanced
+              : prev.advancedGradient
+          }));
+        }
+
+        if (config.userAuthBackground) {
+          const userConfig = config.userAuthBackground;
+          setUserAuthBgConfig(prev => ({
+            ...prev,
+            backgroundColor: userConfig.backgroundColor || '',
+            priority: userConfig.priority || 'image',
+            gradientMode: userConfig.gradientConfig?.mode === 'advanced' ? 'advanced' : 'simple',
+            simpleGradient: userConfig.gradientConfig?.mode === 'simple' && userConfig.gradientConfig?.simple
+              ? userConfig.gradientConfig.simple
+              : prev.simpleGradient,
+            advancedGradient: userConfig.gradientConfig?.mode === 'advanced' && userConfig.gradientConfig?.advanced
+              ? userConfig.gradientConfig.advanced
+              : prev.advancedGradient
+          }));
+        }
       }
 
       const registrationSetting = settings.find((s: any) => s.key === 'registration_settings');
@@ -359,6 +758,14 @@ export default function AdminSettingsPage() {
         setPaypalForm({
           ...paypalSetting.value,
           clientSecret: paypalSetting.value.clientSecret ? '••••••••' : ''
+        });
+      }
+
+      const paystackSetting = settings.find((s: any) => s.key === 'payment_paystack');
+      if (paystackSetting) {
+        setPaystackForm({
+          ...paystackSetting.value,
+          secretKey: paystackSetting.value.secretKey ? '••••••••' : ''
         });
       }
 
@@ -412,6 +819,15 @@ export default function AdminSettingsPage() {
           enabled: customScriptsSetting.value.enabled || false,
           scripts: customScriptsSetting.value.scripts || '',
           lastModified: customScriptsSetting.value.lastModified || ''
+        });
+      }
+
+      const customCssSetting = settings.find((s: any) => s.key === 'custom_css');
+      if (customCssSetting) {
+        setCustomCssForm({
+          enabled: customCssSetting.value.enabled || false,
+          css: customCssSetting.value.css || '',
+          lastModified: customCssSetting.value.lastModified || ''
         });
       }
 
@@ -474,6 +890,16 @@ export default function AdminSettingsPage() {
     }
   }, [googleSheetsOAuthSettings]);
 
+  useEffect(() => {
+    if (googleMapsSettings) {
+
+
+      if (!googleMapsSettings.configured) {
+        setGoogleMapsApiKey('');
+      }
+    }
+  }, [googleMapsSettings]);
+
 
 
   useEffect(() => {
@@ -501,6 +927,22 @@ export default function AdminSettingsPage() {
       const file = e.target.files[0];
       setFaviconFile(file);
       setFaviconPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleAdminAuthBgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setAdminAuthBgFile(file);
+      setAdminAuthBgPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleUserAuthBgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setUserAuthBgFile(file);
+      setUserAuthBgPreview(URL.createObjectURL(file));
     }
   };
 
@@ -608,6 +1050,199 @@ export default function AdminSettingsPage() {
     }
   });
 
+  const uploadAdminAuthBgMutation = useMutation({
+    mutationFn: async () => {
+      if (!adminAuthBgFile) throw new Error('No admin auth background file selected');
+
+      const formData = new FormData();
+      formData.append('adminAuthBackground', adminAuthBgFile);
+
+      const res = await fetch('/api/admin/settings/branding/admin-auth-background', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to upload admin auth background');
+      }
+
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/branding'] });
+      await refreshBranding();
+
+      toast({
+        title: 'Admin auth background uploaded',
+        description: 'The admin authentication background has been uploaded successfully.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error uploading admin auth background',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const uploadUserAuthBgMutation = useMutation({
+    mutationFn: async () => {
+      if (!userAuthBgFile) throw new Error('No user auth background file selected');
+
+      const formData = new FormData();
+      formData.append('userAuthBackground', userAuthBgFile);
+
+      const res = await fetch('/api/admin/settings/branding/user-auth-background', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to upload user auth background');
+      }
+
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/branding'] });
+      await refreshBranding();
+
+      toast({
+        title: 'User auth background uploaded',
+        description: 'The user authentication background has been uploaded successfully.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error uploading user auth background',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const deleteAdminAuthBgMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('DELETE', '/api/admin/settings/branding/admin-auth-background');
+      if (!res.ok) throw new Error('Failed to delete admin auth background');
+      return res.json();
+    },
+    onSuccess: () => {
+      setAdminAuthBgPreview(null);
+      setAdminAuthBgFile(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      toast({ title: 'Admin auth background deleted' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const deleteUserAuthBgMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('DELETE', '/api/admin/settings/branding/user-auth-background');
+      if (!res.ok) throw new Error('Failed to delete user auth background');
+      return res.json();
+    },
+    onSuccess: () => {
+      setUserAuthBgPreview(null);
+      setUserAuthBgFile(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      toast({ title: 'User auth background deleted' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const validateAuthBackgroundConfig = (config: typeof adminAuthBgConfig) => {
+
+    if (config.backgroundColor) {
+      const hexPattern = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+      const rgbPattern = /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*[\d.]+)?\s*\)$/;
+      if (!hexPattern.test(config.backgroundColor) && !rgbPattern.test(config.backgroundColor)) {
+        throw new Error('Invalid color format');
+      }
+    }
+
+
+    if (config.gradientMode === 'advanced') {
+      if (config.advancedGradient.stops.length < 2) {
+        throw new Error('Advanced gradient must have at least 2 color stops');
+      }
+    }
+
+    return true;
+  };
+
+  const saveAuthBackgroundConfigMutation = useMutation({
+    mutationFn: async () => {
+
+      validateAuthBackgroundConfig(adminAuthBgConfig);
+      validateAuthBackgroundConfig(userAuthBgConfig);
+
+
+      const buildGradientConfig = (config: typeof adminAuthBgConfig) => {
+        if (config.gradientMode === 'simple') {
+          return {
+            mode: 'simple',
+            simple: config.simpleGradient
+          };
+        } else {
+          return {
+            mode: 'advanced',
+            advanced: config.advancedGradient
+          };
+        }
+      };
+
+      const payload = {
+        adminAuthBackground: {
+          backgroundColor: adminAuthBgConfig.backgroundColor || undefined,
+          gradientConfig: adminAuthBgConfig.backgroundColor || adminAuthBgConfig.gradientMode
+            ? buildGradientConfig(adminAuthBgConfig)
+            : undefined,
+          priority: adminAuthBgConfig.priority
+        },
+        userAuthBackground: {
+          backgroundColor: userAuthBgConfig.backgroundColor || undefined,
+          gradientConfig: userAuthBgConfig.backgroundColor || userAuthBgConfig.gradientMode
+            ? buildGradientConfig(userAuthBgConfig)
+            : undefined,
+          priority: userAuthBgConfig.priority
+        }
+      };
+
+      const res = await apiRequest('POST', '/api/admin/settings/branding/auth-backgrounds', payload);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to save auth background configuration');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      toast({
+        title: 'Auth background settings saved',
+        description: 'Authentication background settings have been saved successfully.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error saving settings',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
   const saveBrandingMutation = useMutation({
     mutationFn: async () => {
       if (!brandingForm.appName) {
@@ -678,6 +1313,60 @@ export default function AdminSettingsPage() {
     onError: (error: any) => {
       toast({
         title: t('admin.settings.error_saving_stripe', 'Error saving Stripe settings'),
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const savePaystackMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        ...paystackForm,
+        secretKey: paystackForm.secretKey === '••••••••' ? undefined : paystackForm.secretKey
+      };
+
+      const res = await apiRequest('POST', '/api/admin/settings/payment/paystack', payload);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to save Paystack settings');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      toast({
+        title: 'Paystack settings saved',
+        description: 'The Paystack settings have been saved successfully.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error saving Paystack settings',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const testPaystackMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/settings/payment/paystack/test');
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to test Paystack connection');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Paystack connection successful',
+        description: data.testMode ? 'Connected in test mode' : 'Connected in live mode'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error connecting to Paystack',
         description: error.message,
         variant: 'destructive'
       });
@@ -1308,6 +1997,37 @@ export default function AdminSettingsPage() {
     }
   });
 
+  const saveGoogleMapsApiKeyMutation = useMutation({
+    mutationFn: async () => {
+      if (!googleMapsApiKey.trim()) {
+        throw new Error('API key is required');
+      }
+      const res = await apiRequest('POST', '/api/company-settings/google-maps', {
+        apiKey: googleMapsApiKey.trim()
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to save Google Maps API key');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/company-settings/google-maps'] });
+      setGoogleMapsApiKey('');
+      toast({
+        title: 'Google Maps API key saved',
+        description: 'Google Maps API key has been saved successfully.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error saving Google Maps API key',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
   const saveCustomScriptsMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/admin/settings/custom-scripts', customScriptsForm);
@@ -1333,6 +2053,30 @@ export default function AdminSettingsPage() {
     }
   });
 
+  const saveCustomCssMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/settings/custom-css', customCssForm);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to save custom CSS settings');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      toast({
+        title: 'Custom CSS settings saved',
+        description: 'Custom CSS configuration has been saved successfully.'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error saving custom CSS settings',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
 
 
   const getIframeProps = () => {
@@ -1522,6 +2266,11 @@ export default function AdminSettingsPage() {
                 <span className="hidden md:inline">{t('admin.settings.custom_scripts', 'Custom Scripts')}</span>
                 <span className="md:hidden">Scripts</span>
               </TabsTrigger>
+              <TabsTrigger value="custom-css" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
+                <Paintbrush className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden md:inline">{t('admin.settings.custom_css', 'Custom CSS')}</span>
+                <span className="md:hidden">CSS</span>
+              </TabsTrigger>
 
             </TabsList>
           </div>
@@ -1545,6 +2294,23 @@ export default function AdminSettingsPage() {
                       onChange={(e) => setBrandingForm({...brandingForm, appName: e.target.value})}
                       placeholder=""
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultTheme">{t('admin.settings.default_theme', 'Default Theme')}</Label>
+                    <Select
+                      value={brandingForm.defaultTheme || 'none'}
+                      onValueChange={(value) => setBrandingForm({...brandingForm, defaultTheme: value === 'none' ? '' : value as 'dark' | 'light' | ''})}
+                    >
+                      <SelectTrigger id="defaultTheme">
+                        <SelectValue placeholder={t('admin.settings.select_theme', 'Select default theme')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t('admin.settings.theme_none', 'None (System Default)')}</SelectItem>
+                        <SelectItem value="light">{t('admin.settings.theme_light', 'Light')}</SelectItem>
+                        <SelectItem value="dark">{t('admin.settings.theme_dark', 'Dark')}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1629,7 +2395,7 @@ export default function AdminSettingsPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {logoPreview && (
-                      <div className="border rounded-md p-4 flex items-center justify-center bg-gray-50">
+                      <div className="border rounded-md p-4 flex items-center justify-center bg-gray-50 dark:bg-muted">
                         <img
                           src={logoPreview}
                           alt={t('admin.settings.logo_preview_alt', 'Logo Preview')}
@@ -1648,7 +2414,7 @@ export default function AdminSettingsPage() {
                       />
                       <Label
                         htmlFor="logo"
-                        className="cursor-pointer flex items-center justify-center border rounded-md px-4 py-2 hover:bg-gray-50"
+                        className="cursor-pointer flex items-center justify-center border rounded-md px-4 py-2 hover:bg-muted"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         {t('admin.settings.choose_logo', 'Choose Logo')}
@@ -1680,7 +2446,7 @@ export default function AdminSettingsPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {faviconPreview && (
-                      <div className="border rounded-md p-4 flex items-center justify-center bg-gray-50">
+                      <div className="border rounded-md p-4 flex items-center justify-center bg-gray-50 dark:bg-muted">
                         <img
                           src={faviconPreview}
                           alt="Favicon Preview"
@@ -1699,7 +2465,7 @@ export default function AdminSettingsPage() {
                       />
                       <Label
                         htmlFor="favicon"
-                        className="cursor-pointer flex items-center justify-center border rounded-md px-4 py-2 hover:bg-gray-50"
+                        className="cursor-pointer flex items-center justify-center border rounded-md px-4 py-2 hover:bg-muted"
                       >
                         <FileImage className="h-4 w-4 mr-2" />
                         Choose Favicon
@@ -1721,6 +2487,253 @@ export default function AdminSettingsPage() {
                     </div>
                   </CardContent>
                 </Card>
+              </div>
+
+              {/* Auth Backgrounds Section */}
+              <div className="col-span-1 lg:col-span-2 mt-6">
+                <h3 className="text-lg font-semibold mb-4">Authentication Page Backgrounds</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Admin Auth Background Card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Admin Auth Background</CardTitle>
+                      <CardDescription>
+                        Customize the background for admin login page (/admin/login)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Image Upload Section */}
+                      {adminAuthBgPreview && (
+                        <div className="border rounded-md p-4 bg-gray-50 dark:bg-muted relative">
+                          <img src={adminAuthBgPreview} alt="Admin Auth Background" className="w-full h-32 object-cover rounded" />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => deleteAdminAuthBgMutation.mutate()}
+                            disabled={deleteAdminAuthBgMutation.isPending}
+                          >
+                            {deleteAdminAuthBgMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="admin-auth-bg"
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+                          onChange={handleAdminAuthBgChange}
+                          className="hidden"
+                        />
+                        <Label htmlFor="admin-auth-bg" className="cursor-pointer flex items-center justify-center border rounded-md px-4 py-2 hover:bg-gray-50 dark:bg-muted">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Choose Background Image
+                        </Label>
+
+                        {adminAuthBgFile && (
+                          <Button onClick={() => uploadAdminAuthBgMutation.mutate()} disabled={uploadAdminAuthBgMutation.isPending}>
+                            {uploadAdminAuthBgMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                            Upload
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Background Color Picker */}
+                      <div className="space-y-2">
+                        <Label>Background Color (Optional)</Label>
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className="w-10 h-10 rounded border cursor-pointer"
+                            style={{ backgroundColor: adminAuthBgConfig.backgroundColor || '#ffffff' }}
+                            onClick={() => document.getElementById('admin-bg-color')?.click()}
+                          />
+                          <Input
+                            id="admin-bg-color"
+                            type="color"
+                            value={adminAuthBgConfig.backgroundColor || '#ffffff'}
+                            onChange={(e) => setAdminAuthBgConfig({ ...adminAuthBgConfig, backgroundColor: e.target.value })}
+                            className="w-16 h-10 p-1"
+                          />
+                          <Input
+                            type="text"
+                            value={adminAuthBgConfig.backgroundColor}
+                            onChange={(e) => setAdminAuthBgConfig({ ...adminAuthBgConfig, backgroundColor: e.target.value })}
+                            placeholder="#ffffff or rgb(255,255,255)"
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Gradient Configuration */}
+                      <div className="space-y-2">
+                        <Label>Background Gradient (Optional)</Label>
+                        <GradientConfigUI
+                          mode={adminAuthBgConfig.gradientMode}
+                          simpleConfig={adminAuthBgConfig.simpleGradient}
+                          advancedConfig={adminAuthBgConfig.advancedGradient}
+                          onModeChange={(mode) => setAdminAuthBgConfig({ ...adminAuthBgConfig, gradientMode: mode })}
+                          onSimpleChange={(simple) => setAdminAuthBgConfig({ ...adminAuthBgConfig, simpleGradient: simple })}
+                          onAdvancedChange={(advanced) => setAdminAuthBgConfig({ ...adminAuthBgConfig, advancedGradient: advanced })}
+                          idPrefix="admin-auth-gradient"
+                        />
+                      </div>
+
+                      {/* Priority Selector */}
+                      <div className="space-y-2">
+                        <Label>Background Priority</Label>
+                        <Select
+                          value={adminAuthBgConfig.priority}
+                          onValueChange={(value) => setAdminAuthBgConfig({ ...adminAuthBgConfig, priority: value as any })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="image">Image Priority (color/gradient as fallback)</SelectItem>
+                            <SelectItem value="color">Color/Gradient Priority (ignore image)</SelectItem>
+                            <SelectItem value="layer">Layer (color/gradient behind image)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* User Auth Background Card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>User Auth Background</CardTitle>
+                      <CardDescription>
+                        Customize the background for user login page (/login)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Image Upload Section */}
+                      {userAuthBgPreview && (
+                        <div className="border rounded-md p-4 bg-gray-50 dark:bg-muted relative">
+                          <img src={userAuthBgPreview} alt="User Auth Background" className="w-full h-32 object-cover rounded" />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => deleteUserAuthBgMutation.mutate()}
+                            disabled={deleteUserAuthBgMutation.isPending}
+                          >
+                            {deleteUserAuthBgMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="user-auth-bg"
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+                          onChange={handleUserAuthBgChange}
+                          className="hidden"
+                        />
+                        <Label htmlFor="user-auth-bg" className="cursor-pointer flex items-center justify-center border rounded-md px-4 py-2 hover:bg-gray-50 dark:bg-muted">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Choose Background Image
+                        </Label>
+
+                        {userAuthBgFile && (
+                          <Button onClick={() => uploadUserAuthBgMutation.mutate()} disabled={uploadUserAuthBgMutation.isPending}>
+                            {uploadUserAuthBgMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                            Upload
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Background Color Picker */}
+                      <div className="space-y-2">
+                        <Label>Background Color (Optional)</Label>
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className="w-10 h-10 rounded border cursor-pointer"
+                            style={{ backgroundColor: userAuthBgConfig.backgroundColor || '#ffffff' }}
+                            onClick={() => document.getElementById('user-bg-color')?.click()}
+                          />
+                          <Input
+                            id="user-bg-color"
+                            type="color"
+                            value={userAuthBgConfig.backgroundColor || '#ffffff'}
+                            onChange={(e) => setUserAuthBgConfig({ ...userAuthBgConfig, backgroundColor: e.target.value })}
+                            className="w-16 h-10 p-1"
+                          />
+                          <Input
+                            type="text"
+                            value={userAuthBgConfig.backgroundColor}
+                            onChange={(e) => setUserAuthBgConfig({ ...userAuthBgConfig, backgroundColor: e.target.value })}
+                            placeholder="#ffffff or rgb(255,255,255)"
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Gradient Configuration */}
+                      <div className="space-y-2">
+                        <Label>Background Gradient (Optional)</Label>
+                        <GradientConfigUI
+                          mode={userAuthBgConfig.gradientMode}
+                          simpleConfig={userAuthBgConfig.simpleGradient}
+                          advancedConfig={userAuthBgConfig.advancedGradient}
+                          onModeChange={(mode) => setUserAuthBgConfig({ ...userAuthBgConfig, gradientMode: mode })}
+                          onSimpleChange={(simple) => setUserAuthBgConfig({ ...userAuthBgConfig, simpleGradient: simple })}
+                          onAdvancedChange={(advanced) => setUserAuthBgConfig({ ...userAuthBgConfig, advancedGradient: advanced })}
+                          idPrefix="user-auth-gradient"
+                        />
+                      </div>
+
+                      {/* Priority Selector */}
+                      <div className="space-y-2">
+                        <Label>Background Priority</Label>
+                        <Select
+                          value={userAuthBgConfig.priority}
+                          onValueChange={(value) => setUserAuthBgConfig({ ...userAuthBgConfig, priority: value as any })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="image">Image Priority (color/gradient as fallback)</SelectItem>
+                            <SelectItem value="color">Color/Gradient Priority (ignore image)</SelectItem>
+                            <SelectItem value="layer">Layer (color/gradient behind image)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Save Configuration Button */}
+                <div className="mt-4 space-y-2">
+                  <Button
+                    variant="brand"
+                    onClick={() => saveAuthBackgroundConfigMutation.mutate()}
+                    disabled={saveAuthBackgroundConfigMutation.isPending}
+                    className="w-full"
+                  >
+                    {saveAuthBackgroundConfigMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Auth Background Settings
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAuthPreviewModal(true)}
+                    className="w-full"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Preview Changes
+                  </Button>
+                </div>
               </div>
             </div>
           </TabsContent>
@@ -2197,6 +3210,59 @@ export default function AdminSettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Google Maps Integration</CardTitle>
+                  <CardDescription>
+                    Configure your Google Maps API key to enable scraping business contacts from Google Maps.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="google-maps-api-key">API Key</Label>
+                    <Input
+                      id="google-maps-api-key"
+                      type="text"
+                      placeholder="AIzaSy..."
+                      value={googleMapsApiKey}
+                      onChange={(e) => setGoogleMapsApiKey(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter your Google Maps API key. Get one from{' '}
+                      <a
+                        href="https://console.cloud.google.com/google/maps-apis"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Google Cloud Console
+                      </a>
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Note: Only super admins can configure this app-level setting.
+                    </p>
+                    {googleMapsSettings?.configured && (
+                      <div className="text-xs text-green-600 mt-1">
+                        Status: Configured ({googleMapsSettings.apiKey})
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <Button
+                      onClick={() => saveGoogleMapsApiKeyMutation.mutate()}
+                      disabled={saveGoogleMapsApiKeyMutation.isPending || !googleMapsApiKey.trim()}
+                      className="w-full"
+                    >
+                      {saveGoogleMapsApiKeyMutation.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Save Google Maps API Key
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
@@ -2284,6 +3350,109 @@ export default function AdminSettingsPage() {
                       className="w-full sm:w-auto"
                     >
                       {testStripeMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="mr-2 h-4 w-4" />
+                      )}
+                      {t('admin.settings.test_connection', 'Test Connection')}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Paystack Integration</CardTitle>
+                  <CardDescription>
+                    Configure Paystack payment gateway
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="paystack-enabled"
+                      checked={paystackForm.enabled}
+                      onCheckedChange={(checked) => setPaystackForm({ ...paystackForm, enabled: checked })}
+                    />
+                    <Label htmlFor="paystack-enabled">Enable Paystack Payments</Label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="paystack-publicKey">Public Key</Label>
+                    <Input
+                      id="paystack-publicKey"
+                      value={paystackForm.publicKey}
+                      onChange={(e) => setPaystackForm({ ...paystackForm, publicKey: e.target.value })}
+                      placeholder="pk_test_xxxxx"
+                      disabled={!paystackForm.enabled}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="paystack-secretKey">Secret Key</Label>
+                    <Input
+                      id="paystack-secretKey"
+                      type="password"
+                      value={paystackForm.secretKey}
+                      onChange={(e) => setPaystackForm({ ...paystackForm, secretKey: e.target.value })}
+                      placeholder="sk_test_xxxxx"
+                      disabled={!paystackForm.enabled}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="paystack-subaccount">Subaccount (optional)</Label>
+                    <Input
+                      id="paystack-subaccount"
+                      value={paystackForm.subaccount}
+                      onChange={(e) => setPaystackForm({ ...paystackForm, subaccount: e.target.value })}
+                      placeholder="ACCT_xxxxx"
+                      disabled={!paystackForm.enabled}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="paystack-webhookSecret">Webhook Secret (optional)</Label>
+                    <Input
+                      id="paystack-webhookSecret"
+                      value={paystackForm.webhookSecret}
+                      onChange={(e) => setPaystackForm({ ...paystackForm, webhookSecret: e.target.value })}
+                      placeholder="whsec_xxxxx"
+                      disabled={!paystackForm.enabled}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="paystack-test-mode"
+                      checked={paystackForm.testMode}
+                      onCheckedChange={(checked) => setPaystackForm({ ...paystackForm, testMode: checked })}
+                      disabled={!paystackForm.enabled}
+                    />
+                    <Label htmlFor="paystack-test-mode">Test Mode</Label>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
+                    <Button
+                      variant="brand"
+                      onClick={() => savePaystackMutation.mutate()}
+                      disabled={savePaystackMutation.isPending || !paystackForm.enabled}
+                      className="btn-brand-primary w-full sm:w-auto"
+                    >
+                      {savePaystackMutation.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      <span className="hidden sm:inline">Save Paystack Settings</span>
+                      <span className="sm:hidden">Save Settings</span>
+                    </Button>
+
+                    <Button
+                      variant="brand"
+                      onClick={() => testPaystackMutation.mutate()}
+                      disabled={testPaystackMutation.isPending || !paystackForm.enabled || !paystackForm.secretKey}
+                      className="w-full sm:w-auto"
+                    >
+                      {testPaystackMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <Check className="mr-2 h-4 w-4" />
@@ -3280,7 +4449,7 @@ export default function AdminSettingsPage() {
                             id="embedCode"
                             readOnly
                             value={embedCode}
-                            className="w-full h-32 p-3 text-sm font-mono bg-gray-50 border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full h-32 p-3 text-sm font-mono bg-gray-50 dark:bg-muted border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Generated embed code will appear here..."
                           />
                         </div>
@@ -3292,7 +4461,7 @@ export default function AdminSettingsPage() {
                       {showEmbedPreview && embedCode && (
                         <div className="space-y-2">
                           <Label>Embed Preview</Label>
-                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 dark:bg-muted">
                             <div
                               className="bg-white rounded border"
                               style={{
@@ -3674,39 +4843,13 @@ export default function AdminSettingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {/* 360Dialog Partner Configuration */}
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-medium">360Dialog Partner API</h3>
-                        <p className="text-sm text-gray-500">
-                          Configure 360Dialog Partner credentials for company onboarding
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => setShowPartnerConfigModal(true)}
-                        variant="outline"
-                        className="btn-brand-primary"
-                      >
-                        <Settings className="w-4 h-4 mr-2" />
-                        {t('admin.settings.configure', 'Configure')}
-                      </Button>
-                    </div>
-
-                    <div className="text-sm text-gray-600">
-                      <p>• Platform-wide Partner API integration</p>
-                      <p>• Enables Integrated Onboarding for companies</p>
-                      <p>• Manages client WhatsApp Business accounts</p>
-                    </div>
-                  </div>
-
                   {/* Meta WhatsApp Business API Partner Configuration */}
                   <div className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-lg font-medium">Meta WhatsApp Business API</h3>
+                        <h3 className="text-lg font-medium">Meta Partner API</h3>
                         <p className="text-sm text-gray-500">
-                          Configure Meta Tech Provider credentials for embedded signup
+                          Configure Meta Tech Provider credentials for embedded signup across WhatsApp, Messenger, and Instagram
                         </p>
                       </div>
                       <Button
@@ -3722,7 +4865,9 @@ export default function AdminSettingsPage() {
                     <div className="text-sm text-gray-600">
                       <p>• Tech Provider embedded signup integration</p>
                       <p>• Streamlined WhatsApp Business account onboarding</p>
-                      <p>• Automatic phone number provisioning</p>
+                      <p>• Easy setup for Messenger via Facebook Pages</p>
+                      <p>• Easy setup for Instagram Business accounts</p>
+                      <p>• Automatic phone number provisioning (WhatsApp)</p>
                     </div>
                   </div>
 
@@ -3768,7 +4913,7 @@ export default function AdminSettingsPage() {
                   Custom Scripts
                 </CardTitle>
                 <CardDescription>
-                  Inject custom HTML and JavaScript code globally across your PowerChat application.
+                  Inject custom HTML and JavaScript code globally across your application.
                   This feature allows you to integrate third-party services like translation tools, analytics, or other widgets.
                 </CardDescription>
               </CardHeader>
@@ -3848,17 +4993,102 @@ export default function AdminSettingsPage() {
                     Save Custom Scripts
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                {/* Usage Examples */}
-                <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium mb-3">Common Use Cases:</h4>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <p><strong>Translation Services:</strong> Weglot, Google Translate Widget</p>
-                    <p><strong>Analytics:</strong> Google Analytics, Facebook Pixel, Hotjar</p>
-                    <p><strong>Customer Support:</strong> Intercom, Zendesk Chat, Crisp</p>
-                    <p><strong>Marketing:</strong> HubSpot tracking, Mailchimp forms</p>
-                    <p><strong>Payment:</strong> Stripe.js, PayPal SDK</p>
+          <TabsContent value="custom-css">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Paintbrush className="h-5 w-5" />
+                  Custom CSS
+                </CardTitle>
+                <CardDescription>
+                  Inject custom CSS styles globally across your application.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+              
+
+                {/* Enable/Disable Toggle */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <Label className="text-base font-medium">Enable Custom CSS</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Toggle to enable or disable custom CSS injection globally
+                    </p>
                   </div>
+                  <Switch
+                    checked={customCssForm.enabled}
+                    onCheckedChange={(checked) =>
+                      setCustomCssForm(prev => ({ ...prev, enabled: checked }))
+                    }
+                  />
+                </div>
+
+                {/* CSS Input */}
+                <div className="space-y-3">
+                  <Label htmlFor="custom-css" className="text-base font-medium">
+                    Custom CSS
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Paste your CSS code here. Styles will be injected into the &lt;head&gt; section of all pages.
+                  </p>
+                  <Textarea
+                    id="custom-css"
+                    placeholder={`Example:
+/* Custom button styles */
+.btn-brand-primary {
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Custom header styles */
+header {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Custom sidebar styles (use !important to override inline styles) */
+aside {
+  background-color: #f5f5f5 !important;
+}
+
+/* Or target admin sidebar specifically */
+div.flex.flex-1.relative > aside {
+  background-color: #f5f5f5 !important;
+}`}
+                    value={customCssForm.css}
+                    onChange={(e) =>
+                      setCustomCssForm(prev => ({ ...prev, css: e.target.value }))
+                    }
+                    className="min-h-[200px] font-mono text-sm"
+                    disabled={!customCssForm.enabled}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    CSS will be applied globally. Use specific selectors to target elements without affecting the entire application.
+                  </p>
+                </div>
+
+                {/* Last Modified Info */}
+                {customCssForm.lastModified && (
+                  <div className="text-sm text-muted-foreground">
+                    Last modified: {new Date(customCssForm.lastModified).toLocaleString()}
+                  </div>
+                )}
+
+                {/* Save Button */}
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => saveCustomCssMutation.mutate()}
+                    disabled={saveCustomCssMutation.isPending}
+                    className="btn-brand-primary"
+                  >
+                    {saveCustomCssMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save Custom CSS
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -3868,19 +5098,6 @@ export default function AdminSettingsPage() {
         </Tabs>
 
         {/* Partner Configuration Modals */}
-        <PartnerConfigurationForm
-          provider="360dialog"
-          isOpen={showPartnerConfigModal}
-          onClose={() => setShowPartnerConfigModal(false)}
-          onSuccess={() => {
-            toast({
-              title: "Success",
-              description: "360Dialog Partner configuration updated successfully",
-            });
-            setShowPartnerConfigModal(false);
-          }}
-        />
-
         <MetaPartnerConfigurationForm
           isOpen={showMetaPartnerConfigModal}
           onClose={() => setShowMetaPartnerConfigModal(false)}
@@ -3903,6 +5120,15 @@ export default function AdminSettingsPage() {
             });
             setShowTikTokPlatformConfigModal(false);
           }}
+        />
+        <AuthBackgroundPreviewModal
+          isOpen={showAuthPreviewModal}
+          onClose={() => setShowAuthPreviewModal(false)}
+          adminConfig={adminAuthBgConfig}
+          adminBgImageUrl={adminAuthBgPreview}
+          userConfig={userAuthBgConfig}
+          userBgImageUrl={userAuthBgPreview}
+          brandingData={{ appName: brandingForm.appName, logoUrl: logoPreview || '', primaryColor: brandingForm.primaryColor }}
         />
       </div>
     </AdminLayout>

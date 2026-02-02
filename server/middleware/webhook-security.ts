@@ -136,19 +136,6 @@ export function createWebhookSecurityMiddleware(options: WebhookSecurityOptions 
 }
 
 /**
- * 360Dialog specific webhook security middleware
- */
-export function create360DialogWebhookSecurity() {
-  return createWebhookSecurityMiddleware({
-    signatureHeader: 'x-360dialog-signature',
-    rateLimit: {
-      windowMs: 60 * 1000, // 1 minute
-      maxRequests: 100 // 100 requests per minute per IP
-    }
-  });
-}
-
-/**
  * TikTok specific webhook security middleware
  */
 export function createTikTokWebhookSecurity() {

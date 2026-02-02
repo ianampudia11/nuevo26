@@ -39,8 +39,8 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
         disabled={currentPage === 1}
         className={`px-3 py-1 rounded-md ${
           currentPage === 1
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+            : 'bg-background border border-border text-foreground hover:bg-accent'
         }`}
       >
         <i className="ri-arrow-left-s-line"></i>

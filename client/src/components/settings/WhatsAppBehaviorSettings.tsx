@@ -347,6 +347,12 @@ export function WhatsAppBehaviorSettings() {
           </div>
           <CardDescription>
             {t('settings.whatsapp.typing_indicators_desc', 'Configure human-like typing indicators that appear before sending messages')}
+            <div className="mt-2 flex items-start gap-2">
+              <Info className="h-4 w-4 mt-0.5 text-blue-500 flex-shrink-0" />
+              <span className="text-sm">
+                {t('settings.whatsapp.applies_to_both', 'These settings apply to both WhatsApp Official (Cloud API) and non-official (Baileys) connections')}
+              </span>
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -515,6 +521,12 @@ export function WhatsAppBehaviorSettings() {
           </div>
           <CardDescription>
             {t('settings.whatsapp.message_splitting_desc', 'Automatically split long messages into smaller, more natural chunks')}
+            <div className="mt-2 flex items-start gap-2">
+              <Info className="h-4 w-4 mt-0.5 text-blue-500 flex-shrink-0" />
+              <span className="text-sm">
+                {t('settings.whatsapp.applies_to_both', 'These settings apply to both WhatsApp Official (Cloud API) and non-official (Baileys) connections')}
+              </span>
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

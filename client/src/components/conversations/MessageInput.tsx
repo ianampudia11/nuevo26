@@ -53,6 +53,27 @@ export default function MessageInput({ conversationId, conversation, contact }: 
   const { t } = useTranslation();
   const { sendMessage, sendMediaMessage, replyToMessage, setReplyToMessage } = useConversations();
 
+
+  const isTikTok = conversation?.channelType === 'tiktok';
+  const tiktokMeta = isTikTok && conversation?.groupMetadata ? (conversation.groupMetadata as {
+    messagingWindowStatus?: 'open' | 'closed' | 'expired';
+    conversationState?: 'active' | 'window_closed' | 'user_blocked' | 'expired';
+    messagingWindowExpiresAt?: number;
+  }) : null;
+  const tiktokCanReply = isTikTok
+    ? (tiktokMeta?.messagingWindowStatus === 'open' || !tiktokMeta?.messagingWindowStatus) &&
+      tiktokMeta?.conversationState !== 'window_closed' &&
+      tiktokMeta?.conversationState !== 'user_blocked' &&
+      tiktokMeta?.conversationState !== 'expired'
+    : true;
+  const tiktokWindowClosedMessage = !tiktokCanReply && isTikTok
+    ? t('message_input.tiktok_window_closed', 'Messaging window has closed. The user must send a message to reopen the conversation.')
+    : null;
+  const tiktokExpiresAt = tiktokMeta?.messagingWindowExpiresAt;
+  const tiktokExpiringSoon = isTikTok && tiktokCanReply && tiktokExpiresAt && tiktokExpiresAt > Date.now();
+  const tiktokRemainingMs = tiktokExpiringSoon && tiktokExpiresAt ? Math.max(0, tiktokExpiresAt - Date.now()) : 0;
+  const TIKTOK_LEARN_MORE_URL = 'https://developers.tiktok.com/doc/business-messaging-overview/';
+
   const focusTextarea = (delay: number = 100, forceForReply: boolean = false) => {
     setTimeout(() => {
       if (textareaRef.current &&
@@ -733,12 +754,60 @@ export default function MessageInput({ conversationId, conversation, contact }: 
     };
   }, [audioURL]);
   
+  const formatRemaining = (ms: number) => {
+    const hours = Math.floor(ms / (60 * 60 * 1000));
+    const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+    if (hours > 0) return t('message_input.tiktok_window_hours', `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} min`, { hours, minutes });
+    return t('message_input.tiktok_window_minutes', `${minutes} minute${minutes !== 1 ? 's' : ''}`, { minutes });
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 transition-colors duration-200">
+    <div className="bg-background border-t border-border p-4 transition-colors duration-200">
+      {isTikTok && tiktokExpiringSoon && tiktokRemainingMs > 0 && (
+        <div
+          className="mb-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 px-3 py-2.5 text-sm text-amber-800 dark:text-amber-200"
+          role="status"
+          title={t('message_input.tiktok_window_tooltip', 'TikTok allows messaging within 24–48 hours after the user\'s last message. After that, the user must send a new message to reopen the window.')}
+        >
+          <span className="font-medium">⚠️ {t('message_input.tiktok_window_expiring_soon', 'Messaging Window Expiring Soon')}</span>
+          <p className="mt-1 text-amber-700 dark:text-amber-300">
+            {t('message_input.tiktok_window_expires_in', `This conversation will expire in ${formatRemaining(tiktokRemainingMs)}.`, { time: formatRemaining(tiktokRemainingMs) })}
+          </p>
+          <p className="mt-0.5 text-amber-600 dark:text-amber-400">
+            {t('message_input.tiktok_window_reopen', 'The user must send a new message to reopen the window.')}
+          </p>
+          <a
+            href={TIKTOK_LEARN_MORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-amber-800 dark:text-amber-200 underline font-medium mt-1 inline-block"
+          >
+            {t('message_input.learn_more', 'Learn More')}
+          </a>
+        </div>
+      )}
+      {tiktokWindowClosedMessage && (
+        <div
+          className="mb-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2.5 text-sm text-red-800 dark:text-red-200"
+          role="alert"
+          title={t('message_input.tiktok_window_tooltip', 'TikTok allows messaging within 24–48 hours after the user\'s last message. After that, the user must send a new message to reopen the window.')}
+        >
+          <span className="font-medium">⚠️ {t('message_input.tiktok_window_closed_banner', 'Messaging Window Closed')}</span>
+          <p className="mt-1">{t('message_input.tiktok_window_closed_description', 'This conversation has expired. The user must send a new message to reopen the window.')}</p>
+          <a
+            href={TIKTOK_LEARN_MORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-red-700 dark:text-red-300 underline font-medium mt-1 inline-block"
+          >
+            {t('message_input.learn_more', 'Learn More')}
+          </a>
+        </div>
+      )}
       {replyToMessage && (
         <div
           id="reply-context"
-          className="mb-3 bg-gray-50 dark:bg-gray-700 border-l-4 border-blue-500 rounded-r-md"
+          className="mb-3 bg-muted border-l-4 border-primary rounded-r-md"
           ref={(el) => {
             if (el && textareaRef.current) {
               setTimeout(() => {
@@ -755,14 +824,14 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                   <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
                     {t('message_input.replying_to', 'Replying to')}
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-300">
+                  <span className="text-xs text-gray-500 dark:text-muted-foreground">
                     {replyToMessage.direction === 'inbound'
                       ? (replyToMessage.contact?.name || t('common.contact', 'Contact'))
                       : t('common.you', 'You')
                     }
                   </span>
                 </div>
-                <p className="text-sm text-gray-700 dark:text-gray-200 line-clamp-2">
+                <p className="text-sm text-gray-700 dark:text-foreground line-clamp-2">
                   {replyToMessage.content
                     ? truncateText(replyToMessage.content)
                     : t('message_bubble.media_message', 'Media message')
@@ -772,7 +841,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
             </div>
             <button
               onClick={handleCancelReply}
-              className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white transition-colors ml-2 flex-shrink-0"
+              className="p-1 rounded-md hover:bg-gray-200 dark:hover: text-gray-500 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground transition-colors ml-2 flex-shrink-0"
               title={t('message_input.cancel_reply', 'Cancel reply')}
               aria-label={t('message_input.cancel_reply', 'Cancel reply')}
             >
@@ -782,16 +851,20 @@ export default function MessageInput({ conversationId, conversation, contact }: 
         </div>
       )}
 
-      {!showRecordingUI ? (
+      {!tiktokCanReply && isTikTok ? (
+        <div className="rounded-lg border border-border bg-muted/50 px-4 py-6 text-center text-muted-foreground text-sm">
+          {t('message_input.tiktok_conversation_expired', 'This conversation has expired. The user must send a new message to reopen the window.')}
+        </div>
+      ) : !showRecordingUI ? (
         <>
-          <div className="relative flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-full px-4 py-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <div className="relative flex items-center bg-background border border-border rounded-full px-4 py-3 shadow-sm hover:shadow-md transition-shadow duration-200">
             <button
               ref={emojiButtonRef}
               className={`
                 p-2 rounded-full transition-all duration-200
-                hover:bg-gray-100 dark:hover:bg-gray-700
-                ${isEmojiPickerOpen ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white
+                hover:bg-gray-100 dark:hover:bg-muted
+                ${isEmojiPickerOpen ? 'bg-gray-100 dark:bg-muted' : ''}
+                text-gray-500 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground
                 flex-shrink-0
               `}
               onClick={handleEmojiButtonClick}
@@ -819,7 +892,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isSending}
+              disabled={isSending || !tiktokCanReply}
               aria-label={t('messages.input.type_message', 'Type a message...')}
               aria-describedby={replyToMessage ? 'reply-context' : undefined}
               autoComplete="off"
@@ -841,7 +914,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                     flex-shrink-0
                   `}
                   onClick={() => setIsSchedulerOpen(true)}
-                  disabled={isSending}
+                  disabled={isSending || !tiktokCanReply}
                   data-tooltip={t('messages.input.schedule_message', 'Schedule message')}
                   aria-label={t('messages.input.schedule_message', 'Schedule message')}
                 >
@@ -854,16 +927,16 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                     w-10 h-10 rounded-full flex items-center justify-center
                     send-button-transition button-scale-hover button-scale-active
                     shadow-lg hover:shadow-xl
-                    ${isSending
+                    ${isSending || !tiktokCanReply
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'send-button-gradient'
                     }
                     text-white focus-ring
                     flex-shrink-0
-                    ${!isSending && message.trim() ? 'send-button-pulse' : ''}
+                    ${!isSending && message.trim() && tiktokCanReply ? 'send-button-pulse' : ''}
                   `}
                   onClick={handleSendMessage}
-                  disabled={isSending || !message.trim()}
+                  disabled={isSending || !message.trim() || !tiktokCanReply}
                   data-tooltip={t('messages.input.send_message', 'Send message')}
                   aria-label={t('messages.input.send_message', 'Send message')}
                 >
@@ -878,12 +951,13 @@ export default function MessageInput({ conversationId, conversation, contact }: 
               <button
                 className={`
                   p-2 rounded-full transition-all duration-200
-                  hover:bg-gray-100 dark:hover:bg-gray-700
-                  text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white
+                  hover:bg-gray-100 dark:hover:bg-muted
+                  text-gray-500 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground
                   button-scale-hover
                   flex-shrink-0
                 `}
                 onClick={handleStartRecording}
+                disabled={!tiktokCanReply}
                 data-tooltip={t('messages.input.record_voice_message', 'Record voice message')}
                 aria-label={t('messages.input.record_voice_message', 'Record voice message')}
               >
@@ -907,15 +981,17 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                 />
               )}
               <button
-                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200"
+                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-muted text-gray-600 dark:text-muted-foreground hover:text-gray-800 dark:hover:text-foreground transition-colors duration-200 disabled:opacity-50 disabled:pointer-events-none"
                 onClick={handleAttachmentClick}
+                disabled={!tiktokCanReply}
                 title={t('messages.input.attach_file', 'Attach file')}
               >
                 <i className="ri-attachment-2 text-base"></i>
               </button>
               <button
-                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200"
+                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-muted text-gray-600 dark:text-muted-foreground hover:text-gray-800 dark:hover:text-foreground transition-colors duration-200 disabled:opacity-50 disabled:pointer-events-none"
                 onClick={handleImageClick}
+                disabled={!tiktokCanReply}
                 title={t('messages.input.attach_image', 'Attach image')}
               >
                 <i className="ri-image-line text-base"></i>
@@ -927,7 +1003,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                 p-2 rounded-md transition-colors duration-200 relative
                 ${!isBotDisabled
                   ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                  : 'hover:bg-gray-100 dark:hover:bg-muted text-gray-600 dark:text-muted-foreground hover:text-gray-800 dark:hover:text-foreground'
                 }
                 ${isToggling ? 'opacity-50 cursor-not-allowed' : ''}
               `}
@@ -953,14 +1029,14 @@ export default function MessageInput({ conversationId, conversation, contact }: 
         </>
       ) : (
         <div className="py-2">
-          <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 p-4 rounded-lg shadow-lg">
+          <div className="flex items-center justify-between bg-background border border-border p-4 rounded-lg shadow-lg">
             <div className="flex items-center">
               <button
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 button-scale-hover"
+                className="p-2 rounded-full hover:bg-accent transition-colors duration-200 button-scale-hover"
                 onClick={handleCancelRecording}
                 title={t('common.cancel', 'Cancel')}
               >
-                <i className="ri-delete-bin-line text-red-500 dark:text-red-400"></i>
+                <i className="ri-delete-bin-line text-destructive"></i>
               </button>
               <div className="text-base font-mono ml-3 text-green-600 dark:text-green-400 font-semibold">
                 {formatTime(recordingTime)}
@@ -998,7 +1074,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                   )}
                 </div>
               ) : (
-                <div className="relative w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full">
+                <div className="relative w-full h-2 bg-muted rounded-full">
                   <div
                     className="absolute left-0 top-0 h-full bg-green-500 dark:bg-green-400 rounded-full"
                     style={{ width: `${Math.min(100, (recordingTime / 300) * 100)}%` }}
@@ -1036,7 +1112,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                   )}
 
                   <button
-                    className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200 button-scale-hover shadow-md hover:shadow-lg"
+                    className="p-2 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-all duration-200 button-scale-hover shadow-md hover:shadow-lg"
                     onClick={handleStopRecording}
                     title={t('messages.input.stop', 'Stop')}
                   >
@@ -1050,7 +1126,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
                   p-2 rounded-full transition-all duration-200 button-scale-hover shadow-md hover:shadow-lg text-white
                   ${recordedAudio && !isSendingVoice
                     ? 'send-button-gradient hover:shadow-xl'
-                    : 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-50'
+                    : 'bg-muted cursor-not-allowed opacity-50'
                   }
                 `}
                 onClick={handleSendVoiceMessage}
@@ -1065,7 +1141,7 @@ export default function MessageInput({ conversationId, conversation, contact }: 
               </button>
 
               {isSendingVoice && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <span>{t('messages.input.sending_voice', 'Sending voice message...')}</span>
                 </div>
               )}

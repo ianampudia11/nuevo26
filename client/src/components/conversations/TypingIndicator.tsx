@@ -31,17 +31,17 @@ export function TypingIndicator({
         >
           <div className="flex gap-1">
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
             />
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
             />
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
             />
@@ -70,17 +70,17 @@ export function TypingIndicator({
         <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
           <div className="flex gap-1">
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
             />
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
             />
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
             />
@@ -127,17 +127,17 @@ export function MultipleTypingIndicator({
         >
           <div className="flex gap-1">
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
             />
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
             />
             <motion.span
-              className="w-2 h-2 bg-gray-400 rounded-full"
+              className="w-2 h-2 bg-muted-foreground rounded-full"
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
             />
@@ -167,17 +167,17 @@ export function MultipleTypingIndicator({
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
               <motion.span
-                className="w-2 h-2 bg-gray-400 rounded-full"
+                className="w-2 h-2 bg-muted-foreground rounded-full"
                 animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
                 transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
               />
               <motion.span
-                className="w-2 h-2 bg-gray-400 rounded-full"
+                className="w-2 h-2 bg-muted-foreground rounded-full"
                 animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
                 transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
               />
               <motion.span
-                className="w-2 h-2 bg-gray-400 rounded-full"
+                className="w-2 h-2 bg-muted-foreground rounded-full"
                 animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
                 transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
               />
@@ -231,7 +231,7 @@ export function PresenceBadge({
         title={labelText[status]}
       />
       {showLabel && (
-        <span className="text-xs text-gray-600">{labelText[status]}</span>
+        <span className="text-xs text-muted-foreground">{labelText[status]}</span>
       )}
     </div>
   );

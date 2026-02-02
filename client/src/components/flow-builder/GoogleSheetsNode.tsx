@@ -23,7 +23,6 @@ import {
   Loader2,
   Play,
   Plus,
-  Sheet,
   Table,
   Trash2,
   Variable,
@@ -51,7 +50,7 @@ const GOOGLE_SHEETS_OPERATIONS = [
     description: 'Add new data row to sheet',
     tooltip: 'Add a new row of data to the end of your Google Sheet. Sets variables: {{google_sheets.success}} (true/false), {{google_sheets.appendedRange}} (cell range), {{google_sheets.rowsAdded}} (count).',
     icon: '➕',
-    color: 'text-green-600'
+    color: 'text-primary'
   },
   {
     id: 'read_rows',
@@ -59,7 +58,7 @@ const GOOGLE_SHEETS_OPERATIONS = [
     description: 'Fetch data with optional filters',
     tooltip: 'Read data from your Google Sheet with optional filtering and row range selection. Sets variables: {{google_sheets.rows}} (all data), {{google_sheets.headers}} (column names), {{google_sheets.totalRows}} (count), {{google_sheets.row_1}} (first row), {{google_sheets.column_Name}} (column data).',
     icon: '📖',
-    color: 'text-blue-600'
+    color: 'text-primary'
   },
   {
     id: 'update_row',
@@ -67,7 +66,7 @@ const GOOGLE_SHEETS_OPERATIONS = [
     description: 'Modify existing row data',
     tooltip: 'Update existing rows in your Google Sheet by matching column values. Sets variables: {{google_sheets.success}} (true/false), {{google_sheets.matchingRows}} (found), {{google_sheets.updatedRows}} (modified).',
     icon: '✏️',
-    color: 'text-orange-600'
+    color: 'text-secondary'
   },
   {
     id: 'get_sheet_info',
@@ -75,7 +74,7 @@ const GOOGLE_SHEETS_OPERATIONS = [
     description: 'Retrieve sheet metadata and headers',
     tooltip: 'Get information about your Google Sheet including column headers and metadata. Sets variables: {{google_sheets.headers}} (column names), {{google_sheets.title}} (sheet title), {{google_sheets.rowCount}}, {{google_sheets.columnCount}}.',
     icon: 'ℹ️',
-    color: 'text-purple-600'
+    color: 'text-primary'
   }
 ];
 
@@ -498,7 +497,7 @@ const ColumnMappingsUI: React.FC<ColumnMappingsUIProps> = ({ value, onChange, pl
                   size="sm"
                   onClick={() => removeMapping(mapping.id)}
                   disabled={mappings.length === 1}
-                  className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                   title="Remove mapping"
                 >
                   <Minus className="h-3 w-3" />
@@ -510,15 +509,15 @@ const ColumnMappingsUI: React.FC<ColumnMappingsUIProps> = ({ value, onChange, pl
       </div>
 
       {hasValidMappings && (
-        <div className="bg-green-50 p-3 rounded border border-green-200">
+        <div className="bg-primary/10 p-3 rounded border border-primary/20">
           <div className="flex items-start gap-2">
-            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
             <div>
-              <div className="font-medium text-green-800 mb-1 text-xs">Current Mappings ({validMappings.length}):</div>
+              <div className="font-medium text-primary mb-1 text-xs">Current Mappings ({validMappings.length}):</div>
               <div className="space-y-1">
                 {validMappings.map((mapping, index) => (
-                  <div key={mapping.id} className="text-xs font-mono bg-white p-1 rounded border">
-                    <span className="text-blue-600">"{mapping.column}"</span> → <span className="text-green-600">{mapping.variable}</span>
+                  <div key={mapping.id} className="text-xs font-mono bg-card p-1 rounded border border-border">
+                    <span className="text-primary">"{mapping.column}"</span> → <span className="text-primary">{mapping.variable}</span>
                   </div>
                 ))}
               </div>
@@ -538,12 +537,12 @@ const ColumnMappingsUI: React.FC<ColumnMappingsUIProps> = ({ value, onChange, pl
       </Button>
       
       {placeholder && (
-        <div className="text-xs text-muted-foreground bg-blue-50 p-3 rounded border border-blue-200">
+        <div className="text-xs text-muted-foreground bg-primary/10 p-3 rounded border border-primary/20">
           <div className="flex items-start gap-2">
-            <HelpCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <HelpCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
             <div>
-              <div className="font-medium text-blue-800 mb-1">Example Configuration:</div>
-              <div className="font-mono text-xs bg-white p-2 rounded border">
+              <div className="font-medium text-primary mb-1">Example Configuration:</div>
+              <div className="font-mono text-xs bg-card p-2 rounded border border-border">
                 {placeholder}
               </div>
             </div>
@@ -735,13 +734,13 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
   const standardHandleStyle = {
     width: 12,
     height: 12,
-    backgroundColor: '#22c55e',
-    border: '2px solid white',
+    backgroundColor: 'hsl(var(--primary))',
+    border: '2px solid hsl(var(--background))',
   };
 
   const getOperationColor = (op: string) => {
     const operationData = GOOGLE_SHEETS_OPERATIONS.find(operation => operation.id === op);
-    return operationData?.color || 'text-gray-600';
+    return operationData?.color || 'text-muted-foreground';
   };
 
   const copyToClipboard = async (text: string, fieldName: string) => {
@@ -1120,7 +1119,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
   };
 
   return (
-    <div className="node-google-sheets p-3 rounded-lg bg-white border border-green-200 shadow-sm min-w-[380px] max-w-[480px] group">
+    <div className="node-google-sheets p-3 rounded-lg bg-card border border-border shadow-sm min-w-[380px] max-w-[480px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -1169,7 +1168,11 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Sheet className="h-4 w-4 text-green-600" />
+              <img 
+                src="https://cdn.activepieces.com/pieces/google-sheets.png" 
+                alt="Google Sheets" 
+                className="h-4 w-4"
+              />
             </TooltipTrigger>
             <TooltipContent side="top">
               <p className="text-xs">Google Sheets Integration</p>
@@ -1182,7 +1185,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-800">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20">
                   {configurationProgress}%
                 </Badge>
               </TooltipTrigger>
@@ -1225,7 +1228,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
         </TooltipProvider>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2 bg-card rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <TooltipProvider>
             <Tooltip>
@@ -1236,7 +1239,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                     {GOOGLE_SHEETS_OPERATIONS.find(op => op.id === operation)?.name || operation}
                   </span>
                   {isGoogleSheetsConnected && (
-                    <span className="text-xs text-green-600 font-medium">✓</span>
+                    <span className="text-xs text-primary font-medium">✓</span>
                   )}
                 </div>
               </TooltipTrigger>
@@ -1254,9 +1257,9 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1">
                   {isGoogleSheetsConnected && spreadsheetId && sheetName ? (
-                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <CheckCircle className="h-3 w-3 text-primary" />
                   ) : (
-                    <AlertCircle className="h-3 w-3 text-yellow-600" />
+                    <AlertCircle className="h-3 w-3 text-muted-foreground" />
                   )}
                   <span className="text-xs text-muted-foreground truncate">
                     {isGoogleSheetsConnected && spreadsheetId && sheetName
@@ -1376,10 +1379,10 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
       />
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border border-border rounded p-2 bg-card">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Table className="h-3.5 w-3.5 text-green-600" />
+              <Table className="h-3.5 w-3.5 text-primary" />
               <Label className="font-medium">Quick Templates</Label>
               <TooltipProvider>
                 <Tooltip>
@@ -1435,7 +1438,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                       <p className="text-xs text-muted-foreground">
                         Found in the Google Sheets URL between '/d/' and '/edit'
                       </p>
-                      <p className="text-xs text-blue-600 mt-1">
+                      <p className="text-xs text-primary mt-1">
                         Example: docs.google.com/spreadsheets/d/[SHEET_ID]/edit
                       </p>
                     </TooltipContent>
@@ -1449,7 +1452,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                   disabled={!spreadsheetId}
                 >
                   {copiedField === 'spreadsheetId' ? (
-                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <CheckCircle className="h-3 w-3 text-primary" />
                   ) : (
                     <Copy className="h-3 w-3" />
                   )}
@@ -1473,8 +1476,8 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                     }}
                     placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
                     className={cn(
-                      fieldValidation.spreadsheetId?.isValid === false ? "border-red-500" :
-                      fieldValidation.spreadsheetId?.isValid === true ? "border-green-500" : ""
+                      fieldValidation.spreadsheetId?.isValid === false ? "border-destructive" :
+                      fieldValidation.spreadsheetId?.isValid === true ? "border-primary" : ""
                     )}
                   />
                 </div>
@@ -1508,7 +1511,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                 </TooltipProvider>
               </div>
               {fieldValidation.spreadsheetId?.message && (
-                <p className="text-[10px] text-red-600 mt-1">
+                <p className="text-[10px] text-destructive mt-1">
                   {fieldValidation.spreadsheetId.message}
                 </p>
               )}
@@ -1540,7 +1543,11 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                       {fetchedSheets.map((sheet) => (
                         <SelectItem key={sheet.id} value={sheet.id}>
                           <div className="flex items-center gap-2">
-                            <Sheet className="w-3 h-3 text-green-600" />
+                            <img 
+                              src="https://cdn.activepieces.com/pieces/google-sheets.png" 
+                              alt="Google Sheets" 
+                              className="w-3 h-3"
+                            />
                             <div>
                               <div className="font-medium text-xs">{sheet.name}</div>
                               <div className="text-[10px] text-muted-foreground">{sheet.id}</div>
@@ -1567,7 +1574,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                       <p className="text-xs text-muted-foreground">
                         The name of the specific sheet tab within your Google Sheets document
                       </p>
-                      <p className="text-xs text-blue-600 mt-1">
+                      <p className="text-xs text-primary mt-1">
                         Default is usually "Sheet1" for new sheets
                       </p>
                     </TooltipContent>
@@ -1639,7 +1646,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                       {fetchedSheetNames.map((name) => (
                         <SelectItem key={name} value={name}>
                           <div className="flex items-center gap-2">
-                            <Table className="w-3 h-3 text-green-600" />
+                            <Table className="w-3 h-3 text-primary" />
                             <span className="text-xs">{name}</span>
                           </div>
                         </SelectItem>
@@ -1678,7 +1685,7 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
                       : 'Verify your configuration and add test data to the sheet'
                     }
                   </p>
-                  <p className="text-xs text-blue-600 mt-1">
+                  <p className="text-xs text-primary mt-1">
                     📊 Will add a sample row with contact information
                   </p>
                 </TooltipContent>
@@ -1692,8 +1699,8 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
             <div className={cn(
               "p-2 rounded border text-xs mt-2",
               testResult.success
-                ? "bg-green-50 border-green-200 text-green-800"
-                : "bg-red-50 border-red-200 text-red-800"
+                ? "bg-primary/10 border-primary/20 text-primary"
+                : "bg-destructive/10 border-destructive/20 text-destructive"
             )}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1">
@@ -1801,13 +1808,13 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
 
               <CollapsibleContent className="space-y-2">
                 {OPERATION_CONFIG[operation as keyof typeof OPERATION_CONFIG].map((configField) => (
-                  <div key={configField.key} className="bg-secondary/20 p-2 rounded border">
+                  <div key={configField.key} className="p-2 rounded border border-border bg-card">
                     <div className="flex gap-2 items-start">
                       <div className="flex-1">
                         <div className="flex items-center gap-1 mb-1">
                           <Label className="text-[10px] font-medium">
                             {configField.label}
-                            {configField.required && <span className="text-red-500 ml-1">*</span>}
+                            {configField.required && <span className="text-destructive ml-1">*</span>}
                           </Label>
                           {configField.tooltip && (
                             <TooltipProvider>
@@ -1895,11 +1902,11 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
             </Collapsible>
           )}
 
-          <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
+          <div className="mt-3 p-2 bg-primary/10 border border-primary/20 rounded">
             <div className="flex items-center gap-1 mb-1">
-              <span className="text-xs font-medium text-green-800">💡 Quick Examples</span>
+              <span className="text-xs font-medium text-primary">💡 Quick Examples</span>
             </div>
-            <div className="text-[10px] text-green-700 space-y-1">
+            <div className="text-[10px] text-primary space-y-1">
               {operation === 'append_row' && (
                 <>
                   <p>• Column mapping: {"{"}"Name": "{"{{contact.name}}"}", "Phone": "{"{{contact.phone}}"}", "Message": "{"{{message.content}}"}"{"}"}</p>
@@ -1928,12 +1935,12 @@ export function GoogleSheetsNode({ id, data, isConnectable }: GoogleSheetsNodePr
           </div>
 
           {/* Variables Available Section */}
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-2 mt-2">
+          <div className="bg-primary/10 border border-primary/20 rounded-md p-2 mt-2">
             <div className="flex items-center gap-1 mb-1">
-              <Variable className="w-3 h-3 text-blue-600" />
-              <span className="text-xs font-medium text-blue-800">📊 Variables Available After Execution</span>
+              <Variable className="w-3 h-3 text-primary" />
+              <span className="text-xs font-medium text-primary">📊 Variables Available After Execution</span>
             </div>
-            <div className="text-[10px] text-blue-700 space-y-1">
+            <div className="text-[10px] text-primary space-y-1">
               <p className="font-medium">Common Variables (all operations):</p>
               <p>• <code>{"{{google_sheets.success}}"}</code> - Operation success (true/false)</p>
               <p>• <code>{"{{google_sheets.data}}"}</code> - Complete response data</p>

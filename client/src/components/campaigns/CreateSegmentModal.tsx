@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { FilterSection } from '@/components/segments/FilterSection';
+import { ContactPreviewTable } from '@/components/segments/ContactPreviewTable';
+import { SegmentSummary } from '@/components/segments/SegmentSummary';
 import {
   Dialog,
   DialogContent,
@@ -42,7 +45,9 @@ import {
   Undo2,
   Upload,
   Download,
-  FileText
+  FileText,
+  Target,
+  Settings
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
@@ -100,6 +105,12 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
   const [csvColumnMapping, setCsvColumnMapping] = useState<Record<string, string>>({});
   const [csvImportStep, setCsvImportStep] = useState<'upload' | 'mapping' | 'preview' | 'importing' | 'results'>('upload');
   const [csvImportResults, setCsvImportResults] = useState<any>(null);
+  const [pipelineStages, setPipelineStages] = useState<Array<{ id: number; name: string; color: string }>>([]);
+  const [selectedPipelineStageIds, setSelectedPipelineStageIds] = useState<number[]>([]);
+  const [dateRangeExpanded, setDateRangeExpanded] = useState(false);
+  const [tagFiltersExpanded, setTagFiltersExpanded] = useState(false);
+  const [pipelineFiltersExpanded, setPipelineFiltersExpanded] = useState(false);
+  const [advancedOptionsExpanded, setAdvancedOptionsExpanded] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -119,8 +130,22 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
       setCsvColumnMapping({});
       setCsvImportStep('upload');
       setCsvImportResults(null);
+      setSelectedPipelineStageIds([]);
+      fetchPipelineStages();
     }
   }, [isOpen]);
+
+  const fetchPipelineStages = async () => {
+    try {
+      const response = await fetch('/api/pipeline/stages');
+      if (response.ok) {
+        const stages = await response.json();
+        setPipelineStages(stages || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pipeline stages:', error);
+    }
+  };
 
   const debouncedPreview = useCallback(
     debounce(async (criteria: SegmentCriteria) => {
@@ -150,19 +175,23 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
       } finally {
         setIsPreviewLoading(false);
       }
-    }, 500),
+    }, 800),
     []
   );
 
   useEffect(() => {
-    if (isOpen && ((criteria.tags?.length ?? 0) > 0 || criteria.created_after || criteria.created_before)) {
-      debouncedPreview(criteria);
+    if (isOpen && ((criteria.tags?.length ?? 0) > 0 || criteria.created_after || criteria.created_before || (selectedPipelineStageIds.length > 0))) {
+      const criteriaWithPipelineStages = {
+        ...criteria,
+        pipelineStageIds: selectedPipelineStageIds.length > 0 ? selectedPipelineStageIds : undefined
+      };
+      debouncedPreview(criteriaWithPipelineStages);
     } else {
       setContactCount(null);
       setContactPreview([]);
       setHasMoreContacts(false);
     }
-  }, [criteria, isOpen, debouncedPreview]);
+  }, [criteria, selectedPipelineStageIds, isOpen, debouncedPreview]);
 
   const handleExcludeContact = (contactId: number) => {
     const contactToExclude = contactPreview.find(c => c.id === contactId);
@@ -288,7 +317,7 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
           return row;
         });
 
-        setCsvPreviewData(dataRows.slice(0, 10)); // Show first 10 rows for preview
+        setCsvPreviewData(dataRows.slice(0, 10)); 
 
 
         const mapping: Record<string, string> = {};
@@ -343,11 +372,15 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
 
       if (response.ok) {
         setCsvImportResults(result);
-        setCsvImportStep('results'); // Add this line to show results
+        setCsvImportStep('results'); 
 
 
-        if ((criteria.tags?.length ?? 0) > 0 || criteria.created_after || criteria.created_before) {
-          debouncedPreview(criteria);
+        const criteriaWithPipelineStages = {
+          ...criteria,
+          pipelineStageIds: selectedPipelineStageIds.length > 0 ? selectedPipelineStageIds : undefined
+        };
+        if ((criteria.tags?.length ?? 0) > 0 || criteria.created_after || criteria.created_before || (selectedPipelineStageIds.length > 0)) {
+          debouncedPreview(criteriaWithPipelineStages);
         }
 
         toast({
@@ -389,10 +422,10 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
       return;
     }
 
-    if ((criteria.tags?.length ?? 0) === 0 && !criteria.created_after && !criteria.created_before) {
+    if (effectiveContactCount === null || effectiveContactCount === 0) {
       toast({
         title: t('common.error', 'Error'),
-        description: t('segments.create.criteria_required', 'Please add at least one filter criteria'),
+        description: t('segments.create.no_contacts_match', 'No contacts match the current criteria. Please adjust your filters or ensure contacts exist that match your criteria.'),
         variant: 'destructive'
       });
       return;
@@ -400,16 +433,31 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
 
     setIsLoading(true);
     try {
+      let criteriaToSend: SegmentFilterCriteria;
+
+      if (hasMoreContacts) {
+        criteriaToSend = {
+          ...criteria,
+          excludedContactIds,
+          pipelineStageIds: selectedPipelineStageIds.length > 0 ? selectedPipelineStageIds : undefined
+        };
+      } else {
+        const contactIds = filteredContacts.map(c => c.id);
+
+        criteriaToSend = {
+          contactIds,
+          excludedContactIds,
+          pipelineStageIds: selectedPipelineStageIds.length > 0 ? selectedPipelineStageIds : undefined
+        };
+      }
+
       const response = await fetch('/api/campaigns/segments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name,
           description: formData.description,
-          criteria: {
-            ...criteria,
-            excludedContactIds
-          }
+          criteria: criteriaToSend
         })
       });
 
@@ -435,9 +483,24 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
     }
   };
 
+  const hasDateFilters = !!(criteria.created_after || criteria.created_before);
+  const hasTagFilters = (criteria.tags?.length ?? 0) > 0;
+  const hasPipelineFilters = selectedPipelineStageIds.length > 0;
+
+  const getDateSummary = () => {
+    if (criteria.created_after && criteria.created_before) {
+      return `${new Date(criteria.created_after).toLocaleDateString()} - ${new Date(criteria.created_before).toLocaleDateString()}`;
+    } else if (criteria.created_after) {
+      return `After ${new Date(criteria.created_after).toLocaleDateString()}`;
+    } else if (criteria.created_before) {
+      return `Before ${new Date(criteria.created_before).toLocaleDateString()}`;
+    }
+    return 'No date filter';
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
@@ -446,6 +509,7 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information */}
           <div className="space-y-4">
             <div>
               <Label htmlFor="name">{t('segments.create.name_label', 'Segment Name')}</Label>
@@ -455,7 +519,11 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder={t('segments.create.name_placeholder', 'e.g., VIP Customers, New Leads')}
                 required
+                maxLength={100}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {formData.name.length}/100 characters
+              </p>
             </div>
 
             <div>
@@ -466,15 +534,221 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder={t('segments.create.description_placeholder', 'Describe this segment...')}
                 rows={2}
+                maxLength={500}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {formData.description.length}/500 characters
+              </p>
             </div>
           </div>
 
           <Separator />
 
+          {/* Filter Criteria */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">{t('segments.create.filter_criteria_title', 'Filter Criteria')}</h3>
+            <h3 className="text-lg font-semibold">{t('segments.create.filter_criteria_title', 'Filter Criteria')}</h3>
+
+            {/* Date Range Filters */}
+            <FilterSection
+              title={t('segments.create.date_range_filters', 'Date Range Filters')}
+              icon={<Calendar className="w-4 h-4" />}
+              summary={getDateSummary()}
+              isActive={hasDateFilters}
+              defaultExpanded={false}
+              color="blue"
+            >
+              <div className="space-y-3">
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const date = new Date();
+                      date.setDate(date.getDate() - 30);
+                      setCriteria(prev => ({ ...prev, created_after: date.toISOString().split('T')[0] }));
+                    }}
+                  >
+                    Last 30 days
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const date = new Date();
+                      date.setDate(date.getDate() - 90);
+                      setCriteria(prev => ({ ...prev, created_after: date.toISOString().split('T')[0] }));
+                    }}
+                  >
+                    Last 90 days
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const date = new Date();
+                      date.setMonth(0, 1);
+                      setCriteria(prev => ({ ...prev, created_after: date.toISOString().split('T')[0] }));
+                    }}
+                  >
+                    This year
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="created_after" className="text-sm">{t('segments.create.created_after_label', 'Created After')}</Label>
+                    <Input
+                      id="created_after"
+                      type="date"
+                      value={criteria.created_after}
+                      onChange={(e) => setCriteria(prev => ({ ...prev, created_after: e.target.value }))}
+                      className="mt-1.5"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="created_before" className="text-sm">{t('segments.create.created_before_label', 'Created Before')}</Label>
+                    <Input
+                      id="created_before"
+                      type="date"
+                      value={criteria.created_before}
+                      onChange={(e) => setCriteria(prev => ({ ...prev, created_before: e.target.value }))}
+                      className="mt-1.5"
+                    />
+                  </div>
+                </div>
+              </div>
+            </FilterSection>
+
+            {/* Tag Filters */}
+            <FilterSection
+              title={t('segments.create.tag_filters', 'Tag Filters')}
+              icon={<Tag className="w-4 h-4" />}
+              summary={hasTagFilters ? `${criteria.tags?.length} tags selected` : 'No tags'}
+              isActive={hasTagFilters}
+              defaultExpanded={false}
+              color="purple"
+            >
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t('segments.create.tag_placeholder', 'Enter tag name')}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAddTag}
+                    disabled={!newTag.trim()}
+                    size="sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {(criteria.tags?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {(criteria.tags ?? []).map((tag, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1.5 bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-900">
+                        <Tag className="w-3 h-3" />
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveTag(tag);
+                          }}
+                          className="ml-1 hover:text-destructive transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  💡 {t('segments.create.tags_description', 'Contacts must have ALL selected tags')}
+                </p>
+              </div>
+            </FilterSection>
+
+            {/* Pipeline Stage Filters */}
+            <FilterSection
+              title={t('segments.create.pipeline_stage_filters', 'Pipeline Stage Filters')}
+              icon={<Target className="w-4 h-4" />}
+              summary={hasPipelineFilters ? `${selectedPipelineStageIds.length} stages selected` : 'No pipeline filter'}
+              isActive={hasPipelineFilters}
+              defaultExpanded={false}
+              color="green"
+            >
+              <div className="space-y-3">
+                <Select
+                  value={undefined}
+                  onValueChange={(value) => {
+                    if (value && !selectedPipelineStageIds.includes(parseInt(value))) {
+                      setSelectedPipelineStageIds([...selectedPipelineStageIds, parseInt(value)]);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('segments.create.pipeline_stage_placeholder', 'Select pipeline stages')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pipelineStages
+                      .filter(stage => !selectedPipelineStageIds.includes(stage.id))
+                      .map((stage) => (
+                        <SelectItem key={stage.id} value={stage.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div style={{ backgroundColor: stage.color }} className="w-3 h-3 rounded-full" />
+                            <span>{stage.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {selectedPipelineStageIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPipelineStageIds.map((stageId) => {
+                      const stage = pipelineStages.find(s => s.id === stageId);
+                      return stage ? (
+                        <Badge key={stageId} variant="secondary" className="flex items-center gap-1.5 bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-900">
+                          <div style={{ backgroundColor: stage.color }} className="w-3 h-3 rounded-full" />
+                          {stage.name}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedPipelineStageIds(selectedPipelineStageIds.filter(id => id !== stageId));
+                            }}
+                            className="ml-1 hover:text-destructive transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  💡 {t('segments.create.pipeline_stage_description', 'Contacts with deals in any of the selected stages will be included')}
+                </p>
+              </div>
+            </FilterSection>
+
+            {/* Advanced Options */}
+            <FilterSection
+              title={t('segments.create.advanced_options', 'Advanced Options')}
+              icon={<Settings className="w-4 h-4" />}
+              summary="CSV import & exclusions"
+              isActive={false}
+              defaultExpanded={false}
+              color="orange"
+            >
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -497,212 +771,50 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
                   {t('segments.csv.import_contacts', 'Import from CSV')}
                 </Button>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="created_after">{t('segments.create.created_after_label', 'Created After')}</Label>
-                <Input
-                  id="created_after"
-                  type="date"
-                  value={criteria.created_after}
-                  onChange={(e) => setCriteria(prev => ({ ...prev, created_after: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="created_before">{t('segments.create.created_before_label', 'Created Before')}</Label>
-                <Input
-                  id="created_before"
-                  type="date"
-                  value={criteria.created_before}
-                  onChange={(e) => setCriteria(prev => ({ ...prev, created_before: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>{t('segments.create.contact_tags_label', 'Contact Tags')}</Label>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={t('segments.create.tag_placeholder', 'Enter tag name')}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleAddTag}
-                    disabled={!newTag.trim()}
-                    size="sm"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {(criteria.tags?.length ?? 0) > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {(criteria.tags ?? []).map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                        <Tag className="w-3 h-3" />
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleRemoveTag(tag);
-                          }}
-                          className="ml-1 hover:text-destructive"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  {t('segments.create.tags_description', 'Contacts must have ALL selected tags')}
-                </p>
-              </div>
-            </div>
+            </FilterSection>
           </div>
 
           <Separator />
 
+          {/* Contact Preview */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                {t('segments.create.contact_preview_title', 'Contact Preview')}
-              </h4>
-              {effectiveContactCount !== null && (
-                <div className="text-sm text-muted-foreground">
-                  {hasMoreContacts ? (
-                    <>{t('segments.create.showing_first_50', 'Showing first 50 of')} <strong>{effectiveContactCount}</strong> {t('segments.create.unique_contacts', 'unique contacts')}</>
-                  ) : (
-                    <><strong>{effectiveContactCount}</strong> {t('segments.create.unique_contacts_match_criteria', 'unique contacts match these criteria')}</>
-                  )}
-                  {excludedContactIds.length > 0 && (
-                    <span className="text-orange-600 ml-2">
-                      ({excludedContactIds.length} {t('segments.create.excluded', 'excluded')})
-                    </span>
-                  )}
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {t('segments.create.deduplication_note', 'Note: Duplicates by phone number are automatically removed. Counts reflect unique phone numbers.')}
-                  </div>
-                </div>
-              )}
-            </div>
+            <h4 className="font-semibold flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              {t('segments.create.contact_preview_title', 'Contact Preview')}
+            </h4>
+
+            {effectiveContactCount !== null && effectiveContactCount > 0 && (
+              <SegmentSummary
+                totalContacts={effectiveContactCount}
+                excludedCount={excludedContactIds.length}
+                invalidCount={invalidPhoneContacts.length}
+              />
+            )}
+
+            {effectiveContactCount !== null && (
+              <div className="text-sm text-muted-foreground">
+                {hasMoreContacts ? (
+                  <p>📊 {t('segments.create.showing_first_50', 'Showing first 50 of')} <strong>{effectiveContactCount}</strong> {t('segments.create.unique_contacts', 'unique contacts')}</p>
+                ) : (
+                  <p>📊 <strong>{effectiveContactCount}</strong> {t('segments.create.unique_contacts_match_criteria', 'unique contacts match these criteria')}</p>
+                )}
+                <p className="text-xs mt-1">
+                  💡 {t('segments.create.deduplication_note', 'Note: Duplicates by phone number are automatically removed. Counts reflect unique phone numbers.')}
+                </p>
+              </div>
+            )}
 
             {isPreviewLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t('segments.create.loading_preview', 'Loading contact preview...')}
-                </div>
+              <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
+                <p className="text-sm text-muted-foreground">{t('segments.create.loading_preview', 'Loading contact preview...')}</p>
               </div>
             ) : filteredContacts.length > 0 ? (
-              <div className="border rounded-lg max-h-80 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('segments.create.table.contact_name', 'Contact Name')}</TableHead>
-                      <TableHead>{t('segments.create.table.phone', 'Phone')}</TableHead>
-                      <TableHead>{t('segments.create.table.email', 'Email')}</TableHead>
-                      <TableHead>{t('segments.create.table.tags', 'Tags')}</TableHead>
-                      <TableHead>{t('segments.create.table.created', 'Created')}</TableHead>
-                      <TableHead>{t('segments.create.table.last_activity', 'Last Activity')}</TableHead>
-                      <TableHead className="w-20">{t('segments.create.table.actions', 'Actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredContacts.map((contact) => (
-                      <TableRow key={contact.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-muted-foreground" />
-                            {contact.name || t('segments.create.table.unknown', 'Unknown')}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Phone className="w-4 h-4 text-muted-foreground" />
-                            {contact.phone}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {contact.email ? (
-                            <div className="flex items-center gap-2">
-                              <Mail className="w-4 h-4 text-muted-foreground" />
-                              {contact.email}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {contact.tags && contact.tags.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {contact.tags.slice(0, 2).map((tag, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                              {contact.tags.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{contact.tags.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm">
-                              {new Date(contact.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {contact.lastActivity ? (
-                            <div className="flex items-center gap-2">
-                              <Activity className="w-4 h-4 text-green-500" />
-                              <span className="text-sm">
-                                {new Date(contact.lastActivity).toLocaleDateString()}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <Activity className="w-4 h-4 text-muted-foreground" />
-                              <span className="text-sm text-muted-foreground">{t('segments.create.table.no_activity', 'No activity')}</span>
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleExcludeContact(contact.id);
-                            }}
-                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            title={t('segments.create.exclude_contact_tooltip', 'Exclude contact from segment')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="max-h-96 overflow-y-auto">
+                <ContactPreviewTable
+                  contacts={filteredContacts}
+                  onExclude={handleExcludeContact}
+                />
               </div>
             ) : contactPreview.length > 0 && filteredContacts.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -743,9 +855,9 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
             )}
 
             {excludedContactIds.length > 0 && (
-              <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <h5 className="text-sm font-medium text-orange-800">
+                  <h5 className="text-sm font-medium text-orange-800 dark:text-orange-400">
                     {t('segments.create.excluded_contacts_title', 'Excluded Contacts')} ({excludedContactIds.length})
                   </h5>
                   <Button
@@ -758,7 +870,7 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
                       setExcludedContactIds([]);
                       setExcludedContactDetails([]);
                     }}
-                    className="text-orange-700 border-orange-300 hover:bg-orange-100"
+                    className="text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-900 hover:bg-orange-100 dark:hover:bg-orange-900/30"
                   >
                     <Undo2 className="w-4 h-4 mr-1" />
                     {t('segments.create.restore_all', 'Restore All')}
@@ -768,9 +880,9 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
                   {excludedContactDetails.map((excludedContact) => (
                     <div
                       key={excludedContact.id}
-                      className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-orange-200"
+                      className="flex items-center gap-2 bg-card px-2 py-1 rounded border border-orange-200"
                     >
-                      <span className="text-sm text-orange-800">
+                      <span className="text-sm text-orange-800 dark:text-orange-400">
                         {excludedContact.name || excludedContact.phone || `Contact ${excludedContact.id}`}
                       </span>
                       <Button
@@ -782,7 +894,7 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
                           e.stopPropagation();
                           handleUndoExclusion(excludedContact.id);
                         }}
-                        className="h-5 w-5 p-0 text-orange-600 hover:text-orange-800"
+                        className="h-5 w-5 p-0 text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300"
                         title={t('segments.create.restore_contact_tooltip', 'Restore contact')}
                       >
                         <Undo2 className="w-3 h-3" />
@@ -822,8 +934,8 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
           <div className="space-y-6">
             {csvImportStep === 'upload' && (
               <div className="space-y-4">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <Upload className="w-8 h-8 mx-auto mb-4 text-gray-400" />
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                  <Upload className="w-8 h-8 mx-auto mb-4 text-muted-foreground" />
                   <div className="space-y-2">
                     <p className="text-sm font-medium">
                       {t('segments.csv.upload_instruction', 'Choose a CSV file to upload')}
@@ -946,11 +1058,11 @@ export function CreateSegmentModal({ isOpen, onClose, onSegmentCreated }: Create
 
             {csvImportStep === 'results' && csvImportResults && (
               <div className="space-y-4">
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <h4 className="font-medium text-green-800 mb-2">
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 rounded-lg">
+                  <h4 className="font-medium text-green-800 dark:text-green-400 mb-2">
                     {t('segments.csv.import_complete', 'Import Complete')}
                   </h4>
-                  <div className="text-sm text-green-700 space-y-1">
+                  <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
                     <p>{t('segments.csv.successful_imports', 'Successfully imported: {{count}} contacts', { count: csvImportResults.successful })}</p>
                     <p>{t('segments.csv.failed_imports', 'Failed imports: {{count}}', { count: csvImportResults.failed })}</p>
                     {csvImportResults.errors && csvImportResults.errors.length > 0 && (

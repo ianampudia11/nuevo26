@@ -117,11 +117,11 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
     const daysUntilExpiry = Math.floor((expiresAt - now) / (1000 * 60 * 60 * 24));
 
     if (daysUntilExpiry < 0) {
-      return { status: 'expired', color: 'text-red-600', message: 'Token expired' };
+      return { status: 'expired', color: 'text-red-600 dark:text-red-400', message: 'Token expired' };
     } else if (daysUntilExpiry < 7) {
-      return { status: 'expiring', color: 'text-orange-600', message: `Expires in ${daysUntilExpiry} days` };
+      return { status: 'expiring', color: 'text-orange-600 dark:text-orange-400', message: `Expires in ${daysUntilExpiry} days` };
     } else {
-      return { status: 'valid', color: 'text-green-600', message: `Valid for ${daysUntilExpiry} days` };
+      return { status: 'valid', color: 'text-green-600 dark:text-green-400', message: `Valid for ${daysUntilExpiry} days` };
     }
   };
 
@@ -142,13 +142,13 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
 
         {loadingConnection ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-gray-500" />
           </div>
         ) : connectionData ? (
           <div className="space-y-6">
             {/* Account Information */}
             <div className="space-y-4">
-              <div className="flex items-center gap-3 pb-3 border-b">
+              <div className="flex items-center gap-3 pb-3 border-b dark:border-gray-700">
                 {connectionData.avatarUrl && (
                   <img 
                     src={connectionData.avatarUrl} 
@@ -160,40 +160,40 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-lg">{connectionData.displayName}</h3>
                     {connectionData.isVerified && (
-                      <span className="text-blue-500" title="Verified Account">
+                      <span className="text-blue-500 dark:text-blue-400" title="Verified Account">
                         <CheckCircle className="h-5 w-5" />
                       </span>
                     )}
                   </div>
                   {connectionData.username && (
-                    <p className="text-sm text-gray-500">@{connectionData.username}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">@{connectionData.username}</p>
                   )}
                 </div>
               </div>
 
               {/* Connection Details */}
               <div className="grid grid-cols-1 gap-3">
-                <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
-                  <User className="h-4 w-4 mt-0.5 text-gray-500" />
+                <div className="flex items-start gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                  <User className="h-4 w-4 mt-0.5 text-gray-500 dark:text-gray-400" />
                   <div className="flex-1">
-                    <Label className="text-xs text-gray-500">Account Name</Label>
+                    <Label className="text-xs text-gray-500 dark:text-gray-400">Account Name</Label>
                     <p className="text-sm font-medium">{accountName}</p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
-                  <AtSign className="h-4 w-4 mt-0.5 text-gray-500" />
+                <div className="flex items-start gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                  <AtSign className="h-4 w-4 mt-0.5 text-gray-500 dark:text-gray-400" />
                   <div className="flex-1">
-                    <Label className="text-xs text-gray-500">Open ID</Label>
-                    <p className="text-sm font-mono text-gray-700">{connectionData.openId}</p>
+                    <Label className="text-xs text-gray-500 dark:text-gray-400">Open ID</Label>
+                    <p className="text-sm font-mono text-gray-700 dark:text-gray-300">{connectionData.openId}</p>
                   </div>
                 </div>
 
                 {connectionData.lastSyncAt && (
-                  <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
-                    <Calendar className="h-4 w-4 mt-0.5 text-gray-500" />
+                  <div className="flex items-start gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <Calendar className="h-4 w-4 mt-0.5 text-gray-500 dark:text-gray-400" />
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-500">Last Sync</Label>
+                      <Label className="text-xs text-gray-500 dark:text-gray-400">Last Sync</Label>
                       <p className="text-sm">{formatDate(connectionData.lastSyncAt)}</p>
                     </div>
                   </div>
@@ -201,15 +201,15 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
 
                 {/* Token Status */}
                 {tokenStatus && (
-                  <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-start gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                     <AlertCircle className={`h-4 w-4 mt-0.5 ${tokenStatus.color}`} />
                     <div className="flex-1">
-                      <Label className="text-xs text-gray-500">Token Status</Label>
+                      <Label className="text-xs text-gray-500 dark:text-gray-400">Token Status</Label>
                       <p className={`text-sm font-medium ${tokenStatus.color}`}>
                         {tokenStatus.message}
                       </p>
                       {tokenStatus.status === 'expired' && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Please refresh the connection to continue using TikTok messaging
                         </p>
                       )}
@@ -218,26 +218,26 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
                 )}
 
                 {/* Connection Status */}
-                <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-start gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                   <div className="flex-1">
-                    <Label className="text-xs text-gray-500">Connection Status</Label>
+                    <Label className="text-xs text-gray-500 dark:text-gray-400">Connection Status</Label>
                     <div className="flex items-center gap-2 mt-1">
                       {connectionData.status === 'active' && (
                         <>
                           <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                          <span className="text-sm font-medium text-green-600">Active</span>
+                          <span className="text-sm font-medium text-green-600 dark:text-green-400">Active</span>
                         </>
                       )}
                       {connectionData.status === 'error' && (
                         <>
                           <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                          <span className="text-sm font-medium text-red-600">Error</span>
+                          <span className="text-sm font-medium text-red-600 dark:text-red-400">Error</span>
                         </>
                       )}
                       {connectionData.status === 'disconnected' && (
                         <>
                           <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
-                          <span className="text-sm font-medium text-gray-600">Disconnected</span>
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Disconnected</span>
                         </>
                       )}
                     </div>
@@ -246,13 +246,13 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
 
                 {/* Scopes */}
                 {connectionData.scopes && connectionData.scopes.length > 0 && (
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <Label className="text-xs text-gray-500">Permissions</Label>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <Label className="text-xs text-gray-500 dark:text-gray-400">Permissions</Label>
                     <div className="flex flex-wrap gap-1 mt-2">
                       {connectionData.scopes.map((scope, index) => (
                         <span 
                           key={index}
-                          className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-700"
+                          className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
                         >
                           {scope}
                         </span>
@@ -265,11 +265,11 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
 
             {/* Warning for expired tokens */}
             {tokenStatus?.status === 'expired' && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-red-800">Token Expired</p>
-                  <p className="text-xs text-red-600 mt-1">
+                  <p className="text-sm font-medium text-red-800 dark:text-red-400">Token Expired</p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                     Your TikTok access token has expired. Click "Refresh Connection" to renew your access.
                   </p>
                 </div>
@@ -278,7 +278,7 @@ export function EditTikTokConnectionForm({ isOpen, onClose, onSuccess, connectio
           </div>
         ) : (
           <div className="flex items-center justify-center py-8">
-            <p className="text-gray-500">No connection data available</p>
+            <p className="text-gray-500 dark:text-gray-400">No connection data available</p>
           </div>
         )}
 

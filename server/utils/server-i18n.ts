@@ -1,6 +1,5 @@
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { storage } from '../storage';
 
 interface TranslationCache {
   [languageCode: string]: Record<string, string>;
@@ -8,26 +7,25 @@ interface TranslationCache {
 
 class ServerI18n {
   private cache: TranslationCache = {};
-  private translationsDir: string;
 
   constructor() {
-    this.translationsDir = path.join(process.cwd(), 'translations');
   }
 
   /**
-   * Load translations from JSON file for a specific language
+   * Load translations from database for a specific language
    */
   private async loadTranslations(languageCode: string): Promise<Record<string, string>> {
-    const filePath = path.join(this.translationsDir, `${languageCode}.json`);
-
     try {
-      const fileContent = await fs.readFile(filePath, 'utf-8');
-      const translationsArray = JSON.parse(fileContent) as Array<{ key: string; value: string }>;
 
+      const translationsArray = await storage.getTranslationsForLanguageAsArray(languageCode);
 
       const translations: Record<string, string> = {};
-      for (const item of translationsArray) {
-        translations[item.key] = item.value;
+      if (translationsArray && translationsArray.length > 0) {
+        for (const item of translationsArray) {
+          translations[item.key] = item.value;
+        }
+      } else {
+        console.warn(`No translations found in database for ${languageCode}`);
       }
 
       return translations;

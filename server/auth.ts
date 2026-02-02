@@ -10,6 +10,7 @@ import connectPg from "connect-pg-simple";
 import { getPool } from "./db";
 import { createAffiliateReferral } from "./middleware/affiliate-tracking";
 import { subdomainMiddleware, requireSubdomainAuth } from "./middleware/subdomain";
+import { initPipelineStages } from "./init-pipeline-stages";
 
 declare global {
   namespace Express {
@@ -380,6 +381,15 @@ export async function setupAuth(app: Express) {
 
       });
 
+
+      if (company.id) {
+        try {
+          await initPipelineStages(company.id);
+        } catch (pipelineError) {
+          console.error('Error initializing pipeline stages during company registration:', pipelineError);
+
+        }
+      }
 
       if (shouldStartTrial && planId && company.id) {
         try {
@@ -910,6 +920,15 @@ export async function setupAuth(app: Express) {
         subscriptionEndDate
       });
 
+
+      if (company.id) {
+        try {
+          await initPipelineStages(company.id);
+        } catch (pipelineError) {
+          console.error('Error initializing pipeline stages during admin company creation:', pipelineError);
+
+        }
+      }
 
       if (shouldStartTrial && planId) {
         try {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@/hooks/use-translation';
 import { useToast } from '@/hooks/use-toast';
+import { useChannelConnections } from '@/hooks/useChannelConnections';
 import {
   Select,
   SelectContent,
@@ -14,13 +14,14 @@ import {
   Wifi,
   AlertCircle
 } from 'lucide-react';
+import { TwilioIcon } from '@/components/icons/TwilioIcon';
 
 interface ChannelConnection {
   id: number;
   channelType: string;
   accountName?: string;
   accountId?: string;
-  status: 'active' | 'inactive' | 'error';
+  status: string | null;
   lastConnectedAt?: string;
   metadata?: any;
 }
@@ -37,20 +38,23 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
   const [selectedChannelId, setSelectedChannelId] = useState<number | undefined>(activeChannelId);
 
 
-  const { data: channels = [], isLoading, error } = useQuery<ChannelConnection[]>({
-    queryKey: ['/api/channel-connections'],
-    queryFn: async () => {
-      const response = await fetch('/api/channel-connections');
-      if (!response.ok) {
-        throw new Error('Failed to fetch channel connections');
-      }
-      return response.json();
-    },
-    refetchInterval: 30000, // Refresh every 30 seconds to check connection status
-  });
+  const { data: channels = [], isLoading, error } = useChannelConnections();
 
 
-  const activeChannels = channels.filter(channel => channel.status === 'active');
+  const normalizeStatus = (status: string | null): 'active' | 'inactive' | 'error' => {
+    if (status === null || status === 'connected' || status === 'pending') {
+      return 'active';
+    }
+    if (status === 'inactive' || status === 'error') {
+      return status;
+    }
+
+    return 'active';
+  };
+
+  const activeChannels = channels.filter(channel => 
+    channel.status === 'active' || channel.status === 'connected' || channel.status === 'pending' || channel.status === null
+  );
 
 
   useEffect(() => {
@@ -128,12 +132,16 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
         return 'Messenger';
       case 'instagram':
         return 'Instagram';
+      case 'tiktok':
+        return 'TikTok Business';
       case 'telegram':
         return 'Telegram';
       case 'email':
         return 'Email';
       case 'twilio_sms':
         return 'Twilio SMS';
+      case 'twilio_voice':
+        return 'Twilio Calls';
       case 'webchat':
         return 'WebChat';
       default:
@@ -152,12 +160,15 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
         return <i className="ri-messenger-line" style={{ color: '#1877F2' }} />;
       case 'instagram':
         return <i className="ri-instagram-line" style={{ color: '#E4405F' }} />;
+      case 'tiktok':
+        return <i className="ri-tiktok-line text-black dark:text-white" />;
       case 'telegram':
         return <i className="ri-telegram-line" style={{ color: '#0088CC' }} />;
       case 'email':
         return <i className="ri-mail-line" style={{ color: '#6B7280' }} />;
       case 'twilio_sms':
-        return <i className="ri-message-3-line" style={{ color: '#E4405F' }} />;
+      case 'twilio_voice':
+        return <TwilioIcon className="w-4 h-4" />;
       case 'webchat':
         return <i className="ri-message-3-line" style={{ color: '#6366f1' }} />;
       default:
@@ -170,11 +181,11 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
       case 'active':
         return 'bg-green-100 text-green-800';
       case 'inactive':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
       case 'error':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -182,8 +193,8 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         <div className="animate-pulse flex items-center gap-2">
-          <div className="w-4 h-4 bg-gray-200 rounded"></div>
-          <div className="w-32 h-6 bg-gray-200 rounded"></div>
+          <div className="w-4 h-4 bg-muted rounded"></div>
+          <div className="w-32 h-6 bg-muted rounded"></div>
         </div>
       </div>
     );
@@ -206,7 +217,7 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
     <div className={`flex items-center gap-2 ${className}`}>
       
       <Select value={selectedChannelId?.toString()} onValueChange={handleChannelChange}>
-        <SelectTrigger className="w-auto min-w-[200px] h-8 text-sm border-gray-200 focus:border-primary-300">
+        <SelectTrigger className="w-auto min-w-[200px] h-8 text-sm border-border focus:border-primary-300">
           <SelectValue>
             {selectedChannel && (
               <div className="flex items-center gap-2">
@@ -214,10 +225,10 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
                 <span className="truncate">{getChannelDisplayName(selectedChannel)}</span>
                 <Badge
                   variant="secondary"
-                  className={`text-xs ${getStatusColor(selectedChannel.status)}`}
+                  className={`text-xs ${getStatusColor(normalizeStatus(selectedChannel.status))}`}
                 >
                   <Wifi className="h-2 w-2 mr-1" />
-                  {t('inbox.channel_status.active', 'Active')}
+                  {t(`inbox.channel_status.${normalizeStatus(selectedChannel.status)}`, normalizeStatus(selectedChannel.status))}
                 </Badge>
               </div>
             )}
@@ -232,17 +243,17 @@ export function ChannelSelector({ activeChannelId, onChannelChange, className }:
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{getChannelDisplayName(channel)}</div>
                   {channel.accountId && (
-                    <div className="text-xs text-gray-500 truncate">
+                    <div className="text-xs text-muted-foreground truncate">
                       {channel.accountId}
                     </div>
                   )}
                 </div>
                 <Badge
                   variant="secondary"
-                  className={`text-xs ${getStatusColor(channel.status)}`}
+                  className={`text-xs ${getStatusColor(normalizeStatus(channel.status))}`}
                 >
                   <Wifi className="h-2 w-2 mr-1" />
-                  {t(`inbox.channel_status.${channel.status}`, channel.status)}
+                  {t(`inbox.channel_status.${normalizeStatus(channel.status)}`, normalizeStatus(channel.status))}
                 </Badge>
               </div>
             </SelectItem>

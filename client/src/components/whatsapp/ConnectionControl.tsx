@@ -56,7 +56,25 @@ const ConnectionControl: React.FC<ConnectionControlProps> = ({
 
 
   useEffect(() => {
-  }, [connectionId, onMessage, queryClient]);
+    const unsubscribe = onMessage('whatsappQrCodeRequired', (event: any) => {
+      if (event.connectionId === connectionId) {
+        toast({
+          title: "QR Code Required",
+          description: event.message || "Your session has expired. Please click 'Rescan QR' to reconnect.",
+          variant: "default",
+          duration: 10000, // Show for 10 seconds
+        });
+        
+
+        setLocalStatus('qr_code');
+        if (onStatusChange) {
+          onStatusChange('qr_code');
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [connectionId, onMessage, onStatusChange]);
 
   const handleReconnect = async () => {
     if (!connectionId || isReconnecting || isDisconnecting) return;

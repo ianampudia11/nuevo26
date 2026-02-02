@@ -73,7 +73,8 @@ export function CheckoutDialog({
 
 
       const payload: any = {
-        planId: plan.id
+        planId: plan.id,
+        originUrl: window.location.origin
       };
 
 
@@ -178,6 +179,18 @@ export function CheckoutDialog({
         toast({
           title: "Currency Mismatch",
           description: `Moyasar only supports SAR (Saudi Riyal). Current configured currency is ${currency}. Please change the default currency to SAR in General Settings.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    if (selectedMethod === 'paystack') {
+      const supported = ['NGN', 'GHS', 'ZAR', 'USD'];
+      if (!supported.includes(currency.toUpperCase())) {
+        toast({
+          title: "Currency Not Supported",
+          description: `Paystack supports NGN, GHS, ZAR, and USD. Current currency is ${currency}.`,
           variant: "destructive"
         });
         return;

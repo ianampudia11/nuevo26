@@ -2,9 +2,43 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    const error = new Error(`${res.status}: ${text}`);
+
+    const clonedRes = res.clone();
+    let errorMessage = res.statusText;
     
+    try {
+
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const jsonData = await clonedRes.json();
+
+        if (jsonData.message) {
+          errorMessage = jsonData.message;
+        } else if (jsonData.error) {
+          errorMessage = typeof jsonData.error === 'string' ? jsonData.error : JSON.stringify(jsonData.error);
+        }
+      } else {
+
+        const text = await clonedRes.text();
+        if (text) {
+          errorMessage = text;
+        }
+      }
+    } catch (parseError) {
+
+      try {
+        const text = await clonedRes.text();
+        if (text) {
+          errorMessage = text;
+        }
+      } catch (textError) {
+
+        errorMessage = res.statusText;
+      }
+    }
+    
+    const error = new Error(`${res.status}: ${errorMessage}`);
+    (error as any).status = res.status;
 
     if (res.status === 401) {
       (error as any).isAuthError = true;

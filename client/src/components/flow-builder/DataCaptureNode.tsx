@@ -277,7 +277,7 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
   }, [updateNodeData, captureRules, storageScope, overwriteExisting, enableValidation]);
 
   return (
-    <div className="node-data-capture p-3 rounded-lg bg-white border border-blue-200 shadow-sm min-w-[380px] max-w-[480px] group">
+    <div className="node-data-capture p-3 rounded-lg bg-card border border-border shadow-sm min-w-[380px] max-w-[480px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -287,7 +287,7 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    className="h-7 w-7 text-primary hover:text-primary/80 hover:bg-primary/10"
                   >
                     <HelpCircle className="h-3.5 w-3.5" />
                   </Button>
@@ -299,7 +299,7 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
                 >
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                      <Database className="h-5 w-5 text-blue-600" />
+                      <Database className="h-5 w-5 text-primary" />
                       Data Capture Node - Help & Documentation
                     </DialogTitle>
                     <DialogDescription>
@@ -366,7 +366,11 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Database className="h-4 w-4 text-blue-600" />
+              <img 
+                src="https://cdn-icons-png.flaticon.com/128/2920/2920349.png" 
+                alt="Data Capture" 
+                className="h-4 w-4"
+              />
             </TooltipTrigger>
             <TooltipContent side="top">
               <p className="text-xs">Data Capture Node</p>
@@ -379,7 +383,7 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20">
                   {configurationProgress}%
                 </Badge>
               </TooltipTrigger>
@@ -422,18 +426,18 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
         </TooltipProvider>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1">
-                  <Variable className="h-3 w-3 text-blue-600" />
-                  <span className="font-medium text-blue-600">
+                  <Variable className="h-3 w-3 text-primary" />
+                  <span className="font-medium text-primary">
                     {captureRules.length} Variable{captureRules.length !== 1 ? 's' : ''}
                   </span>
                   {captureRules.length > 0 && (
-                    <span className="text-xs text-green-600 font-medium">✓</span>
+                    <span className="text-xs text-primary font-medium">✓</span>
                   )}
                 </div>
               </TooltipTrigger>
@@ -456,9 +460,9 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1">
                   {captureRules.length > 0 ? (
-                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <CheckCircle className="h-3 w-3 text-primary" />
                   ) : (
-                    <AlertCircle className="h-3 w-3 text-yellow-600" />
+                    <AlertCircle className="h-3 w-3 text-secondary" />
                   )}
                   <span className="text-xs text-muted-foreground truncate">
                     {captureRules.length > 0 ? 'Ready' : 'Setup required'}
@@ -551,10 +555,10 @@ export function DataCaptureNode({ id, data, isConnectable }: DataCaptureNodeProp
       </div>
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border rounded p-2 ">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Database className="h-3.5 w-3.5 text-blue-600" />
+              <Database className="h-3.5 w-3.5 text-primary" />
               <Label className="font-medium">Quick Templates</Label>
               <TooltipProvider>
                 <Tooltip>
@@ -805,15 +809,15 @@ function DataCaptureHelpContent() {
         {/* Node Overview */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Database className="h-4 w-4 text-blue-600" />
+            <Database className="h-4 w-4 text-primary" />
             Node Overview
           </h3>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-gray-700 mb-2">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+            <p className="text-sm text-foreground mb-2">
               The <strong>Data Capture Node</strong> is a powerful tool for extracting and storing information from user conversations.
               It enables you to capture specific data points and make them available as variables throughout your entire flow.
             </p>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-foreground">
               <strong>Key Benefits:</strong> Personalize responses, store user preferences, extract order information,
               collect contact details, and create dynamic, context-aware conversations.
             </p>
@@ -823,7 +827,7 @@ function DataCaptureHelpContent() {
         {/* Data Source Types */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-green-600" />
+            <MessageSquare className="h-4 w-4 text-primary" />
             Data Source Types
           </h3>
           <div className="space-y-4">
@@ -832,10 +836,10 @@ function DataCaptureHelpContent() {
                 <MessageSquare className="h-3 w-3" />
                 Message Content
               </h4>
-              <p className="text-xs text-gray-600 mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
                 Captures the entire message text sent by the user.
               </p>
-              <div className="bg-gray-50 rounded p-2 text-xs font-mono">
+              <div className="bg-muted rounded p-2 text-xs font-mono">
                 User: "Hello, my name is John and I need help with order #12345"<br/>
                 Captured: "Hello, my name is John and I need help with order #12345"
               </div>
@@ -846,10 +850,10 @@ function DataCaptureHelpContent() {
                 <User className="h-3 w-3" />
                 Contact Field
               </h4>
-              <p className="text-xs text-gray-600 mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
                 Extracts data from existing contact information using dot notation.
               </p>
-              <div className="bg-gray-50 rounded p-2 text-xs font-mono space-y-1">
+              <div className="bg-muted rounded p-2 text-xs font-mono space-y-1">
                 <div><strong>Examples:</strong></div>
                 <div>contact.name → "John Smith"</div>
                 <div>contact.phone → "+1234567890"</div>
@@ -863,10 +867,10 @@ function DataCaptureHelpContent() {
                 <Hash className="h-3 w-3" />
                 Regex Extract
               </h4>
-              <p className="text-xs text-gray-600 mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
                 Uses regular expressions to extract specific patterns from messages.
               </p>
-              <div className="bg-gray-50 rounded p-2 text-xs font-mono space-y-1">
+              <div className="bg-muted rounded p-2 text-xs font-mono space-y-1">
                 <div><strong>Common Patterns:</strong></div>
                 <div>Name: My name is ([A-Za-z\\s]+)</div>
                 <div>Email: ([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]&#123;2,&#125;)</div>
@@ -881,10 +885,10 @@ function DataCaptureHelpContent() {
                 <MessageSquare className="h-3 w-3" />
                 User Input & Custom Prompt
               </h4>
-              <p className="text-xs text-gray-600 mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
                 Captures direct user responses or prompts users for specific information.
               </p>
-              <div className="bg-gray-50 rounded p-2 text-xs">
+              <div className="bg-muted rounded p-2 text-xs">
                 Best used when you want to capture the user's complete response to a specific question or prompt.
               </div>
             </div>
@@ -894,33 +898,33 @@ function DataCaptureHelpContent() {
         {/* Data Types */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Tag className="h-4 w-4 text-purple-600" />
+            <Tag className="h-4 w-4 text-primary" />
             Data Types & Validation
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1">String (Text)</h4>
-              <p className="text-xs text-gray-600">Any text content, no validation</p>
+              <p className="text-xs text-muted-foreground">Any text content, no validation</p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1">Number</h4>
-              <p className="text-xs text-gray-600">Numeric values, validates format</p>
+              <p className="text-xs text-muted-foreground">Numeric values, validates format</p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1">Email</h4>
-              <p className="text-xs text-gray-600">Validates email format (user@domain.com)</p>
+              <p className="text-xs text-muted-foreground">Validates email format (user@domain.com)</p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1">Phone</h4>
-              <p className="text-xs text-gray-600">Validates phone number format</p>
+              <p className="text-xs text-muted-foreground">Validates phone number format</p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1">Date</h4>
-              <p className="text-xs text-gray-600">Validates date format</p>
+              <p className="text-xs text-muted-foreground">Validates date format</p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1">Boolean (Yes/No)</h4>
-              <p className="text-xs text-gray-600">True/false, yes/no values</p>
+              <p className="text-xs text-muted-foreground">True/false, yes/no values</p>
             </div>
           </div>
         </section>
@@ -930,17 +934,17 @@ function DataCaptureHelpContent() {
         {/* Variable System */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Variable className="h-4 w-4 text-orange-600" />
+            <Variable className="h-4 w-4 text-primary" />
             Variable System
           </h3>
           <div className="space-y-4">
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
               <h4 className="font-medium text-sm mb-2">How Variables Work</h4>
-              <p className="text-xs text-gray-700 mb-2">
-                Once captured, data becomes available as <code className="bg-gray-200 px-1 rounded">&#123;&#123;variable_name&#125;&#125;</code> tokens
+              <p className="text-xs text-foreground mb-2">
+                Once captured, data becomes available as <code className="bg-muted px-1 rounded">&#123;&#123;variable_name&#125;&#125;</code> tokens
                 that can be used in any subsequent node in your flow.
               </p>
-              <div className="bg-white rounded p-2 text-xs font-mono">
+              <div className="bg-card rounded p-2 text-xs font-mono">
                 Captured: user_name = "John"<br/>
                 Usage: "Hello &#123;&#123;user_name&#125;&#125;, how can I help you today?"<br/>
                 Result: "Hello John, how can I help you today?"
@@ -952,15 +956,15 @@ function DataCaptureHelpContent() {
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
                   <Badge variant="outline" className="text-xs">Session</Badge>
-                  <p className="text-xs text-gray-600">Available during the current conversation only</p>
+                  <p className="text-xs text-muted-foreground">Available during the current conversation only</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <Badge variant="outline" className="text-xs">Flow</Badge>
-                  <p className="text-xs text-gray-600">Available throughout the entire flow execution</p>
+                  <p className="text-xs text-muted-foreground">Available throughout the entire flow execution</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <Badge variant="outline" className="text-xs">Global</Badge>
-                  <p className="text-xs text-gray-600">Available across all flows for this contact</p>
+                  <p className="text-xs text-muted-foreground">Available across all flows for this contact</p>
                 </div>
               </div>
             </div>
@@ -970,36 +974,36 @@ function DataCaptureHelpContent() {
         {/* Configuration Options */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Settings className="h-4 w-4 text-gray-600" />
+            <Settings className="h-4 w-4 text-muted-foreground" />
             Configuration Options
           </h3>
           <div className="space-y-3">
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1 flex items-center gap-2">
-                <CheckCircle className="h-3 w-3 text-green-600" />
+                <CheckCircle className="h-3 w-3 text-primary" />
                 Overwrite Existing Variables
               </h4>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 When enabled, will replace existing variables with the same name.
                 When disabled, will skip capture if variable already exists.
               </p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1 flex items-center gap-2">
-                <CheckCircle className="h-3 w-3 text-blue-600" />
+                <CheckCircle className="h-3 w-3 text-primary" />
                 Enable Data Validation
               </h4>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 Validates captured data against the specified data type (email format, phone format, etc.).
                 Invalid data will be rejected.
               </p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1 flex items-center gap-2">
-                <AlertCircle className="h-3 w-3 text-red-600" />
+                <AlertCircle className="h-3 w-3 text-destructive" />
                 Required Fields
               </h4>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 When a field is marked as required, the flow will fail if the data cannot be captured.
                 Use for critical information only.
               </p>
@@ -1012,28 +1016,28 @@ function DataCaptureHelpContent() {
         {/* Practical Examples */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Eye className="h-4 w-4 text-indigo-600" />
+            <Eye className="h-4 w-4 text-primary" />
             Practical Examples
           </h3>
           <div className="space-y-4">
             {/* Example 1 */}
-            <div className="border rounded-lg p-4 bg-indigo-50">
+            <div className="border rounded-lg p-4 bg-primary/10 border-primary/20">
               <h4 className="font-medium text-sm mb-2">Example 1: Contact Information Collection</h4>
               <div className="space-y-2 text-xs">
-                <div className="bg-white rounded p-2">
+                <div className="bg-card rounded p-2">
                   <strong>User Message:</strong> "Hi, my name is Sarah Johnson and my email is sarah@company.com"
                 </div>
-                <div className="bg-gray-50 rounded p-2 font-mono">
+                <div className="bg-muted rounded p-2 font-mono">
                   <strong>Capture Rules:</strong><br/>
                   Rule 1: user_name | Regex Extract | My name is ([A-Za-z\\s]+)<br/>
                   Rule 2: user_email | Regex Extract | ([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]&#123;2,&#125;)
                 </div>
-                <div className="bg-green-50 rounded p-2">
+                <div className="bg-primary/10 rounded p-2">
                   <strong>Result:</strong><br/>
                   &#123;&#123;user_name&#125;&#125; = "Sarah Johnson"<br/>
                   &#123;&#123;user_email&#125;&#125; = "sarah@company.com"
                 </div>
-                <div className="bg-blue-50 rounded p-2">
+                <div className="bg-primary/10 rounded p-2">
                   <strong>Usage in Next Node:</strong><br/>
                   "Thank you &#123;&#123;user_name&#125;&#125;! I'll send the information to &#123;&#123;user_email&#125;&#125;."
                 </div>
@@ -1041,36 +1045,36 @@ function DataCaptureHelpContent() {
             </div>
 
             {/* Example 2 */}
-            <div className="border rounded-lg p-4 bg-green-50">
+            <div className="border rounded-lg p-4 bg-primary/10 border-primary/20">
               <h4 className="font-medium text-sm mb-2">Example 2: Order Status Inquiry</h4>
               <div className="space-y-2 text-xs">
-                <div className="bg-white rounded p-2">
+                <div className="bg-card rounded p-2">
                   <strong>User Message:</strong> "I need help with order #ORD-12345"
                 </div>
-                <div className="bg-gray-50 rounded p-2 font-mono">
+                <div className="bg-muted rounded p-2 font-mono">
                   <strong>Capture Rule:</strong><br/>
                   order_id | Regex Extract | order[\\s#]*([A-Z0-9-]+)
                 </div>
-                <div className="bg-green-50 rounded p-2">
+                <div className="bg-primary/10 rounded p-2">
                   <strong>Result:</strong> &#123;&#123;order_id&#125;&#125; = "ORD-12345"
                 </div>
-                <div className="bg-blue-50 rounded p-2">
+                <div className="bg-primary/10 rounded p-2">
                   <strong>Usage:</strong> Pass to API call node to fetch order details
                 </div>
               </div>
             </div>
 
             {/* Example 3 */}
-            <div className="border rounded-lg p-4 bg-yellow-50">
+            <div className="border rounded-lg p-4 bg-secondary/10 border-secondary/20">
               <h4 className="font-medium text-sm mb-2">Example 3: Using Contact Fields</h4>
               <div className="space-y-2 text-xs">
-                <div className="bg-gray-50 rounded p-2 font-mono">
+                <div className="bg-muted rounded p-2 font-mono">
                   <strong>Capture Rules:</strong><br/>
                   customer_name | Contact Field | contact.name<br/>
                   customer_phone | Contact Field | contact.phone<br/>
                   customer_company | Contact Field | contact.company
                 </div>
-                <div className="bg-blue-50 rounded p-2">
+                <div className="bg-primary/10 rounded p-2">
                   <strong>Usage:</strong> Automatically populate forms or personalize messages with existing contact data
                 </div>
               </div>
@@ -1081,13 +1085,13 @@ function DataCaptureHelpContent() {
         {/* Best Practices */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CheckCircle className="h-4 w-4 text-primary" />
             Best Practices & Tips
           </h3>
           <div className="space-y-3">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-green-800">✅ Do's</h4>
-              <ul className="text-xs text-green-700 space-y-1">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-primary">✅ Do's</h4>
+              <ul className="text-xs text-foreground space-y-1">
                 <li>• Use descriptive variable names (user_email, order_id, customer_name)</li>
                 <li>• Test regex patterns with sample data before deploying</li>
                 <li>• Use appropriate data types for validation</li>
@@ -1095,17 +1099,17 @@ function DataCaptureHelpContent() {
                 <li>• Use session scope for temporary data, global for persistent data</li>
               </ul>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-red-800">❌ Don'ts</h4>
-              <ul className="text-xs text-red-700 space-y-1">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-destructive">❌ Don'ts</h4>
+              <ul className="text-xs text-foreground space-y-1">
                 <li>• Don't make too many fields required (causes flow failures)</li>
                 <li>• Don't use overly complex regex patterns (hard to maintain)</li>
                 <li>• Don't overwrite important variables accidentally</li>
               </ul>
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-blue-800">💡 Pro Tips</h4>
-              <ul className="text-xs text-blue-700 space-y-1">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-primary">💡 Pro Tips</h4>
+              <ul className="text-xs text-foreground space-y-1">
                 <li>• Use the Variables tab in the sidebar to browse all available variables</li>
                 <li>• Use templates for common capture scenarios</li>
               </ul>

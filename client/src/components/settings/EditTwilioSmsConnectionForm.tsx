@@ -117,9 +117,7 @@ export function EditTwilioSmsConnectionForm({ isOpen, onClose, onSuccess, connec
     try {
       const w = new URL(form.webhookUrl);
       const s = new URL(form.statusCallbackUrl);
-      if (w.protocol !== 'https:' || s.protocol !== 'https:') {
-        return 'Webhook URLs must be HTTPS.';
-      }
+     
     } catch {
       return 'Webhook URLs are invalid.';
     }

@@ -189,7 +189,7 @@ export function VideoNodeWithUpload({ id, data, isConnectable }: VideoNodeProps)
       ) : (
         <div className="space-y-3">
           {mediaUrl ? (
-            <div className="relative aspect-video bg-secondary/30 rounded overflow-hidden flex items-center justify-center">
+            <div className="relative aspect-video  rounded overflow-hidden flex items-center justify-center">
               {mediaUrl.match(/\.(mp4|webm|mov)$/i) ? (
                 <video 
                   src={mediaUrl} 
@@ -202,7 +202,7 @@ export function VideoNodeWithUpload({ id, data, isConnectable }: VideoNodeProps)
               <span className="absolute bottom-1 right-1 text-[10px] px-1 bg-background/80 rounded">{t('flow_builder.video_upload_video_label', 'Video')}</span>
             </div>
           ) : (
-            <div className="bg-secondary/30 p-3 rounded flex flex-col items-center justify-center">
+            <div className=" p-3 rounded flex flex-col items-center justify-center">
               <FileVideo className="h-8 w-8 text-muted-foreground mb-1" />
               <span className="text-xs text-muted-foreground">{t('flow_builder.video_upload_no_video_selected', 'No video selected')}</span>
             </div>

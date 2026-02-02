@@ -51,7 +51,7 @@ export function MentionAutocomplete({
         top: position.y
       } : undefined}
       className={cn(
-        'bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50',
+        'bg-popover rounded-lg shadow-xl border border-border overflow-hidden z-50',
         !position && 'absolute bottom-full mb-2',
         className
       )}
@@ -62,7 +62,7 @@ export function MentionAutocomplete({
             key={user.userId}
             onClick={() => onSelect(user)}
             className={cn(
-              'w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-100 transition-colors text-left',
+              'w-full flex items-center gap-3 px-4 py-2 hover:bg-accent transition-colors text-left',
               index === selectedIndex && 'bg-blue-50'
             )}
           >

@@ -342,7 +342,7 @@ export function FollowUpNode({ id, data, isConnectable }: FollowUpNodeProps) {
       <div className={`${isEditing ? 'max-h-[500px]' : 'max-h-[200px]'} overflow-y-auto custom-scrollbar`}>
         <div className="p-3 space-y-3">
 
-          <div className="text-sm p-3 bg-secondary/40 rounded border border-border">
+          <div className="text-sm p-3  rounded border border-border">
             <div className="flex items-center gap-2 mb-2">
               {getMessageTypeIcon()}
               <span className="font-medium">
@@ -436,7 +436,7 @@ export function FollowUpNode({ id, data, isConnectable }: FollowUpNodeProps) {
                         {availableVariables.map((variable) => (
                           <button
                             key={variable.name}
-                            className="text-[10px] px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                            className="text-[10px] px-2 py-1  rounded hover:"
                             title={variable.description}
                             onClick={() => insertVariableIntoMessage(variable.name)}
                           >
@@ -489,7 +489,7 @@ export function FollowUpNode({ id, data, isConnectable }: FollowUpNodeProps) {
                             {availableVariables.map((variable) => (
                               <button
                                 key={variable.name}
-                                className="text-[10px] px-2 py-1 bg-secondary rounded hover:bg-secondary/80"
+                                className="text-[10px] px-2 py-1  rounded hover:"
                                 title={variable.description}
                                 onClick={() => insertVariableIntoCaption(variable.name)}
                               >

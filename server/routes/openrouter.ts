@@ -53,64 +53,23 @@ router.get('/models', async (req, res) => {
     }
     
 
+
     const fallbackModels = {
       data: [
-        {
-          id: 'openai/gpt-4o-mini',
-          name: 'GPT-4o Mini',
-          description: 'Fast and efficient model for most tasks',
-          pricing: { prompt: '0.00015', completion: '0.0006' },
-          context_length: 128000,
-          architecture: { modality: 'text' }
-        },
-        {
-          id: 'openai/gpt-4o',
-          name: 'GPT-4o',
-          description: 'Most capable OpenAI model',
-          pricing: { prompt: '0.0025', completion: '0.01' },
-          context_length: 128000,
-          architecture: { modality: 'text' }
-        },
-        {
-          id: 'anthropic/claude-3-5-sonnet',
-          name: 'Claude 3.5 Sonnet',
-          description: 'Anthropic\'s most capable model',
-          pricing: { prompt: '0.003', completion: '0.015' },
-          context_length: 200000,
-          architecture: { modality: 'text' }
-        },
-        {
-          id: 'anthropic/claude-3-haiku',
-          name: 'Claude 3 Haiku',
-          description: 'Fast and efficient Anthropic model',
-          pricing: { prompt: '0.00025', completion: '0.00125' },
-          context_length: 200000,
-          architecture: { modality: 'text' }
-        },
-        {
-          id: 'google/gemini-pro',
-          name: 'Gemini Pro',
-          description: 'Google\'s advanced language model',
-          pricing: { prompt: '0.000125', completion: '0.000375' },
-          context_length: 32000,
-          architecture: { modality: 'text' }
-        },
-        {
-          id: 'meta-llama/llama-3.1-8b-instruct',
-          name: 'Llama 3.1 8B Instruct',
-          description: 'Meta\'s open-source instruction-tuned model',
-          pricing: { prompt: '0.00018', completion: '0.00018' },
-          context_length: 128000,
-          architecture: { modality: 'text' }
-        },
-        {
-          id: 'mistralai/mistral-7b-instruct',
-          name: 'Mistral 7B Instruct',
-          description: 'Mistral\'s efficient instruction-tuned model',
-          pricing: { prompt: '0.00025', completion: '0.00025' },
-          context_length: 32000,
-          architecture: { modality: 'text' }
-        }
+        { id: 'openai/gpt-5.2', name: 'GPT-5.2', description: 'OpenAI frontier model', pricing: { prompt: '0.0025', completion: '0.01' }, context_length: 128000, architecture: { modality: 'text' } },
+        { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini', description: 'Fast GPT-5 for most tasks', pricing: { prompt: '0.00015', completion: '0.0006' }, context_length: 128000, architecture: { modality: 'text' } },
+        { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast and efficient model for most tasks', pricing: { prompt: '0.00015', completion: '0.0006' }, context_length: 128000, architecture: { modality: 'text' } },
+        { id: 'openai/gpt-4o', name: 'GPT-4o', description: 'OpenAI flexible chat model', pricing: { prompt: '0.0025', completion: '0.01' }, context_length: 128000, architecture: { modality: 'text' } },
+        { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'OpenAI legacy chat model', pricing: { prompt: '0.0005', completion: '0.0015' }, context_length: 16385, architecture: { modality: 'text' } },
+        { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', description: 'Anthropic agentic model with tool orchestration', pricing: { prompt: '0.003', completion: '0.015' }, context_length: 200000, architecture: { modality: 'text' } },
+        { id: 'anthropic/claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Anthropic capable model', pricing: { prompt: '0.003', completion: '0.015' }, context_length: 200000, architecture: { modality: 'text' } },
+        { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', description: 'Fast Anthropic model', pricing: { prompt: '0.00025', completion: '0.00125' }, context_length: 200000, architecture: { modality: 'text' } },
+        { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', description: 'Google high-speed agentic model', pricing: { prompt: '0.000125', completion: '0.000375' }, context_length: 1000000, architecture: { modality: 'text' } },
+        { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Google fast model with tool calling', pricing: { prompt: '0.000125', completion: '0.000375' }, context_length: 1000000, architecture: { modality: 'text' } },
+        { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Google efficient model', pricing: { prompt: '0.0001', completion: '0.0003' }, context_length: 1000000, architecture: { modality: 'text' } },
+        { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', description: 'Meta open-source instruction model', pricing: { prompt: '0.00052', completion: '0.00075' }, context_length: 128000, architecture: { modality: 'text' } },
+        { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B Instruct', description: 'Meta smaller instruction model', pricing: { prompt: '0.00018', completion: '0.00018' }, context_length: 128000, architecture: { modality: 'text' } },
+        { id: 'mistralai/mistral-nemo', name: 'Mistral Nemo 12B', description: 'Mistral multilingual with function calling', pricing: { prompt: '0.0002', completion: '0.0002' }, context_length: 128000, architecture: { modality: 'text' } }
       ]
     };
     

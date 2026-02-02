@@ -17,7 +17,7 @@ export interface WhatsAppCampaign {
   description: string;
   status: 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'cancelled' | 'failed';
   whatsappChannelType: WhatsAppChannelType;
-  campaignType: 'immediate' | 'scheduled';
+  campaignType: 'immediate' | 'scheduled' | 'recurring_daily';
   totalRecipients: number;
   processedRecipients: number;
   successfulSends: number;
@@ -36,6 +36,15 @@ export interface WhatsAppCampaign {
 }
 
 
+export interface WhatsAppRecurringDailySettings {
+  enabled: boolean;
+  sendTimes: string[]; // Array of time strings in HH:mm format (e.g., ['10:00', '15:00', '22:00'])
+  offDays: number[]; // Array of day numbers (0=Sunday, 1=Monday, etc.) when campaign should not be sent
+  timezone: string; // IANA timezone identifier (e.g., 'America/New_York')
+  startDate?: string; // Optional start date for the recurring campaign
+  endDate?: string; // Optional end date for the recurring campaign
+}
+
 export interface WhatsAppCampaignData {
   name: string;
   description: string;
@@ -48,12 +57,15 @@ export interface WhatsAppCampaignData {
   whatsappAccountIds?: number[];
   channelId?: number; // Legacy support
   channelIds?: number[]; // Legacy support
-  campaignType: 'immediate' | 'scheduled';
+  campaignType: 'immediate' | 'scheduled' | 'recurring_daily';
   scheduledAt?: string;
   messageType: WhatsAppMessageType;
   rateLimitSettings: WhatsAppRateLimitSettings;
   antiBanSettings: WhatsAppAntiBanSettings;
   businessHoursSettings?: WhatsAppBusinessHoursSettings;
+  /** Array of pipeline stage IDs to filter campaign recipients. Merged with segment criteria. */
+  pipelineStageIds?: number[];
+  recurringDailySettings?: WhatsAppRecurringDailySettings;
 }
 
 
@@ -149,6 +161,11 @@ export interface WhatsAppSegmentCriteria {
   created_after?: string;
   created_before?: string;
   excludedContactIds?: number[];
+  /**
+   * Array of pipeline stage IDs. Filters contacts that have deals in the specified pipeline stages.
+   * Contacts will be included if they have at least one deal in any of the specified stages.
+   */
+  pipelineStageIds?: number[];
 
   hasWhatsappNumber: boolean;
   whatsappOptedIn?: boolean;

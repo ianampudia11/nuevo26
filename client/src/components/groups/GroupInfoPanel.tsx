@@ -213,21 +213,21 @@ export function GroupInfoPanel({ conversation, className }: GroupInfoPanelProps)
 
   
   return (
-    <div className={cn("h-full bg-white", className)} onClick={(e) => e.stopPropagation()}>
+    <div className={cn("h-full bg-card", className)} onClick={(e) => e.stopPropagation()}>
       {/* Mobile header */}
-      <div className="p-4 border-b border-gray-200 flex justify-between items-center lg:hidden">
+      <div className="p-4 border-b border-border flex justify-between items-center lg:hidden">
         <h2 className="font-medium text-lg">{t('groups.group_info', 'Group Info')}</h2>
         <button
           onClick={toggleContactDetails}
-          className="p-2 rounded-md hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
+          className="p-2 rounded-md hover:bg-accent min-h-[44px] min-w-[44px] flex items-center justify-center"
           aria-label={t('groups.close_group_info', 'Close group info')}
         >
-          <i className="ri-close-line text-lg text-gray-600"></i>
+          <i className="ri-close-line text-lg text-muted-foreground"></i>
         </button>
       </div>
 
       {/* Group header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center space-x-3">
           <GroupAvatar
             groupName={conversation.groupName || 'Group'}
@@ -242,7 +242,7 @@ export function GroupInfoPanel({ conversation, className }: GroupInfoPanelProps)
             <h3 className="text-lg font-semibold truncate">
               {conversation.groupName || t('groups.unnamed_group', 'Unnamed Group')}
             </h3>
-            <div className="flex items-center text-sm text-gray-500 mt-1">
+            <div className="flex items-center text-sm text-muted-foreground mt-1">
               <Users className="h-4 w-4 mr-1" />
               {conversation.groupParticipantCount || participants.length} {t('groups.participants', 'participants')}
             </div>

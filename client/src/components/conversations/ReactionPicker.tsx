@@ -72,12 +72,12 @@ export function QuickReactionBar({
   className = ''
 }: QuickReactionBarProps) {
   return (
-    <div className={cn('flex items-center gap-1 bg-white rounded-full shadow-lg px-2 py-1', className)}>
+    <div className={cn('flex items-center gap-1 bg-popover rounded-full shadow-lg px-2 py-1', className)}>
       {quickReactions.map((emoji) => (
         <button
           key={emoji}
           onClick={() => onSelect(emoji)}
-          className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-100 rounded-full transition-all hover:scale-110"
+          className="w-8 h-8 flex items-center justify-center text-xl hover:bg-accent rounded-full transition-all hover:scale-110"
           title={`React with ${emoji}`}
         >
           {emoji}

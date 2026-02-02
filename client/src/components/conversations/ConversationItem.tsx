@@ -11,6 +11,7 @@ import { stripAgentSignature } from '@/utils/messageUtils';
 import { stripFormatting } from '@/utils/textFormatter';
 import BotIcon from '@/components/ui/bot-icon';
 import useSocket from '@/hooks/useSocket';
+import { TwilioIcon } from '@/components/icons/TwilioIcon';
 
 interface ConversationItemProps {
   conversation: any;
@@ -59,10 +60,15 @@ export default function ConversationItem({ conversation, isActive, onClick, sear
         return { icon: 'ri-messenger-line', color: '#1877F2', name: t('conversations.item.channel.messenger', 'Messenger') };
       case 'instagram':
         return { icon: 'ri-instagram-line', color: '#E4405F', name: t('conversations.item.channel.instagram', 'Instagram') };
+      case 'tiktok':
+        return { icon: 'ri-tiktok-line dark:text-white', color: '#000000', name: t('conversations.item.channel.tiktok', 'TikTok Business') };
       case 'email':
         return { icon: 'ri-mail-line', color: '#333235', name: t('conversations.item.channel.email', 'Email') };
       case 'sms':
         return { icon: 'ri-message-2-line', color: '#10B981', name: t('conversations.item.channel.sms', 'SMS') };
+      case 'twilio_sms':
+      case 'twilio_voice':
+        return { icon: TwilioIcon, isComponent: true, color: '#F22F46', name: t('conversations.item.channel.twilio', 'Twilio') };
       case 'webapp':
         return { icon: 'ri-global-line', color: '#8B5CF6', name: t('conversations.item.channel.web_chat', 'Web Chat') };
       case 'webchat':
@@ -170,7 +176,7 @@ export default function ConversationItem({ conversation, isActive, onClick, sear
       className={`border-l-4 min-h-[88px] sm:min-h-[80px] ${
         isActive
           ? 'border-primary-500 bg-primary-50 hover:bg-primary-100'
-          : 'border-transparent hover:bg-gray-50'
+          : 'border-transparent hover:bg-accent/50'
       } cursor-pointer transition-colors duration-150`}
       onClick={handleClick}
       role="button"
@@ -209,10 +215,10 @@ export default function ConversationItem({ conversation, isActive, onClick, sear
                   size="md"
                 />
               ) : (
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200"></div>
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-muted"></div>
               )}
               {!conversation.isGroup && (
-                <span className={`absolute bottom-0 right-0 block h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full ${contact?.isActive ? 'bg-green-500' : 'bg-gray-300'} border-2 border-white`}></span>
+                <span className={`absolute bottom-0 right-0 block h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full ${contact?.isActive ? 'bg-green-500' : 'bg-muted'} border-2 border-background`}></span>
               )}
             </div>
             <div className="ml-3 flex-1 min-w-0">
@@ -225,16 +231,20 @@ export default function ConversationItem({ conversation, isActive, onClick, sear
                 </p>
                 {unreadCount > 0 && (
                   <span
-                    className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full min-w-[20px] h-5 flex-shrink-0"
+                    className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-destructive-foreground bg-destructive rounded-full min-w-[20px] h-5 flex-shrink-0"
                     aria-label={`${unreadCount} ${t('conversations.item.unread_messages', 'unread messages')}`}
                   >
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </div>
-              <div className="flex items-center text-xs text-gray-500 mt-1">
+              <div className="flex items-center text-xs text-muted-foreground mt-1">
                 <span className="flex items-center">
-                  <i className={channelInfo.icon + " mr-1"} style={{ color: channelInfo.color }}></i>
+                  {channelInfo.isComponent ? (
+                    <channelInfo.icon className="w-3 h-3 mr-1" />
+                  ) : (
+                    <i className={channelInfo.icon + " mr-1"} style={typeof channelInfo.icon === 'string' && channelInfo.icon.includes('tiktok') ? undefined : { color: channelInfo.color }}></i>
+                  )}
                   <span className="truncate">{channelInfo.name}</span>
                 </span>
                 {conversation.isGroup && (
@@ -248,16 +258,16 @@ export default function ConversationItem({ conversation, isActive, onClick, sear
               </div>
             </div>
           </div>
-          <div className="text-xs text-gray-500 ml-2 flex-shrink-0">{formattedTime}</div>
+          <div className="text-xs text-muted-foreground ml-2 flex-shrink-0">{formattedTime}</div>
         </div>
 
         <div className="mt-2 sm:mt-1">
           {isLoadingMessages ? (
             <div className="animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              <div className="h-4 bg-muted rounded w-3/4"></div>
             </div>
           ) : (
-            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
               {formatMessagePreview(latestMessageData)}
             </p>
           )}
@@ -304,7 +314,7 @@ export default function ConversationItem({ conversation, isActive, onClick, sear
             )}
 
             {conversation.botDisabled && (
-              <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">
+              <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-muted text-muted-foreground whitespace-nowrap">
                 <BotIcon className="mr-1 opacity-50" size={12} color="#6b7280" />
                 <span className="hidden sm:inline">{t('conversations.item.bot_disabled', 'Bot disabled')}</span>
                 <span className="sm:hidden">{t('conversations.item.bot_off', 'Bot off')}</span>

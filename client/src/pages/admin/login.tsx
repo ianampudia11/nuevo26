@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,6 +19,10 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { useBranding } from "@/contexts/branding-context";
+import { useAuthBackgroundStyles } from "@/hooks/use-branding-styles";
+import { useTheme } from "next-themes";
+import { BrandingLogo } from "@/components/auth/BrandingLogo";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -31,6 +35,10 @@ export default function AdminLoginPage() {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [_, navigate] = useLocation();
+  const { branding } = useBranding();
+  const { theme } = useTheme();
+  const authBackgroundStyles = useAuthBackgroundStyles('admin');
+  const [backgroundImageError, setBackgroundImageError] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -72,16 +80,91 @@ export default function AdminLoginPage() {
     loginMutation.mutate(values);
   };
 
+  useEffect(() => {
+    if (branding.adminAuthBackgroundUrl) {
+      const img = new Image();
+      img.src = branding.adminAuthBackgroundUrl;
+      img.onerror = () => setBackgroundImageError(true);
+      img.onload = () => setBackgroundImageError(false);
+    }
+  }, [branding.adminAuthBackgroundUrl]);
+
+  const finalBackgroundStyles = useMemo(() => {
+
+    if (backgroundImageError) {
+
+      const config = branding.authBackgroundConfig?.adminAuthBackground;
+      if (!config) {
+        return { backgroundColor: '#f3f4f6' }; // Default gray-100
+      }
+
+
+      const gradientCss = config.gradientConfig
+        ? (config.gradientConfig.mode === 'simple'
+          ? (() => {
+              const { startColor, endColor, direction } = config.gradientConfig!.simple;
+              const directionMap: Record<string, string> = {
+                'to-right': 'to right',
+                'to-left': 'to left',
+                'to-top': 'to top',
+                'to-bottom': 'to bottom',
+                'to-br': 'to bottom right',
+                'to-bl': 'to bottom left',
+                'to-tr': 'to top right',
+                'to-tl': 'to top left'
+              };
+              const cssDirection = directionMap[direction] || 'to bottom';
+              return `linear-gradient(${cssDirection}, ${startColor}, ${endColor})`;
+            })()
+          : (() => {
+              const { stops, angle } = config.gradientConfig!.advanced;
+              const stopsCss = stops
+                .map(stop => `${stop.color} ${stop.position}%`)
+                .join(', ');
+              return `linear-gradient(${angle}deg, ${stopsCss})`;
+            })())
+        : undefined;
+
+
+      switch (config.priority) {
+        case 'image':
+        case 'layer':
+
+          return {
+            backgroundImage: gradientCss || undefined,
+            backgroundColor: !gradientCss ? config.backgroundColor : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          };
+        
+        case 'color':
+
+          return {
+            backgroundImage: gradientCss || undefined,
+            backgroundColor: !gradientCss ? config.backgroundColor : undefined
+          };
+        
+        default:
+          return { backgroundColor: '#f3f4f6' }; // Default gray-100
+      }
+    }
+    
+
+    return Object.keys(authBackgroundStyles).length > 0
+      ? authBackgroundStyles
+      : { backgroundColor: '#f3f4f6' }; // Default gray-100
+  }, [authBackgroundStyles, backgroundImageError, branding.authBackgroundConfig]);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md p-4">
+    <div className="min-h-screen flex items-center justify-center dark:bg-background" style={finalBackgroundStyles}>
+      {/* Dark overlay for custom backgrounds in dark mode - only show overlay, don't override background */}
+      {theme === 'dark' && <div className="absolute inset-0 bg-black/40 z-0"></div>}
+      <div className="w-full max-w-md p-4 relative z-10">
         <Card>
           <CardHeader className="space-y-1 text-center">
             <div className="flex justify-center mb-4">
-              <svg  viewBox="0 0 24 24" width={60} height={60} fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8.18164 10.7027C8.18164 10.7027 8.18168 8.13513 8.18164 6.59459C8.1816 4.74571 9.70861 3 11.9998 3C14.291 3 15.8179 4.74571 15.8179 6.59459C15.8179 8.13513 15.8179 10.7027 15.8179 10.7027" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M4.50005 11.3932C4.50001 13.1319 4.49995 16.764 4.50007 19.1988C4.5002 21.8911 8.66375 22.5 12.0001 22.5C15.3364 22.5 19.5 21.8911 19.5 19.1988L19.5 11.3932C19.5 10.8409 19.0523 10.3957 18.5 10.3957H5.50004C4.94777 10.3957 4.50006 10.8409 4.50005 11.3932ZM10.5 16.0028C10.5 16.4788 10.7069 16.9065 11.0357 17.2008V18.7529C11.0357 19.3051 11.4834 19.7529 12.0357 19.7529H12.1786C12.7309 19.7529 13.1786 19.3051 13.1786 18.7529V17.2008C13.5074 16.9065 13.7143 16.4788 13.7143 16.0028C13.7143 15.1152 12.9948 14.3957 12.1072 14.3957C11.2195 14.3957 10.5 15.1152 10.5 16.0028Z" fill="#000000"/>
-              </svg>
+              <BrandingLogo logoHeight="h-[60px]" />
             </div>
             <CardTitle className="text-2xl">{t('admin.login_title', 'Admin Login')}</CardTitle>
             <CardDescription>
@@ -131,7 +214,7 @@ export default function AdminLoginPage() {
 
                 {/* Forgot password link */}
                 <div className="flex justify-end">
-                  <a href="/admin/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+                  <a href="/admin/forgot-password" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline">
                     {t('auth.forgot_password', 'Forgot password?')}
                   </a>
                 </div>
@@ -155,7 +238,7 @@ export default function AdminLoginPage() {
             </Form>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {t('admin.restricted_area', 'This area is restricted to administrators only')}
             </p>
           </CardFooter>

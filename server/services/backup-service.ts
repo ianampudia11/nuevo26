@@ -135,10 +135,10 @@ export class BackupService {
 
   private async reconnectDatabase(): Promise<void> {
     try {
+      
 
 
-
-
+      
       const { reinitializePool } = await import('../db');
       reinitializePool();
 
@@ -146,18 +146,18 @@ export class BackupService {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
 
-
+      
       const client = await getPool().connect();
       try {
         await client.query('SELECT 1 as test');
-
+        
       } finally {
         client.release();
       }
 
-
-
-
+      
+      
+      
     } catch (error) {
       console.error('Error reconnecting to database:', error);
       console.error('Database connection may be in an inconsistent state');
@@ -871,7 +871,7 @@ export class BackupService {
     const env = { ...process.env, PGPASSWORD: dbConfig.password };
 
     try {
-
+      
       
 
       const terminateCommand = `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${dbConfig.database}';`;
@@ -885,20 +885,18 @@ export class BackupService {
 
       try {
         const { stdout: terminateStdout, stderr: terminateStderr } = await execCommand('psql', terminateArgs, { env });
-
+        
         if (terminateStderr && !terminateStderr.includes('does not exist')) {
-
+          
         }
       } catch (error) {
-
-
       }
 
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 
 
-
+      
       const dropCommand = `DROP DATABASE IF EXISTS "${dbConfig.database}";`;
       const dropArgs = [
         `--host=${dbConfig.host}`,
@@ -909,13 +907,13 @@ export class BackupService {
       ];
 
       const { stdout: dropStdout, stderr: dropStderr } = await execCommand('psql', dropArgs, { env });
-
+      
       if (dropStderr && !dropStderr.includes('does not exist')) {
-
+        
       }
 
 
-
+      
       const createCommand = `CREATE DATABASE "${dbConfig.database}";`;
       const createArgs = [
         `--host=${dbConfig.host}`,
@@ -926,9 +924,9 @@ export class BackupService {
       ];
 
       const { stdout: createStdout, stderr: createStderr } = await execCommand('psql', createArgs, { env });
-
+      
       if (createStderr) {
-
+        
       }
 
 
@@ -1014,7 +1012,7 @@ export class BackupService {
         }
       });
 
-
+      
 
 
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1118,7 +1116,7 @@ export class BackupService {
       const maintenanceCoordinator = MaintenanceCoordinator.getInstance();
       try {
         await maintenanceCoordinator.pauseAllServices();
-
+        
       } catch (error) {
         console.error('Failed to pause some services:', error);
 
@@ -1126,7 +1124,7 @@ export class BackupService {
 
       const { drainPool } = await import('../db');
       await drainPool();
-
+      
 
 
       const shouldDropAndRecreate = options?.dropDatabase === true || needsExclusiveAccess;
@@ -1136,7 +1134,7 @@ export class BackupService {
         const reason = options?.dropDatabase === true 
           ? 'User requested complete database drop before restore'
           : 'Backup contains database-level statements requiring exclusive access';
-
+        
         try {
           await this.dropAndRecreateDatabase(dbConfig);
           emitProgress('database_recreated', 'Database dropped and recreated successfully', 44);
@@ -1147,7 +1145,6 @@ export class BackupService {
           throw new Error(errorMsg);
         }
       } else {
-
 
         emitProgress('online_restore', 'Using online restore mode (no downtime)', 50);
       }
@@ -1182,11 +1179,8 @@ export class BackupService {
 
         if (!shouldDropAndRecreate) {
           args.push('--single-transaction');
-
-        } else {
-
-        }
-
+          
+        } 
         args.push(filePath);
       } else {
 
@@ -1211,9 +1205,7 @@ export class BackupService {
 
         if (!shouldDropAndRecreate) {
           args.splice(args.length - 2, 0, '--single-transaction');
-
-        } else {
-
+          
         }
       }
 
@@ -1251,7 +1243,7 @@ export class BackupService {
       emitProgress('resuming_services', 'Resuming background services...', 87);
       try {
         await maintenanceCoordinator.resumeAllServices();
-
+        
       } catch (error) {
         console.error('Failed to resume some services:', error);
 
@@ -1298,7 +1290,7 @@ export class BackupService {
         const { MaintenanceCoordinator } = await import('./maintenance-coordinator');
         const maintenanceCoordinator = MaintenanceCoordinator.getInstance();
         await maintenanceCoordinator.resumeAllServices();
-
+        
       } catch (resumeError) {
         console.error('Failed to resume services after restore failure:', resumeError);
       }
@@ -1323,13 +1315,13 @@ export class BackupService {
         const { MaintenanceCoordinator } = await import('./maintenance-coordinator');
         const maintenanceCoordinator = MaintenanceCoordinator.getInstance();
         await maintenanceCoordinator.resumeAllServices();
-
+        
       } catch (resumeError) {
         console.error('Failed to resume services in finally block:', resumeError);
       }
 
       try {
-
+        
         await storage.saveAppSetting('system.maintenanceMode', false);
 
 
@@ -1341,7 +1333,7 @@ export class BackupService {
           }
         });
 
-
+        
       } catch (error) {
         console.error('Failed to clear maintenance mode:', error);
 
@@ -1526,7 +1518,7 @@ export class BackupService {
             return false;
           }
 
-
+          
           return true;
         } catch (error) {
           console.error('[BackupValidation] Failed to read SQL file for validation:', error);
@@ -1536,10 +1528,10 @@ export class BackupService {
 
 
       try {
-
+        
         const pgListCmd = `pg_restore --list "${filePath}"`;
         await execAsync(pgListCmd);
-
+        
         return true;
       } catch (error) {
         console.error('[BackupValidation] pg_restore --list validation failed:', error);
@@ -1754,7 +1746,7 @@ export class BackupService {
 
       const createDbStart = Date.now();
       await adminClient.connect();
-
+      
 
       await adminClient.query(`CREATE DATABASE ${tempDbName}`);
       tempDbCreated = true;
@@ -1764,7 +1756,7 @@ export class BackupService {
 
 
       const restoreStart = Date.now();
-
+      
 
       const env = { ...process.env, PGPASSWORD: dbConfig.password };
       const ext = path.extname(filePath).toLowerCase();
@@ -1816,7 +1808,7 @@ export class BackupService {
 
 
       const verifyStart = Date.now();
-
+      
 
       const verifyClient = new Client({
         host: dbConfig.host,
@@ -2042,13 +2034,12 @@ export class BackupService {
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
 
-
     const backups = await this.getBackupRecords();
     const oldBackups = backups.filter(backup =>
       new Date(backup.created_at) < cutoffDate
     );
 
-
+    
 
     let deleted = 0;
     const errors: string[] = [];
@@ -2059,7 +2050,6 @@ export class BackupService {
         await this.deleteBackup(backup.id);
         deleted++;
         deletedBackups.push(backup.filename);
-
 
 
         await this.logBackupEvent({
@@ -2099,7 +2089,7 @@ export class BackupService {
 
     const duration = Date.now() - startTime;
     const summary = `Cleanup completed: ${deleted} deleted, ${errors.length} errors in ${(duration / 1000).toFixed(2)}s`;
-
+    
 
 
     await this.logBackupEvent({
@@ -2327,7 +2317,7 @@ export class BackupService {
           if (line.includes(`SET ${param}`) || line.includes(`set ${param}`)) {
             shouldSkip = true;
             linesFiltered++;
-
+            
             break;
           }
         }
@@ -2338,7 +2328,7 @@ export class BackupService {
             if (upperLine.includes(setCmd.toUpperCase())) {
               shouldSkip = true;
               linesFiltered++;
-
+              
               break;
             }
           }
@@ -2356,7 +2346,6 @@ export class BackupService {
           ) {
             shouldSkip = true;
             linesFiltered++;
-
           }
         }
 
@@ -2377,7 +2366,6 @@ export class BackupService {
         if (!shouldSkip && upperLine.includes('ALTER EXTENSION') && upperLine.includes('SET SCHEMA')) {
           shouldSkip = true;
           linesFiltered++;
-
         }
 
 
@@ -2390,7 +2378,7 @@ export class BackupService {
 
                 shouldSkip = true;
                 linesFiltered++;
-
+                
               }
               break;
             }
@@ -2409,7 +2397,7 @@ export class BackupService {
         writeStream.on('error', reject);
       });
 
-
+      
 
 
       if (!needsExclusiveAccess && nonTransactionalFound.length > 0) {

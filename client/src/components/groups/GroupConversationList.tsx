@@ -72,7 +72,7 @@ export default function GroupConversationList() {
     return (
       <div className={`
         ${isMobile ? 'w-full' : 'w-72 lg:w-80'}
-        border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col
+        border-r border-border bg-background flex-shrink-0 overflow-hidden flex flex-col
         ${isMobile ? 'h-full' : ''}
       `}>
         <div className="p-3 sm:p-4 border-b border-gray-200">
@@ -133,7 +133,7 @@ export default function GroupConversationList() {
     <div
       className={`
         ${isMobile ? 'w-full' : 'w-72 lg:w-80'}
-        border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden flex flex-col
+        border-r border-border bg-background flex-shrink-0 overflow-hidden flex flex-col
         ${isMobile ? 'h-full' : ''}
       `}
       onClick={(e) => e.stopPropagation()}

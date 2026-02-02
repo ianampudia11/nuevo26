@@ -1,5 +1,6 @@
 import {storage} from '../../storage';
 import {InsertMessage, InsertConversation, InsertContact} from '@shared/schema';
+import { getCachedCompanySetting, getCachedInitialPipelineStage } from '../../utils/pipeline-cache';
 import {EventEmitter} from 'events';
 import axios from 'axios';
 import crypto from 'crypto';
@@ -59,7 +60,7 @@ eventEmitter.setMaxListeners(50);
 import { eventEmitterMonitor } from '../../utils/event-emitter-monitor';
 eventEmitterMonitor.register('messenger-service', eventEmitter);
 
-const MESSENGER_API_VERSION = 'v22.0';
+const MESSENGER_API_VERSION = 'v24.0';
 const MESSENGER_GRAPH_URL = 'https://graph.facebook.com';
 
 /**
@@ -1846,6 +1847,37 @@ async function handleIncomingMessengerMessage(messagingEvent: any, companyId?: n
 
       contact = await storage.getOrCreateContact(insertContactData);
 
+
+      try {
+        const autoAddEnabled = await getCachedCompanySetting(connection.companyId, 'autoAddContactToPipeline');
+        if (autoAddEnabled) {
+
+          const initialStage = await getCachedInitialPipelineStage(connection.companyId);
+          if (initialStage) {
+
+            const existingDeal = await storage.getActiveDealByContact(contact.id, connection.companyId, initialStage.pipelineId);
+            if (!existingDeal) {
+              const deal = await storage.createDeal({
+                companyId: connection.companyId,
+                contactId: contact.id,
+                title: `New Lead - ${contact.name}`,
+                pipelineId: initialStage.pipelineId,
+                stageId: initialStage.id,
+                stage: 'lead'
+              });
+              await storage.createDealActivity({
+                dealId: deal.id,
+                userId: connection.userId,
+                type: 'create',
+                content: 'Deal automatically created when contact was added'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-adding contact to pipeline:', error);
+
+      }
       
     } else {
 

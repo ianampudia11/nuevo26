@@ -43,25 +43,25 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --background: 180 6% 12%;
+    --foreground: 200 10% 91%;
+    --card: 180 6% 15%;
+    --card-foreground: 200 10% 91%;
+    --popover: 180 6% 15%;
+    --popover-foreground: 200 10% 91%;
+    --primary: #00a884;
+    --primary-foreground: 200 10% 91%;
+    --secondary: 195 20% 22%;
+    --secondary-foreground: 200 10% 91%;
+    --muted: 180 6% 18%;
+    --muted-foreground: 200 10% 65%;
+    --accent: 195 20% 22%;
+    --accent-foreground: 200 10% 91%;
+    --destructive: 0 65% 51%;
+    --destructive-foreground: 200 10% 91%;
+    --border: 180 6% 20%;
+    --input: 180 6% 20%;
+    --ring: 168 76% 18%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -135,6 +135,71 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* ReactFlow Minimap Dark Mode Support */
+.react-flow__minimap {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.react-flow__minimap-mask {
+  fill: hsl(var(--background)) !important;
+  fill-opacity: 0.6 !important;
+}
+
+.dark .react-flow__minimap-mask {
+  fill: hsl(var(--background)) !important;
+  fill-opacity: 0.6 !important;
+}
+
+/* ReactFlow Controls Dark Mode Support */
+.react-flow__controls {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.react-flow__controls-button {
+  background-color: hsl(var(--card)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: hsl(var(--accent)) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: hsl(var(--foreground)) !important;
+}
+
+.dark .react-flow__controls-button {
+  background-color: hsl(var(--card)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .react-flow__controls-button:hover {
+  background-color: hsl(var(--accent)) !important;
+}
+
+/* Dark mode scrollbar styles */
+.dark .custom-scrollbar {
+  scrollbar-color: hsl(180 6% 20%) hsl(180 6% 12%);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(180 6% 12%);
+  border-radius: 3px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(180 6% 20%);
+  border-radius: 3px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(180 6% 25%);
 }
 
 /* Flow Builder Node Scrollbar */
@@ -292,24 +357,72 @@
 }
 
 button[role="checkbox"] {
-  border: 2px solid hsl(var(--border)) ;
-  background-color: hsl(var(--background)) ;
+  border: 2px solid hsl(var(--border));
+  background-color: transparent;
   min-width: 16px !important;
   min-height: 16px !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
 }
 
 button[role="checkbox"]:hover {
-  border-color: hsl(var(--primary)) ;
+  border-color: hsl(var(--primary));
 }
 
 button[role="checkbox"][data-state="checked"] {
-  background-color: hsl(var(--primary)) ;
+  background-color: hsl(var(--primary));
   border-color: hsl(var(--primary));
 }
 
 button[role="checkbox"][data-state="checked"] svg {
-  color: hsl(var(--primary-foreground)) ;
+  color: hsl(var(--primary-foreground));
   display: block !important;
+}
+
+/* Light theme specific checkbox styles */
+:root:not(.dark) button[role="checkbox"] {
+  border-color: hsl(var(--border));
+}
+
+:root:not(.dark) button[role="checkbox"]:hover {
+  border-color: hsl(var(--primary));
+  background-color: hsl(var(--primary) / 0.1);
+}
+
+:root:not(.dark) button[role="checkbox"][data-state="checked"] {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+/* Dark theme specific checkbox styles */
+.dark button[role="checkbox"] {
+  border-color: hsl(var(--border));
+}
+
+.dark button[role="checkbox"]:hover {
+  border-color: hsl(var(--primary));
+  background-color: hsl(var(--primary) / 0.1);
+}
+
+.dark button[role="checkbox"][data-state="checked"] {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+button[role="switch"] {
+  background-color: #d1d5db;
+}
+
+button[role="switch"][data-state="checked"] {
+  background-color: rgb(34 197 94) !important; /* green-500 */
+}
+
+.dark button[role="switch"][data-state="checked"] {
+  background-color: rgb(22 163 74) !important; /* green-600 */
+}
+
+button[role="switch"][data-state="unchecked"] {
+  background-color: #d1d5db !important;
 }
 
 .checkbox-container {
@@ -343,8 +456,8 @@ button[role="checkbox"][data-state="checked"] svg {
 }
 
 .agent-assignment-dropdown [data-radix-dropdown-menu-content] {
-  background: white !important;
-  border: 1px solid #ccc !important;
+  background: hsl(var(--popover)) !important;
+  border: 1px solid hsl(var(--border)) !important;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
   min-width: 200px !important;
   min-height: 50px !important;
@@ -489,7 +602,7 @@ button[role="checkbox"][data-state="checked"] svg {
     position: fixed;
     top: 0;
     bottom: 0;
-    background: white;
+    background: hsl(var(--background));
     z-index: 50;
     touch-action: auto;
     -webkit-overflow-scrolling: touch;
@@ -531,6 +644,18 @@ button[role="checkbox"][data-state="checked"] svg {
 }
 
 @layer utilities {
+  /* Only apply transparent background to non-checkbox elements */
+  /* Exclude Radix UI checkbox buttons and checked states */
+  .bg-primary:not(button[role="checkbox"]) {
+    background-color: transparent !important;
+  }
+  
+  /* Ensure checkbox checked state always uses primary color, overriding .bg-primary */
+  button[role="checkbox"][data-state="checked"],
+  button[role="checkbox"][data-state="checked"].bg-primary {
+    background-color: hsl(var(--primary)) !important;
+  }
+
   .bg-brand-primary {
     background-color: var(--brand-primary-color) !important;
   }
@@ -632,5 +757,42 @@ button[role="checkbox"][data-state="checked"] svg {
     .embedded-context .sidebar.open {
       transform: translateX(0);
     }
+  }
+
+  /* Slider component styling */
+  [data-radix-slider-thumb] {
+    border: none !important;
+  }
+
+  /* Switch component background color */
+  [data-radix-switch-root][data-state="checked"] {
+    background-color: rgb(34 197 94) !important; /* green-500 */
+  }
+
+  .dark [data-radix-switch-root][data-state="checked"] {
+    background-color: rgb(22 163 74) !important; /* green-600 */
+  }
+
+  /* Switch component icon visibility */
+  [data-radix-switch-root][data-state="checked"] [data-switch-icon="on"] {
+    display: block !important;
+  }
+
+  [data-radix-switch-root][data-state="checked"] [data-switch-icon="off"] {
+    display: none !important;
+  }
+
+  [data-radix-switch-root][data-state="unchecked"] [data-switch-icon="on"] {
+    display: none !important;
+  }
+
+  [data-radix-switch-root][data-state="unchecked"] [data-switch-icon="off"] {
+    display: block !important;
+  }
+
+  /* Twilio icon dark mode support */
+  .dark .twilio-icon .twilio-path-primary,
+  .dark .twilio-icon .twilio-path-secondary {
+    fill: #ffffff;
   }
 }

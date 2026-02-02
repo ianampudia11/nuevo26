@@ -1,4 +1,5 @@
 import { storage } from '../../storage';
+import { getCachedCompanySetting, getCachedInitialPipelineStage } from '../../utils/pipeline-cache';
 import {
   InsertMessage,
   InsertConversation,
@@ -858,6 +859,38 @@ async function handleIncomingTelegramMessage(update: TelegramWebhookUpdate): Pro
       };
       contact = await storage.getOrCreateContact(insertContactData);
       logger.info('telegram', `Created new contact for Telegram user ${senderId}`);
+
+
+      try {
+        const autoAddEnabled = await getCachedCompanySetting(connection.companyId, 'autoAddContactToPipeline');
+        if (autoAddEnabled) {
+
+          const initialStage = await getCachedInitialPipelineStage(connection.companyId);
+          if (initialStage) {
+
+            const existingDeal = await storage.getActiveDealByContact(contact.id, connection.companyId, initialStage.pipelineId);
+            if (!existingDeal) {
+              const deal = await storage.createDeal({
+                companyId: connection.companyId,
+                contactId: contact.id,
+                title: `New Lead - ${contact.name}`,
+                pipelineId: initialStage.pipelineId,
+                stageId: initialStage.id,
+                stage: 'lead'
+              });
+              await storage.createDealActivity({
+                dealId: deal.id,
+                userId: connection.userId,
+                type: 'create',
+                content: 'Deal automatically created when contact was added'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-adding contact to pipeline:', error);
+
+      }
     }
 
 

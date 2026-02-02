@@ -11,10 +11,16 @@ import {
   TooltipProvider,
   TooltipTrigger 
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
+
+interface MinimalContact {
+  id: number;
+  name: string;
+  avatarUrl?: string | null | undefined;
+}
 
 interface ContactAvatarProps {
-  contact: Contact;
+  contact: MinimalContact;
   connectionId?: number;
   size?: "sm" | "md" | "lg";
   showRefreshButton?: boolean;
@@ -31,15 +37,6 @@ export function ContactAvatar({
   const { updateProfilePicture, isUpdating } = useProfilePicture();
   const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
-  
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map(part => part[0])
-      .join("")
-      .toUpperCase()
-      .substring(0, 2);
-  };
   
   const sizeClasses = {
     sm: "h-8 w-8 text-xs",
@@ -75,8 +72,16 @@ export function ContactAvatar({
       onMouseLeave={() => setIsHovered(false)}
     >
       <Avatar className={cn(sizeClasses[size], className)}>
-        <AvatarImage src={contact.avatarUrl || ""} alt={contact.name} />
-        <AvatarFallback>
+        <AvatarImage 
+          src={contact.avatarUrl || ""} 
+          alt={contact.name}
+          onError={(e) => {
+            if (contact.avatarUrl) {
+              console.warn(`Failed to load avatar for contact ${contact.id} (${contact.name}):`, contact.avatarUrl);
+            }
+          }}
+        />
+        <AvatarFallback className="bg-primary-100 text-primary-700 font-medium">
           {getInitials(contact.name)}
         </AvatarFallback>
       </Avatar>

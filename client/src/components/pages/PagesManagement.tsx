@@ -179,21 +179,28 @@ export function PagesManagement() {
   };
 
   const getPublicUrl = (page: CompanyPage) => {
-    const subdomain = (company as any)?.subdomain || company?.slug || 'company';
-    const baseUrl = import.meta.env.VITE_BASE_URL || 'http://localhost:9000';
-    const port = import.meta.env.VITE_PORT || '9000';
+
+    if (typeof window === 'undefined') {
+      return '';
+    }
 
 
-    const url = new URL(baseUrl);
-    const protocol = url.protocol;
-    const hostname = url.hostname;
+    const subdomain = (company as any)?.subdomain || company?.slug;
+    if (!subdomain) {
+      return '';
+    }
 
-
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    const port = window.location.port;
 
     if (hostname === 'localhost') {
-      return `${protocol}//${subdomain}.localhost:${port}/${page.slug}`;
+
+      return `${protocol}//${hostname}${port ? `:${port}` : ''}/${page.slug}`;
     } else {
-      return `${protocol}//${subdomain}.${hostname}/${page.slug}`;
+
+      const portSuffix = port && port !== '80' && port !== '443' ? `:${port}` : '';
+      return `${protocol}//${subdomain}.${hostname}${portSuffix}/${page.slug}`;
     }
   };
 
@@ -366,7 +373,7 @@ export function PagesManagement() {
                     )}
                   </div>
 
-                  {page.isPublished && (
+                  {page.isPublished && getPublicUrl(page) && (
                     <div className="text-sm">
                       <a
                         href={getPublicUrl(page)}

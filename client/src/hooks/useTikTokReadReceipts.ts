@@ -1,15 +1,6 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 
-
-const useWebSocket = () => {
-  return {
-    socket: null,
-    subscribe: (_event: string, _callback: (data: any) => void) => {
-
-      return () => {};
-    }
-  };
-};
+const READ_RECEIPT_POLL_INTERVAL_MS = 30000; // 30 seconds
 
 interface MessageDeliveryStatus {
   status: string;
@@ -27,81 +18,122 @@ interface ReadReceipt {
 }
 
 /**
- * Hook for managing read receipts and delivery status
+ * Hook for managing read receipts and delivery status (TikTok Business Messaging API).
+ * Read receipts are not real-time; uses polling-based status updates.
  */
-export function useTikTokReadReceipts(conversationId: number) {
-  const { socket, subscribe } = useWebSocket();
-  const [messageStatuses, setMessageStatuses] = useState<Map<number, MessageDeliveryStatus>>(new Map());
+function normalizeStatus(raw: unknown): MessageDeliveryStatus | null {
+  if (raw == null || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const status = typeof o.status === 'string' ? o.status : 'sent';
+  return {
+    status,
+    sentAt: o.sentAt != null ? new Date(o.sentAt as string) : undefined,
+    deliveredAt: o.deliveredAt != null ? new Date(o.deliveredAt as string) : undefined,
+    readAt: o.readAt != null ? new Date(o.readAt as string) : undefined,
+    failedAt: o.failedAt != null ? new Date(o.failedAt as string) : undefined,
+    error: typeof o.error === 'string' ? o.error : undefined,
+    readBy: Array.isArray(o.readBy) ? (o.readBy as number[]) : undefined
+  };
+}
 
-  /**
-   * Mark a message as read
-   */
+export function useTikTokReadReceipts(conversationId: number, pollIntervalMs: number = READ_RECEIPT_POLL_INTERVAL_MS) {
+  const [messageStatuses, setMessageStatuses] = useState<Map<number, MessageDeliveryStatus>>(new Map());
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const knownMessageIdsRef = useRef<number[]>([]);
+
   const markMessageAsRead = useCallback(async (messageId: number) => {
     try {
-      const response = await fetch(`/api/tiktok/messages/${messageId}/read`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `/api/tiktok/conversations/${conversationId}/messages/${messageId}/read`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
         }
-      });
+      );
 
       if (!response.ok) {
+        if (response.status === 404) {
+
+          return;
+        }
         throw new Error('Failed to mark message as read');
       }
+      setMessageStatuses(prev => {
+        const next = new Map(prev);
+        const existing = next.get(messageId);
+        next.set(messageId, {
+          ...existing,
+          status: 'read',
+          readAt: new Date()
+        });
+        return next;
+      });
     } catch (error) {
       console.error('Error marking message as read:', error);
     }
-  }, []);
+  }, [conversationId]);
 
-  /**
-   * Mark entire conversation as read
-   */
   const markConversationAsRead = useCallback(async () => {
     if (!conversationId) return;
 
     try {
       const response = await fetch(`/api/tiktok/conversations/${conversationId}/read`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (!response.ok) {
         throw new Error('Failed to mark conversation as read');
       }
+      setMessageStatuses(prev => {
+        const next = new Map(prev);
+        next.forEach((s, id) => {
+          next.set(id, { ...s, status: 'read', readAt: new Date() });
+        });
+        return next;
+      });
     } catch (error) {
       console.error('Error marking conversation as read:', error);
     }
   }, [conversationId]);
 
-  /**
-   * Get delivery status for a message
-   */
   const getMessageStatus = useCallback(async (messageId: number): Promise<MessageDeliveryStatus | null> => {
     try {
-      const response = await fetch(`/api/tiktok/messages/${messageId}/status`);
-      
+      const response = await fetch(
+        `/api/tiktok/conversations/${conversationId}/messages/${messageId}/status`
+      );
+
       if (!response.ok) {
+        if (response.status === 404) return null;
         throw new Error('Failed to get message status');
       }
 
       const data = await response.json();
-      return data.status;
+      const raw = data.status ?? data;
+      const statusObj = normalizeStatus(raw);
+      if (statusObj) {
+        setMessageStatuses(prev => {
+          const next = new Map(prev);
+          next.set(messageId, statusObj);
+          return next;
+        });
+        return statusObj;
+      }
+      return null;
     } catch (error) {
       console.error('Error getting message status:', error);
       return null;
     }
-  }, []);
+  }, [conversationId]);
 
-  /**
-   * Get read receipts for a message
-   */
   const getReadReceipts = useCallback(async (messageId: number): Promise<ReadReceipt[]> => {
     try {
-      const response = await fetch(`/api/tiktok/messages/${messageId}/receipts`);
-      
+      const response = await fetch(
+        `/api/tiktok/conversations/${conversationId}/messages/${messageId}/receipts`
+      );
+
       if (!response.ok) {
+        if (response.status === 404) return [];
         throw new Error('Failed to get read receipts');
       }
 
@@ -111,58 +143,39 @@ export function useTikTokReadReceipts(conversationId: number) {
       console.error('Error getting read receipts:', error);
       return [];
     }
-  }, []);
+  }, [conversationId]);
 
-  /**
-   * Listen to message status updates via WebSocket
-   */
   useEffect(() => {
-    if (!socket || !conversationId) return;
+    knownMessageIdsRef.current = Array.from(messageStatuses.keys());
+  }, [messageStatuses]);
 
-    const unsubscribe = subscribe('messageStatusUpdate', (data: any) => {
-      if (data.conversationId !== conversationId) return;
 
-      setMessageStatuses(prev => {
-        const newMap = new Map(prev);
-        const existing = newMap.get(data.messageId);
+  useEffect(() => {
+    if (!conversationId || pollIntervalMs <= 0) return;
 
-        newMap.set(data.messageId, {
-          status: data.status,
-          sentAt: data.sentAt ? new Date(data.sentAt) : existing?.sentAt,
-          deliveredAt: data.deliveredAt ? new Date(data.deliveredAt) : existing?.deliveredAt,
-          readAt: data.readAt ? new Date(data.readAt) : existing?.readAt,
-          failedAt: data.failedAt ? new Date(data.failedAt) : existing?.failedAt,
-          error: data.error || existing?.error,
-          readBy: data.readBy || existing?.readBy
-        });
-
-        return newMap;
-      });
-    });
-
-    return () => {
-      unsubscribe();
+    const poll = () => {
+      const ids = knownMessageIdsRef.current;
+      ids.forEach(id => getMessageStatus(id));
     };
-  }, [socket, conversationId, subscribe]);
 
-  /**
-   * Get status for a specific message
-   */
+    pollIntervalRef.current = setInterval(poll, pollIntervalMs);
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [conversationId, pollIntervalMs, getMessageStatus]);
+
   const getStatus = useCallback((messageId: number): MessageDeliveryStatus | null => {
     return messageStatuses.get(messageId) || null;
   }, [messageStatuses]);
 
-  /**
-   * Check if message is read
-   */
   const isMessageRead = useCallback((messageId: number): boolean => {
     const status = messageStatuses.get(messageId);
     return status?.status === 'read';
   }, [messageStatuses]);
 
-  /**
-   * Check if message is delivered
-   */
   const isMessageDelivered = useCallback((messageId: number): boolean => {
     const status = messageStatuses.get(messageId);
     return status?.status === 'delivered' || status?.status === 'read';
@@ -176,7 +189,8 @@ export function useTikTokReadReceipts(conversationId: number) {
     getReadReceipts,
     getStatus,
     isMessageRead,
-    isMessageDelivered
+    isMessageDelivered,
+    isBestEffort: true // UI can show "best effort, may not be real-time"
   };
 }
 
@@ -187,24 +201,18 @@ export function useAutoReadReceipts(conversationId: number, enabled: boolean = t
   const { markMessageAsRead } = useTikTokReadReceipts(conversationId);
   const [viewedMessages, setViewedMessages] = useState<Set<number>>(new Set());
 
-  /**
-   * Mark message as viewed (will trigger read receipt)
-   */
   const markAsViewed = useCallback((messageId: number) => {
     if (!enabled) return;
-    
+
     if (!viewedMessages.has(messageId)) {
       setViewedMessages(prev => new Set(prev).add(messageId));
       markMessageAsRead(messageId);
     }
   }, [enabled, viewedMessages, markMessageAsRead]);
 
-  /**
-   * Mark multiple messages as viewed
-   */
   const markMultipleAsViewed = useCallback((messageIds: number[]) => {
     if (!enabled) return;
-    
+
     const newMessages = messageIds.filter(id => !viewedMessages.has(id));
     if (newMessages.length > 0) {
       setViewedMessages(prev => {
@@ -212,8 +220,6 @@ export function useAutoReadReceipts(conversationId: number, enabled: boolean = t
         newMessages.forEach(id => newSet.add(id));
         return newSet;
       });
-      
-
       newMessages.forEach(id => markMessageAsRead(id));
     }
   }, [enabled, viewedMessages, markMessageAsRead]);
@@ -247,7 +253,7 @@ export function useMessageVisibility(
         }
       });
     }, {
-      threshold: 0.5, // Message must be 50% visible
+      threshold: 0.5,
       ...options
     });
 
@@ -256,9 +262,6 @@ export function useMessageVisibility(
     };
   }, [onMessageVisible, options, observedElements]);
 
-  /**
-   * Observe a message element
-   */
   const observe = useCallback((element: Element, messageId: number) => {
     if (observerRef.current && element) {
       observerRef.current.observe(element);
@@ -266,9 +269,6 @@ export function useMessageVisibility(
     }
   }, []);
 
-  /**
-   * Stop observing an element
-   */
   const unobserve = useCallback((element: Element) => {
     if (observerRef.current && element) {
       observerRef.current.unobserve(element);
@@ -285,4 +285,3 @@ export function useMessageVisibility(
     unobserve
   };
 }
-

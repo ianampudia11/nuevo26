@@ -596,21 +596,21 @@ export default function TasksPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800 border-red-200';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'urgent': return 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border-red-200 dark:border-red-800';
+      case 'high': return 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400 border-orange-200 dark:border-orange-800';
+      case 'medium': return 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
+      case 'low': return 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border-green-200 dark:border-green-800';
+      default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'not_started': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'completed': return 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border-green-200 dark:border-green-800';
+      case 'in_progress': return 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800';
+      case 'not_started': return 'bg-muted text-muted-foreground border-border';
+      case 'cancelled': return 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border-red-200 dark:border-red-800';
+      default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -655,7 +655,7 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Header />
       
       <div className="flex flex-1 overflow-hidden">
@@ -667,16 +667,16 @@ export default function TasksPage() {
             <div className="mb-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">
+                  <h1 className="text-2xl font-bold text-foreground">
                     {t('tasks.title', 'Tasks')}
                   </h1>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {t('tasks.subtitle', 'Manage and track all your tasks')}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   {/* View Toggle - Hidden on mobile */}
-                  <div className="hidden md:flex items-center border border-gray-200 rounded-lg p-1 bg-white">
+                  <div className="hidden md:flex items-center border border-border rounded-lg p-1 bg-card">
                     <Button
                       variant={viewMode === 'grid' ? 'default' : 'ghost'}
                       size="sm"
@@ -721,7 +721,7 @@ export default function TasksPage() {
                   {/* Search */}
                   <div className="lg:col-span-2">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground/70" />
                       <Input
                         type="text"
                         placeholder={t('tasks.searchPlaceholder', 'Search tasks, contacts...')}
@@ -792,16 +792,16 @@ export default function TasksPage() {
 
             {/* Bulk Actions Bar */}
             {showBulkActions && canManageTasks && (
-              <Card className="mb-4 border-blue-200 bg-blue-50">
+              <Card className="mb-4 border-primary/30 bg-primary/10 dark:bg-primary/20">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <span className="text-sm font-medium text-blue-900">
+                      <span className="text-sm font-medium text-primary dark:text-primary/90">
                         {selectedTasks.size} {t('tasks.selected', 'selected')}
                       </span>
                       <div className="flex items-center gap-2">
                         <Select onValueChange={handleBulkStatusUpdate}>
-                          <SelectTrigger className="w-[180px] bg-white">
+                          <SelectTrigger className="w-[180px] bg-background">
                             <SelectValue placeholder={t('tasks.updateStatus', 'Update Status')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -813,7 +813,7 @@ export default function TasksPage() {
                         </Select>
 
                         <Select onValueChange={handleBulkPriorityUpdate}>
-                          <SelectTrigger className="w-[180px] bg-white">
+                          <SelectTrigger className="w-[180px] bg-background">
                             <SelectValue placeholder={t('tasks.updatePriority', 'Update Priority')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -825,7 +825,7 @@ export default function TasksPage() {
                         </Select>
 
                         <Select onValueChange={handleBulkAssigneeUpdate}>
-                          <SelectTrigger className="w-[180px] bg-white">
+                          <SelectTrigger className="w-[180px] bg-background">
                             <SelectValue placeholder={t('tasks.assignTo', 'Assign To')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -861,15 +861,15 @@ export default function TasksPage() {
               <CardContent className="p-0">
                 {isLoadingTasks ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
                   </div>
                 ) : tasks.length === 0 ? (
                   <div className="text-center py-12">
-                    <CheckSquare className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">
+                    <CheckSquare className="mx-auto h-12 w-12 text-muted-foreground/70" />
+                    <h3 className="mt-2 text-sm font-medium text-foreground">
                       {t('tasks.noTasks', 'No tasks found')}
                     </h3>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {t('tasks.noTasksDescription', 'Get started by creating a new task.')}
                     </p>
                     {canManageTasks && (
@@ -912,7 +912,7 @@ export default function TasksPage() {
                           {tasks.map((task: Task) => (
                           <TableRow 
                             key={task.id} 
-                            className="hover:bg-gray-50"
+                            className="hover:bg-accent"
                             style={{ backgroundColor: task.backgroundColor || 'transparent' }}
                           >
                             {canManageTasks && (
@@ -927,22 +927,22 @@ export default function TasksPage() {
                               <div className="min-w-0">
                                 <button
                                   onClick={() => openTaskDetailsDialog(task)}
-                                  className="font-medium text-gray-900 truncate text-sm hover:text-blue-600 hover:underline text-left w-full"
+                                  className="font-medium text-foreground truncate text-sm hover:text-primary hover:underline text-left w-full"
                                   title={task.title}
                                 >
                                   {task.title.replace(/\b\w/g, l => l.toUpperCase())}
                                 </button>
                                 {task.description && (
-                                  <div className="text-xs text-gray-500 truncate" title={task.description}>
+                                  <div className="text-xs text-muted-foreground truncate" title={task.description}>
                                     {task.description}
                                   </div>
                                 )}
                               </div>
                             </TableCell>
                             <TableCell className="max-w-24 px-1">
-                              <button
+                                <button
                                 onClick={() => setLocation(`/contacts?id=${task.contactId}`)}
-                                className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline min-w-0"
+                                className="flex items-center gap-1 text-primary hover:text-primary/90 hover:underline min-w-0"
                               >
                                 {(() => {
                                   const contact = displayContacts.find((c: Contact) => c.id === task.contactId);
@@ -953,12 +953,12 @@ export default function TasksPage() {
                                       className="h-5 w-5 rounded-full object-cover"
                                     />
                                   ) : (
-                                    <div className="h-5 w-5 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-700">
+                                    <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                       {contact?.name?.charAt(0).toUpperCase() || '?'}
                                     </div>
                                   );
                                 })()}
-                                <span className="truncate text-xs font-bold text-gray-600" title={getContactName(task.contactId)}>
+                                <span className="truncate text-xs font-bold text-muted-foreground" title={getContactName(task.contactId)}>
                                   {getContactName(task.contactId).replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                 </span>
                               </button>
@@ -998,15 +998,15 @@ export default function TasksPage() {
                                   if (task.assignedTo && assigneeName !== 'Unassigned') {
                                     const initials = assigneeName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
                                     return (
-                                      <div className="h-5 w-5 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-700">
+                                      <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                         {initials}
                                       </div>
                                     );
                                   }
                                   
-                                  return <User className="h-5 w-5 text-gray-400" />;
+                                  return <User className="h-5 w-5 text-muted-foreground/70" />;
                                 })()}
-                                <span className="text-xs text-gray-700">
+                                <span className="text-xs text-foreground/90">
                                   {getAssigneeName(task.assignedTo)}
                                 </span>
                               </div>
@@ -1014,13 +1014,13 @@ export default function TasksPage() {
                             <TableCell className="px-1">
                               {task.dueDate ? (
                                 <div className="flex items-center gap-1">
-                                  <CalendarIcon className="h-3 w-3 text-gray-400" />
-                                  <span className="text-xs text-gray-700">
+                                  <CalendarIcon className="h-3 w-3 text-muted-foreground/70" />
+                                  <span className="text-xs text-foreground/90">
                                     {format(parseISO(task.dueDate), 'MMM dd, yyyy')}
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-xs text-gray-400">-</span>
+                                <span className="text-xs text-muted-foreground/70">-</span>
                               )}
                             </TableCell>
                             <TableCell className="px-1">
@@ -1040,7 +1040,7 @@ export default function TasksPage() {
                                     onClick={() => openDeleteDialog(task)}
                                     className="h-6 w-6 p-0"
                                   >
-                                    <Trash2 className="h-3 w-3 text-red-600" />
+                                    <Trash2 className="h-3 w-3 text-destructive" />
                                   </Button>
                                 </div>
                               )}
@@ -1057,7 +1057,7 @@ export default function TasksPage() {
                           <Card 
                             key={task.id} 
                             className="hover:shadow-lg transition-shadow overflow-hidden"
-                            style={{ backgroundColor: task.backgroundColor || 'white' }}
+                            style={{ backgroundColor: task.backgroundColor || undefined }}
                           >
                             <CardContent className="p-4">
                               {/* Card Header */}
@@ -1072,7 +1072,7 @@ export default function TasksPage() {
                                   )}
                                   <button
                                     onClick={() => openTaskDetailsDialog(task)}
-                                    className="font-semibold text-gray-900 mb-1 truncate text-xs md:text-base hover:text-blue-600 hover:underline text-left w-full block"
+                                    className="font-semibold text-foreground mb-1 truncate text-xs md:text-base hover:text-primary hover:underline text-left w-full block"
                                     title={task.title}
                                   >
                                     {(() => {
@@ -1081,7 +1081,7 @@ export default function TasksPage() {
                                     })()}
                                   </button>
                                   {task.description && (
-                                    <p className="text-xs md:text-sm text-gray-500 line-clamp-1 mb-3 overflow-hidden" title={task.description}>
+                                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-1 mb-3 overflow-hidden" title={task.description}>
                                       {task.description.length > 30 ? `${task.description.substring(0, 30)}...` : task.description}
                                     </p>
                                   )}
@@ -1102,7 +1102,7 @@ export default function TasksPage() {
                                       onClick={() => openDeleteDialog(task)}
                                       className="h-5 w-5 md:h-6 md:w-6 p-0"
                                     >
-                                      <Trash2 className="h-3 w-3 text-red-600" />
+                                      <Trash2 className="h-3 w-3 text-destructive" />
                                     </Button>
                                   </div>
                                 )}
@@ -1130,14 +1130,14 @@ export default function TasksPage() {
                                       className="h-5 w-5 rounded-full object-cover"
                                     />
                                   ) : (
-                                    <div className="h-5 w-5 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-700">
+                                    <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                       {contact?.name?.charAt(0).toUpperCase() || '?'}
                                     </div>
                                   );
                                 })()}
                                 <button
                                   onClick={() => setLocation(`/contacts?id=${task.contactId}`)}
-                                  className="text-xs md:text-sm text-gray-600 hover:text-blue-800 hover:underline truncate font-bold"
+                                  className="text-xs md:text-sm text-muted-foreground hover:text-primary/90 hover:underline truncate font-bold"
                                   title={getContactName(task.contactId)}
                                 >
                                   {(() => {
@@ -1172,15 +1172,15 @@ export default function TasksPage() {
                                   if (task.assignedTo && assigneeName !== 'Unassigned') {
                                     const initials = assigneeName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
                                     return (
-                                      <div className="h-5 w-5 md:h-6 md:w-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-700">
+                                      <div className="h-5 w-5 md:h-6 md:w-6 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                         {initials}
                                       </div>
                                     );
                                   }
                                   
-                                  return <User className="h-5 w-5 md:h-6 md:w-6 text-gray-400" />;
+                                  return <User className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground/70" />;
                                 })()}
-                                <span className="text-xs md:text-sm text-gray-700 truncate" title={getAssigneeName(task.assignedTo)}>
+                                <span className="text-xs md:text-sm text-foreground/90 truncate" title={getAssigneeName(task.assignedTo)}>
                                   {(() => {
                                     const assigneeName = getAssigneeName(task.assignedTo);
                                     return assigneeName.length > 12 ? `${assigneeName.substring(0, 12)}...` : assigneeName;
@@ -1191,8 +1191,8 @@ export default function TasksPage() {
                               {/* Due Date */}
                               {task.dueDate && (
                                 <div className="flex items-center gap-2">
-                                  <CalendarIcon className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
-                                  <span className="text-xs md:text-sm text-gray-700">
+                                  <CalendarIcon className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground/70" />
+                                  <span className="text-xs md:text-sm text-foreground/90">
                                     {format(parseISO(task.dueDate), 'MMM dd, yyyy')}
                                   </span>
                                 </div>
@@ -1206,7 +1206,7 @@ export default function TasksPage() {
                     {/* Pagination */}
                     {totalPages > 1 && (
                       <div className="border-t px-4 py-3 flex items-center justify-between">
-                        <div className="text-sm text-gray-700">
+                        <div className="text-sm text-foreground/90">
                           {t('tasks.showing', 'Showing')} {(page - 1) * limit + 1} {t('tasks.to', 'to')}{' '}
                           {Math.min(page * limit, totalTasks)} {t('tasks.of', 'of')} {totalTasks} {t('tasks.tasks', 'tasks')}
                         </div>
@@ -1219,7 +1219,7 @@ export default function TasksPage() {
                           >
                             {t('tasks.previous', 'Previous')}
                           </Button>
-                          <span className="text-sm text-gray-700">
+                          <span className="text-sm text-foreground/90">
                             {t('tasks.page', 'Page')} {page} {t('tasks.of', 'of')} {totalPages}
                           </span>
                           <Button
@@ -1271,7 +1271,7 @@ export default function TasksPage() {
                 <PopoverContent className="w-full p-0" align="start">
                   <div className="flex flex-col max-h-96">
                     {/* Search Input */}
-                    <div className="p-3 border-b sticky top-0 bg-white">
+                    <div className="p-3 border-b sticky top-0 bg-background">
                       <Input
                         placeholder={t('tasks.searchContact', 'Search by name, phone, email...')}
                         value={contactSearchTerm}
@@ -1304,7 +1304,7 @@ export default function TasksPage() {
                           <Loader2 className="h-4 w-4 animate-spin" />
                         </div>
                       ) : contacts.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-sm text-gray-500">
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                           {t('tasks.noContactsFound', 'No contacts found')}
                         </div>
                       ) : (
@@ -1319,7 +1319,7 @@ export default function TasksPage() {
                               setFormData({ ...formData, contactId: contact.id });
                               setContactPopoverOpen(false);
                             }}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 border-b last:border-b-0 flex items-center gap-2 transition-colors cursor-pointer"
+                            className="w-full px-4 py-2 text-left hover:bg-accent border-b last:border-b-0 flex items-center gap-2 transition-colors cursor-pointer"
                           >
                             {contact.avatarUrl ? (
                               <img
@@ -1328,14 +1328,14 @@ export default function TasksPage() {
                                 className="h-6 w-6 rounded-full object-cover flex-shrink-0"
                               />
                             ) : (
-                              <div className="h-6 w-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-700 flex-shrink-0">
+                              <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
                                 {contact.name?.charAt(0).toUpperCase() || '?'}
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium truncate">{contact.name}</div>
                               {contact.phone && (
-                                <div className="text-xs text-gray-500 truncate">{contact.phone}</div>
+                                <div className="text-xs text-muted-foreground truncate">{contact.phone}</div>
                               )}
                             </div>
                           </div>
@@ -1418,7 +1418,7 @@ export default function TasksPage() {
             <div className="grid grid-cols-2 gap-4">
               {/* Due Date */}
               <div>
-                <Label htmlFor="dueDate">{t('tasks.dueDate', 'Due Date')} <span className="text-red-500">*</span></Label>
+                <Label htmlFor="dueDate">{t('tasks.dueDate', 'Due Date')} <span className="text-destructive">*</span></Label>
                 <Input
                   id="dueDate"
                   type="date"
@@ -1550,7 +1550,7 @@ export default function TasksPage() {
                           setFormData({ ...formData, category: '' });
                           setCategoryPopoverOpen(false);
                         }}
-                        className="px-4 py-2 text-left hover:bg-gray-100 text-sm"
+                        className="px-4 py-2 text-left hover:bg-accent text-sm"
                         type="button"
                       >
                         {t('tasks.noCategory', 'No Category')}
@@ -1558,7 +1558,7 @@ export default function TasksPage() {
                       {categories.map((category) => (
                         <div
                           key={category.id}
-                          className="flex items-center justify-between px-4 py-2 hover:bg-gray-100 group"
+                          className="flex items-center justify-between px-4 py-2 hover:bg-accent group"
                         >
                           <button
                             onClick={() => {
@@ -1572,16 +1572,16 @@ export default function TasksPage() {
                           </button>
                           <button
                             onClick={(e) => handleEditCategoryClick(category, e)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 rounded"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded"
                             type="button"
                           >
-                            <Pencil className="h-4 w-4 text-gray-500" />
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </div>
                       ))}
                       <button
                         onClick={() => setShowNewCategoryInput(true)}
-                        className="px-4 py-2 text-left hover:bg-gray-100 text-sm text-blue-600 font-medium flex items-center gap-2"
+                        className="px-4 py-2 text-left hover:bg-accent text-sm text-primary font-medium flex items-center gap-2"
                         type="button"
                       >
                         <FolderPlus className="h-4 w-4" />
@@ -1602,7 +1602,7 @@ export default function TasksPage() {
                   id="backgroundColor"
                   value={formData.backgroundColor}
                   onChange={(e) => setFormData({ ...formData, backgroundColor: e.target.value })}
-                  className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+                  className="w-12 h-10 rounded border border-input cursor-pointer"
                 />
                 <div className="flex-1">
                   <Input
@@ -1613,11 +1613,11 @@ export default function TasksPage() {
                   />
                 </div>
                 <div 
-                  className="w-10 h-10 rounded border border-gray-300"
+                  className="w-10 h-10 rounded border border-input"
                   style={{ backgroundColor: formData.backgroundColor }}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {t('tasks.backgroundColorHelp', 'Choose a background color for this task')}
               </p>
             </div>
@@ -1652,7 +1652,7 @@ export default function TasksPage() {
               <Input
                 value={selectedTask ? getContactName(selectedTask.contactId) : ''}
                 disabled
-                className="bg-gray-50"
+                className="bg-muted/30"
               />
             </div>
 
@@ -1722,7 +1722,7 @@ export default function TasksPage() {
             <div className="grid grid-cols-2 gap-4">
               {/* Due Date */}
               <div>
-                <Label htmlFor="dueDate">{t('tasks.dueDate', 'Due Date')} <span className="text-red-500">*</span></Label>
+                <Label htmlFor="dueDate">{t('tasks.dueDate', 'Due Date')} <span className="text-destructive">*</span></Label>
                 <Input
                   id="dueDate"
                   type="date"
@@ -1854,7 +1854,7 @@ export default function TasksPage() {
                           setFormData({ ...formData, category: '' });
                           setCategoryPopoverOpen(false);
                         }}
-                        className="px-4 py-2 text-left hover:bg-gray-100 text-sm"
+                        className="px-4 py-2 text-left hover:bg-accent text-sm"
                         type="button"
                       >
                         {t('tasks.noCategory', 'No Category')}
@@ -1862,7 +1862,7 @@ export default function TasksPage() {
                       {categories.map((category) => (
                         <div
                           key={category.id}
-                          className="flex items-center justify-between px-4 py-2 hover:bg-gray-100 group"
+                          className="flex items-center justify-between px-4 py-2 hover:bg-accent group"
                         >
                           <button
                             onClick={() => {
@@ -1876,16 +1876,16 @@ export default function TasksPage() {
                           </button>
                           <button
                             onClick={(e) => handleEditCategoryClick(category, e)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 rounded"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded"
                             type="button"
                           >
-                            <Pencil className="h-4 w-4 text-gray-500" />
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </div>
                       ))}
                       <button
                         onClick={() => setShowNewCategoryInput(true)}
-                        className="px-4 py-2 text-left hover:bg-gray-100 text-sm text-blue-600 font-medium flex items-center gap-2"
+                        className="px-4 py-2 text-left hover:bg-accent text-sm text-primary font-medium flex items-center gap-2"
                         type="button"
                       >
                         <FolderPlus className="h-4 w-4" />
@@ -1906,7 +1906,7 @@ export default function TasksPage() {
                   id="editBackgroundColor"
                   value={formData.backgroundColor}
                   onChange={(e) => setFormData({ ...formData, backgroundColor: e.target.value })}
-                  className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+                  className="w-12 h-10 rounded border border-input cursor-pointer"
                 />
                 <div className="flex-1">
                   <Input
@@ -1917,11 +1917,11 @@ export default function TasksPage() {
                   />
                 </div>
                 <div 
-                  className="w-10 h-10 rounded border border-gray-300"
+                  className="w-10 h-10 rounded border border-input"
                   style={{ backgroundColor: formData.backgroundColor }}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {t('tasks.backgroundColorHelp', 'Choose a background color for this task')}
               </p>
             </div>
@@ -1952,7 +1952,7 @@ export default function TasksPage() {
             <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteTask}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               disabled={deleteTaskMutation.isPending}
             >
               {deleteTaskMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1980,7 +1980,7 @@ export default function TasksPage() {
               {/* Task Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">{t('tasks.status', 'Status')}</Label>
+                  <Label className="text-sm font-medium text-foreground">{t('tasks.status', 'Status')}</Label>
                   <div className="mt-1">
                     <Badge className={`${getStatusColor(selectedTask.status)} text-xs`}>
                       {getStatusLabel(selectedTask.status)}
@@ -1989,7 +1989,7 @@ export default function TasksPage() {
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">{t('tasks.priority', 'Priority')}</Label>
+                  <Label className="text-sm font-medium text-foreground">{t('tasks.priority', 'Priority')}</Label>
                   <div className="mt-1">
                     <Badge className={`${getPriorityColor(selectedTask.priority)} text-xs`}>
                       <Flag className="h-3 w-3 mr-1" />
@@ -1999,15 +1999,15 @@ export default function TasksPage() {
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">{t('tasks.assignedTo', 'Assigned To')}</Label>
-                  <div className="mt-1 text-sm text-gray-900">
+                  <Label className="text-sm font-medium text-foreground">{t('tasks.assignedTo', 'Assigned To')}</Label>
+                  <div className="mt-1 text-sm text-foreground">
                     {selectedTask.assignedTo || t('tasks.unassigned', 'Unassigned')}
                   </div>
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">{t('tasks.dueDate', 'Due Date')}</Label>
-                  <div className="mt-1 text-sm text-gray-900">
+                  <Label className="text-sm font-medium text-foreground">{t('tasks.dueDate', 'Due Date')}</Label>
+                  <div className="mt-1 text-sm text-foreground">
                     {selectedTask.dueDate ? format(parseISO(selectedTask.dueDate), 'MMM dd, yyyy') : t('tasks.noDueDate', 'No due date')}
                   </div>
                 </div>
@@ -2016,23 +2016,23 @@ export default function TasksPage() {
               {/* Description */}
               {selectedTask.description && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">{t('tasks.description', 'Description')}</Label>
-                  <div className="mt-1 p-3 bg-gray-50 rounded-md">
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedTask.description}</p>
+                  <Label className="text-sm font-medium text-foreground">{t('tasks.description', 'Description')}</Label>
+                  <div className="mt-1 p-3 bg-muted/30 rounded-md">
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedTask.description}</p>
                   </div>
                 </div>
               )}
 
               {/* Contact Information */}
               <div>
-                <Label className="text-sm font-medium text-gray-700">{t('tasks.contact', 'Contact')}</Label>
+                <Label className="text-sm font-medium text-foreground">{t('tasks.contact', 'Contact')}</Label>
                 <div className="mt-1">
                   {(() => {
                     const contact = displayContacts.find((c: Contact) => c.id === selectedTask.contactId);
                     return (
                       <button
                         onClick={() => setLocation(`/contacts?id=${selectedTask.contactId}`)}
-                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline"
+                        className="flex items-center gap-2 text-primary hover:text-primary/90 hover:underline"
                       >
                         {contact?.avatarUrl ? (
                           <img
@@ -2041,7 +2041,7 @@ export default function TasksPage() {
                             className="h-6 w-6 rounded-full object-cover"
                           />
                         ) : (
-                          <div className="h-6 w-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-700">
+                          <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
                             {contact?.name?.charAt(0).toUpperCase() || '?'}
                           </div>
                         )}
@@ -2056,7 +2056,7 @@ export default function TasksPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {selectedTask.category && (
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">{t('tasks.category', 'Category')}</Label>
+                    <Label className="text-sm font-medium text-foreground">{t('tasks.category', 'Category')}</Label>
                     <div className="mt-1">
                       <Badge variant="outline" className="text-xs">
                         {selectedTask.category}
@@ -2067,7 +2067,7 @@ export default function TasksPage() {
                 
                 {selectedTask.tags && selectedTask.tags.length > 0 && (
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">{t('tasks.tags', 'Tags')}</Label>
+                    <Label className="text-sm font-medium text-foreground">{t('tasks.tags', 'Tags')}</Label>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {selectedTask.tags.map((tag, index) => (
                         <Badge key={index} variant="secondary" className="text-xs">
@@ -2080,16 +2080,16 @@ export default function TasksPage() {
               </div>
 
               {/* Timestamps */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-500">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">{t('tasks.createdAt', 'Created')}</Label>
+                  <Label className="text-sm font-medium text-foreground">{t('tasks.createdAt', 'Created')}</Label>
                   <div className="mt-1">
                     {format(parseISO(selectedTask.createdAt), 'MMM dd, yyyy HH:mm')}
                   </div>
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">{t('tasks.updatedAt', 'Last Updated')}</Label>
+                  <Label className="text-sm font-medium text-foreground">{t('tasks.updatedAt', 'Last Updated')}</Label>
                   <div className="mt-1">
                     {format(parseISO(selectedTask.updatedAt), 'MMM dd, yyyy HH:mm')}
                   </div>

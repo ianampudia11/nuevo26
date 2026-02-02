@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position, useReactFlow } from 'reactflow';
-import { ListOrdered, Copy, Trash2 } from 'lucide-react';
+import { Copy, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/hooks/use-translation';
 import { useFlowContext } from '../../pages/flow-builder';
@@ -24,8 +24,8 @@ const invalidResponseHandleStyle = {
   ...standardHandleStyle,
   top: '50%',
   right: '-12px',
-  backgroundColor: '#f97316', // Orange color for invalid response
-  borderColor: '#ea580c'
+  backgroundColor: 'hsl(var(--secondary))',
+  borderColor: 'hsl(var(--border))'
 };
 
 interface PollOption {
@@ -152,7 +152,7 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
   };
 
   return (
-    <div className="node-whatsapp-poll p-3 rounded-lg bg-white border border-green-200 shadow-sm max-w-[380px] group">
+    <div className="node-whatsapp-poll p-3 rounded-lg bg-card border border-border shadow-sm max-w-[380px] group">
       <NodeToolbar
         id={id}
         onDuplicate={onDuplicateNode}
@@ -160,7 +160,7 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
       />
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <ListOrdered className="h-4 w-4 text-green-600" />
+        <img src="https://cdn-icons-png.flaticon.com/128/12482/12482449.png" alt="WhatsApp Poll" className="h-4 w-4" />
         <span>{t('flow_builder.whatsapp_poll_node_title', 'WhatsApp Poll')}</span>
         <button
           className="ml-auto text-xs text-muted-foreground hover:text-foreground"
@@ -195,7 +195,7 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
               {options.map((option, index) => (
                 <div key={index} className="space-y-2 p-3 border border-border rounded-lg bg-background/50">
                   <div className="flex items-center gap-2">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-md bg-green-600 text-white flex items-center justify-center text-xs font-medium">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
                       {index + 1}
                     </div>
                     <div className="flex-1 font-medium text-xs">Option {index + 1}</div>
@@ -268,14 +268,14 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
                   type="checkbox"
                   checked={enableGoBack}
                   onChange={(e) => handleEnableGoBackChange(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300"
+                  className="w-4 h-4 rounded border-input"
                 />
                 <span className="text-muted-foreground">Enable Go Back</span>
               </label>
             </div>
             
             {enableGoBack && (
-              <div className="space-y-2 p-3 border rounded-lg bg-secondary/20">
+              <div className="space-y-2 p-3 border rounded-lg ">
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">Display Text:</label>
                   <input
@@ -311,7 +311,7 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
             <div className="text-xs font-medium text-muted-foreground">
               {t('flow_builder.poll_question_label', 'Question')}
             </div>
-            <div className="text-sm p-2 bg-secondary/40 rounded-md border border-border">
+            <div className="text-sm p-2  rounded-md border border-border">
               {question || t('flow_builder.poll_no_question', 'No question set')}
             </div>
           </div>
@@ -322,7 +322,7 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
             </div>
             {options.map((option, index) => (
               <div key={index} className="flex items-center gap-2 relative">
-                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-green-600 text-white flex items-center justify-center text-xs font-medium">
+                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
                   {index + 1}
                 </div>
                 <div className="text-sm flex-1 pr-6">
@@ -344,7 +344,7 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
             {/* 🔧 NEW: Go Back Option Display */}
             {enableGoBack && (
               <div className="flex items-center gap-2 relative">
-                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-gray-500 text-white flex items-center justify-center text-xs font-medium">
+                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium">
                   ←
                 </div>
                 <div className="text-sm flex-1 pr-6">
@@ -359,8 +359,8 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
                   id="go-back"
                   style={{
                     ...outputHandleStyle,
-                    backgroundColor: '#6b7280', // Gray color for go back
-                    borderColor: '#4b5563'
+                    backgroundColor: 'hsl(var(--muted))',
+                    borderColor: 'hsl(var(--border))'
                   }}
                   isConnectable={isConnectable}
                 />
@@ -369,11 +369,11 @@ export default function WhatsAppPollNode({ data, isConnectable, id }: any) {
           </div>
 
           <div className="flex items-center gap-2 relative mt-3 pt-3 border-t border-border/50">
-            <div className="flex-shrink-0 w-6 h-6 rounded-md bg-orange-500 text-white flex items-center justify-center text-xs font-medium">
+            <div className="flex-shrink-0 w-6 h-6 rounded-md flex-shrink-0 w-6 h-6 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium flex items-center justify-center text-xs font-medium">
               !
             </div>
             <div className="text-sm flex-1 pr-6">
-              <div className="text-orange-700 font-medium">
+              <div className="text-secondary font-medium">
                 {t('flow_builder.poll_invalid_response_title', 'Invalid Response')}
               </div>
               <div className="text-xs text-muted-foreground">

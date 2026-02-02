@@ -47,7 +47,7 @@ import {
 import { 
   Loader2, Calendar as CalendarIcon, X, UserPlus, Clock, MapPin,
   ChevronLeft, ChevronRight, Search, Settings, PlusCircle, Check,
-  ChevronDown, Pencil, Trash
+  ChevronDown, Pencil, Trash, Menu, X as XIcon
 } from 'lucide-react';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { format, addDays, subDays, parse, parseISO, formatISO, addHours, getDay, isSameMonth, startOfWeek, eachDayOfInterval, addWeeks, subWeeks, getDaysInMonth, isToday, endOfWeek, isSameDay, addMonths, subMonths } from 'date-fns';
@@ -153,6 +153,7 @@ export default function Calendar() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Appointment | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -545,6 +546,20 @@ export default function Calendar() {
     }
   }, [availabilityData]);
   
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+
+      if (window.innerWidth < 640 && viewMode === 'week') {
+        setViewMode('day');
+      }
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, [viewMode]);
+  
   const handleScheduleAppointment = () => {
     const isConnected = selectedProvider === 'google' ? isGoogleCalendarConnected :
                        selectedProvider === 'zoho' ? isZohoCalendarConnected : isCalendlyCalendarConnected;
@@ -916,9 +931,197 @@ export default function Calendar() {
     return eventMap;
   }, [filteredEvents]);
   
+
+  const getEventTimestamps = (event: Appointment): { start: number; end: number } | null => {
+    if (!event.start?.dateTime || !event.end?.dateTime) {
+      return null;
+    }
+    
+    try {
+      const start = parseISO(event.start.dateTime);
+      const end = parseISO(event.end.dateTime);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return null;
+      }
+      
+      return {
+        start: start.getTime(),
+        end: end.getTime()
+      };
+    } catch {
+      return null;
+    }
+  };
+  
+
+  const eventsOverlap = (event1: Appointment, event2: Appointment): boolean => {
+    const times1 = getEventTimestamps(event1);
+    const times2 = getEventTimestamps(event2);
+    
+    if (!times1 || !times2) return false;
+    
+    return (times1.start < times2.end && times1.end > times2.start);
+  };
+  
+
+  const detectOverlaps = (events: Appointment[]): Appointment[][] => {
+    if (events.length === 0) return [];
+    
+
+    const validEvents = events.filter(event => getEventTimestamps(event) !== null);
+    
+    if (validEvents.length === 0) return [];
+    
+    const overlapGroups: Appointment[][] = [];
+    const visited = new Set<string>();
+    
+
+    validEvents.forEach((event) => {
+      if (visited.has(event.id)) return;
+      
+      const group: Appointment[] = [];
+      const queue: Appointment[] = [event];
+      visited.add(event.id);
+      
+
+      while (queue.length > 0) {
+        const currentEvent = queue.shift()!;
+        group.push(currentEvent);
+        
+
+        validEvents.forEach((otherEvent) => {
+          if (visited.has(otherEvent.id)) return;
+          
+          if (eventsOverlap(currentEvent, otherEvent)) {
+            visited.add(otherEvent.id);
+            queue.push(otherEvent);
+          }
+        });
+      }
+      
+      if (group.length > 0) {
+        overlapGroups.push(group);
+      }
+    });
+    
+    return overlapGroups;
+  };
+  
+
+  const calculateEventColumns = (overlapGroup: Appointment[]): Map<string, { column: number; totalColumns: number }> => {
+    const columnMap = new Map<string, { column: number; totalColumns: number }>();
+    
+    if (overlapGroup.length === 0) return columnMap;
+    
+
+    const validEvents = overlapGroup.filter(event => getEventTimestamps(event) !== null);
+    
+    if (validEvents.length === 0) return columnMap;
+    
+
+    const sortedEvents = [...validEvents].sort((a, b) => {
+      const aTimes = getEventTimestamps(a);
+      const bTimes = getEventTimestamps(b);
+      if (!aTimes || !bTimes) return 0;
+      return aTimes.start - bTimes.start;
+    });
+    
+
+    const columns: Array<{ endTime: number }> = [];
+    
+    sortedEvents.forEach((event) => {
+      const times = getEventTimestamps(event);
+      if (!times) return;
+      
+      const eventStart = times.start;
+      const eventEnd = times.end;
+      
+
+      let assignedColumn = -1;
+      for (let i = 0; i < columns.length; i++) {
+        if (columns[i].endTime <= eventStart) {
+          assignedColumn = i;
+          break;
+        }
+      }
+      
+
+      if (assignedColumn === -1) {
+        assignedColumn = columns.length;
+        columns.push({ endTime: eventEnd });
+      } else {
+        columns[assignedColumn].endTime = Math.max(columns[assignedColumn].endTime, eventEnd);
+      }
+      
+      columnMap.set(event.id, {
+        column: assignedColumn,
+        totalColumns: columns.length
+      });
+    });
+    
+
+    const totalColumns = columns.length;
+    columnMap.forEach((value) => {
+      value.totalColumns = totalColumns;
+    });
+    
+    return columnMap;
+  };
+  
+
+  const calculateEventHeight = (startDateTime: string, endDateTime: string, hourSlotHeight: number = 60): number => {
+    if (!startDateTime || !endDateTime) return 20; // Default minimum height
+    
+    try {
+      const start = parseISO(startDateTime);
+      const end = parseISO(endDateTime);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return 20; // Default minimum height
+      }
+      
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+      const height = (durationMinutes / 60) * hourSlotHeight;
+      return Math.max(height, 20); // Minimum height of 20px
+    } catch {
+      return 20; // Default minimum height
+    }
+  };
+  
+
+  const calculateEventTopPosition = (dateTime: string, hourSlotHour: number, hourSlotHeight: number = 60): number => {
+    if (!dateTime) return 0;
+    
+    try {
+      const eventDate = parseISO(dateTime);
+      
+      if (isNaN(eventDate.getTime())) {
+        return 0;
+      }
+      
+      const eventHour = eventDate.getHours();
+      const eventMinutes = eventDate.getMinutes();
+      
+
+      if (eventHour < hourSlotHour) {
+        return 0;
+      }
+      
+
+      const minutesOffset = eventMinutes;
+      const topOffset = (minutesOffset / 60) * hourSlotHeight;
+      return topOffset;
+    } catch {
+      return 0;
+    }
+  };
+  
   const getEventsForDay = (day: Date) => {
     const dateKey = format(day, 'yyyy-MM-dd');
-    return eventsByDate.get(dateKey) || [];
+    const events = eventsByDate.get(dateKey) || [];
+
+    return events.filter((event: Appointment) => getEventTimestamps(event) !== null);
   };
   
   const renderMonthCell = (day: Date) => {
@@ -930,20 +1133,20 @@ export default function Calendar() {
     return (
       <div 
         key={day.toString()} 
-        className={`border border-gray-200 min-h-[100px] p-1 transition-colors ${
-          isToday(day) ? 'bg-blue-50' : 
-          !isCurrentMonth ? 'bg-gray-50 text-gray-400' : 
-          isSelectedDay ? 'bg-blue-100' : ''
+        className={`border border-border min-h-[80px] md:min-h-[100px] lg:min-h-[120px] p-1 transition-colors ${
+          isToday(day) ? 'bg-primary/10 dark:bg-primary/20' : 
+          !isCurrentMonth ? 'bg-muted/30 text-muted-foreground/70' : 
+          isSelectedDay ? 'bg-primary/20 dark:bg-primary/30' : ''
         }`}
         onClick={() => setSelectedDate(day)}
       >
         <div className="flex justify-between items-start">
-          <span className={`text-sm font-medium ${isToday(day) ? 'text-blue-700 w-6 h-6 rounded-full bg-blue-200 flex items-center justify-center' : ''}`}>
+          <span className={`text-sm font-medium ${isToday(day) ? 'text-primary dark:text-primary/90 w-6 h-6 rounded-full bg-primary/30 dark:bg-primary/40 flex items-center justify-center' : ''}`}>
             {displayDay}
           </span>
         </div>
-        <div className="mt-1 space-y-1 max-h-[80px] overflow-hidden">
-          {dayEvents.slice(0, 3).map((event: any, idx: number) => (
+        <div className="mt-1 space-y-1 max-h-[120px] overflow-y-auto custom-scrollbar">
+          {dayEvents.slice(0, 5).map((event: any, idx: number) => (
             <div
               key={event.id || idx}
               className={`text-xs px-1 py-0.5 rounded truncate ${EVENT_COLORS[event.colorId || 'default']} text-white flex items-center space-x-1`}
@@ -956,7 +1159,7 @@ export default function Calendar() {
               {/* Provider indicator */}
               <div
                 className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  event.provider === 'google' ? 'bg-blue-200' :
+                  event.provider === 'google' ? 'bg-primary/30 dark:bg-primary/40' :
                   event.provider === 'zoho' ? 'bg-orange-200' :
                   event.provider === 'calendly' ? 'bg-purple-200' : 'bg-gray-200'
                 }`}
@@ -969,9 +1172,9 @@ export default function Calendar() {
               </span>
             </div>
           ))}
-          {dayEvents.length > 3 && (
-            <div className="text-xs text-gray-500 pl-1">
-              +{dayEvents.length - 3} {t('calendar.more', 'more')}
+          {dayEvents.length > 5 && (
+            <div className="text-xs text-muted-foreground pl-1">
+              +{dayEvents.length - 5} {t('calendar.more', 'more')}
             </div>
           )}
         </div>
@@ -979,72 +1182,166 @@ export default function Calendar() {
     );
   };
   
+
+  const parseHourSlot = (hourSlot: string): number => {
+    const [hourStr, period] = hourSlot.split(' ');
+    let hour = parseInt(hourStr);
+    if (period === 'pm' && hour !== 12) hour += 12;
+    if (period === 'am' && hour === 12) hour = 0;
+    return hour;
+  };
+
+
+  const getEventHour = (dateTime: string): number => {
+    return parseISO(dateTime).getHours();
+  };
+
+
+  const getEventMinutes = (dateTime: string): number => {
+    return parseISO(dateTime).getMinutes();
+  };
+
   const renderWeekDayCell = (day: Date, hourSlots: string[]) => {
     const dayEvents = getEventsForDay(day);
     
+
+    const overlapGroups = detectOverlaps(dayEvents);
+    const eventColumnMap = new Map<string, { column: number; totalColumns: number }>();
+    
+    overlapGroups.forEach((group) => {
+      const columnMap = calculateEventColumns(group);
+      columnMap.forEach((value, key) => {
+        eventColumnMap.set(key, value);
+      });
+    });
+    
+
+    const renderedEvents = new Set<string>();
+    
     return (
       <div className="flex-1 flex flex-col min-h-[800px]">
-        <div className={`text-center py-2 font-medium ${isToday(day) ? 'bg-blue-100' : 'bg-gray-50'}`}>
+        <div className={`text-center py-2 font-medium ${isToday(day) ? 'bg-primary/20 dark:bg-primary/30' : 'bg-muted/30'}`}>
           <div>{format(day, 'EEE')}</div>
-          <div className={`text-lg ${isToday(day) ? 'text-blue-600' : ''}`}>{format(day, 'd')}</div>
+          <div className={`text-lg ${isToday(day) ? 'text-primary' : ''}`}>{format(day, 'd')}</div>
         </div>
-        <div className="flex-1 flex flex-col border-l">
-          {hourSlots.map((hour) => (
-            <div key={hour} className="border-b py-2 px-1 flex-1 min-h-[60px] relative">
-              <div className="text-xs text-gray-400 absolute top-0 left-1">{hour}</div>
-              {dayEvents
-                .filter((event: Appointment) => {
-                  const eventHour = format(parseISO(event.start.dateTime), 'h a');
-                  return eventHour === hour;
-                })
-                .map((event: any) => (
-                  <div
-                    key={event.id}
-                    className={`mt-4 p-1 rounded-sm text-xs text-white ${EVENT_COLORS[event.colorId || 'default']} flex items-center space-x-1`}
-                    onClick={() => {
-                      setSelectedEvent(event);
-                      setIsEditModalOpen(true);
-                    }}
-                  >
-                    {/* Provider indicator */}
+        <div className="flex-1 flex flex-col border-l overflow-visible">
+          {hourSlots.map((hour) => {
+
+            const slotHour = parseHourSlot(hour);
+            const hourSlotHeight = 60;
+            
+
+            const eventsForThisHour = dayEvents.filter((event: Appointment) => {
+              if (renderedEvents.has(event.id)) return false;
+              
+              const eventStart = parseISO(event.start.dateTime);
+              const eventEnd = parseISO(event.end.dateTime);
+              const eventStartHour = eventStart.getHours();
+              const eventEndHour = eventEnd.getHours();
+              
+
+              if (eventStartHour === slotHour) {
+                renderedEvents.add(event.id);
+                return true;
+              }
+              
+
+              if (eventStartHour < slotHour && eventEndHour >= slotHour) {
+
+                return false;
+              }
+              
+              return false;
+            });
+
+            return (
+              <div key={hour} className="border-b py-2 px-1 min-h-[60px] h-[60px] relative overflow-visible">
+                <div className="text-xs text-muted-foreground/70 absolute top-0 left-1">{hour}</div>
+                {eventsForThisHour.map((event: any) => {
+                  const eventStart = parseISO(event.start.dateTime);
+                  const eventEnd = parseISO(event.end.dateTime);
+                  const eventStartHour = eventStart.getHours();
+                  const eventStartMinutes = eventStart.getMinutes();
+                  
+
+                  const eventHeight = calculateEventHeight(event.start.dateTime, event.end.dateTime, hourSlotHeight);
+                  
+
+                  const topOffset = calculateEventTopPosition(event.start.dateTime, slotHour, hourSlotHeight);
+                  
+
+                  const columnInfo = eventColumnMap.get(event.id) || { column: 0, totalColumns: 1 };
+                  const { column: columnIndex, totalColumns } = columnInfo;
+                  
+
+                  const widthPercent = 100 / totalColumns;
+                  const eventWidth = `calc(${widthPercent}% - 4px)`;
+                  const leftOffset = `calc(4px + ${columnIndex * widthPercent}%)`;
+                  
+
+                  const zIndex = 1 + columnIndex;
+                  
+                  return (
                     <div
-                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                        event.provider === 'google' ? 'bg-blue-200' :
-                        event.provider === 'zoho' ? 'bg-orange-200' :
-                        event.provider === 'calendly' ? 'bg-purple-200' : 'bg-gray-200'
-                      }`}
-                      title={event.provider === 'google' ? t('calendar.google_calendar', 'Google Calendar') :
-                             event.provider === 'zoho' ? t('calendar.zoho_calendar', 'Zoho Calendar') :
-                             event.provider === 'calendly' ? t('calendar.calendly_calendar', 'Calendly') : t('nav.calendar', 'Calendar')}
-                    />
-                    <span className="truncate">
-                      {format(parseISO(event.start.dateTime), 'h:mm a')} - {event.summary}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          ))}
+                      key={event.id}
+                      className={`p-0.5 md:p-1 rounded-sm text-[10px] md:text-xs text-white ${EVENT_COLORS[event.colorId || 'default']} flex items-center space-x-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer hover:z-20 hover:shadow-lg transition-shadow`}
+                      style={{
+                        top: `${topOffset}px`,
+                        position: 'absolute',
+                        width: eventWidth,
+                        left: leftOffset,
+                        height: `${eventHeight}px`,
+                        zIndex: zIndex,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                      onClick={() => {
+                        setSelectedEvent(event);
+                        setIsEditModalOpen(true);
+                      }}
+                    >
+                      {/* Provider indicator */}
+                      <div
+                        className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full flex-shrink-0 ${
+                          event.provider === 'google' ? 'bg-primary/30 dark:bg-primary/40' :
+                          event.provider === 'zoho' ? 'bg-orange-200' :
+                          event.provider === 'calendly' ? 'bg-purple-200' : 'bg-gray-200'
+                        }`}
+                        title={event.provider === 'google' ? t('calendar.google_calendar', 'Google Calendar') :
+                               event.provider === 'zoho' ? t('calendar.zoho_calendar', 'Zoho Calendar') :
+                               event.provider === 'calendly' ? t('calendar.calendly_calendar', 'Calendly') : t('nav.calendar', 'Calendar')}
+                      />
+                      <span className="truncate">
+                        {format(parseISO(event.start.dateTime), 'h:mm a')} - {event.summary}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   };
   
   const hourSlots = [
+    '12 am', '1 am', '2 am', '3 am', '4 am', '5 am', '6 am', '7 am',
     '8 am', '9 am', '10 am', '11 am', '12 pm', 
-    '1 pm', '2 pm', '3 pm', '4 pm', '5 pm', '6 pm'
+    '1 pm', '2 pm', '3 pm', '4 pm', '5 pm', '6 pm', '7 pm', '8 pm', '9 pm', '10 pm', '11 pm'
   ];
   
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-poppins text-gray-800 bg-gray-50">
+    <div className="h-screen flex flex-col overflow-hidden font-poppins text-foreground bg-background">
       <Header />
       
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto p-6">
+          <div className="max-w-7xl mx-auto p-2 md:p-4 lg:p-6">
             {/* Calendar Provider Selection and Filtering */}
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 pb-4 mb-6 space-y-4">
+            <div className="sticky top-0 z-10 bg-background border-b border-border pb-4 mb-6 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
                 {/* Provider Selection for Creating Events */}
                 <div className="flex items-center space-x-4">
@@ -1058,7 +1355,7 @@ export default function Calendar() {
                     >
                       <span>{t('calendar.google_calendar', 'Google Calendar')}</span>
                       {isGoogleCalendarConnected && (
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-green-500 dark:bg-green-600 rounded-full"></div>
                       )}
                     </Button>
                     <Button
@@ -1069,7 +1366,7 @@ export default function Calendar() {
                     >
                       <span>{t('calendar.zoho_calendar', 'Zoho Calendar')}</span>
                       {isZohoCalendarConnected && (
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-green-500 dark:bg-green-600 rounded-full"></div>
                       )}
                     </Button>
                     <Button
@@ -1080,7 +1377,7 @@ export default function Calendar() {
                     >
                       <span>{t('calendar.calendly_calendar', 'Calendly')}</span>
                       {isCalendlyCalendarConnected && (
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-green-500 dark:bg-green-600 rounded-full"></div>
                       )}
                     </Button>
                   </div>
@@ -1088,8 +1385,8 @@ export default function Calendar() {
 
                 {/* Calendar View Filter */}
                 <div className="flex items-center space-x-4">
-                  <h3 className="text-sm font-medium text-gray-700">{t('calendar.view', 'View:')}:</h3>
-                  <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+                  <h3 className="text-sm font-medium text-foreground">{t('calendar.view', 'View:')}:</h3>
+                  <div className="flex space-x-1 bg-muted rounded-lg p-1">
                     <Button
                       variant={calendarFilter === 'all' ? 'default' : 'ghost'}
                       size="sm"
@@ -1105,7 +1402,7 @@ export default function Calendar() {
                       className="text-xs px-3 py-1 h-7 flex items-center space-x-1"
                       disabled={!isGoogleCalendarConnected}
                     >
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full"></div>
                       <span>{t('calendar.google', 'Google')}</span>
                     </Button>
                     <Button
@@ -1158,11 +1455,21 @@ export default function Calendar() {
               )}
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="border-b p-4 flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <div className="text-xl ">{t('nav.calendar', 'Calendar')}</div>
-                  <div className="text-sm text-gray-500">{t('calendar.personal_teams', 'Personal, Teams')}</div>
+            <div className="bg-card rounded-xl shadow-sm overflow-hidden">
+              <div className="border-b p-2 md:p-4 flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0 md:space-x-4">
+                <div className="flex items-center space-x-2 w-full md:w-auto justify-between md:justify-start">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="lg:hidden"
+                      onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    >
+                      {isSidebarOpen ? <XIcon className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                    </Button>
+                    <div className="text-xl ">{t('nav.calendar', 'Calendar')}</div>
+                    <div className="text-sm text-muted-foreground">{t('calendar.personal_teams', 'Personal, Teams')}</div>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-4">
                   <Button 
@@ -1211,8 +1518,29 @@ export default function Calendar() {
                 </div>
               </div>
               
-              <div className="flex flex-1 h-full">
-                <div className="w-[260px] border-r p-4">
+              <div className="flex flex-1 h-full relative">
+                {/* Mobile sidebar overlay */}
+                {isSidebarOpen && (
+                  <div 
+                    className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+                    onClick={() => setIsSidebarOpen(false)}
+                  />
+                )}
+                {/* Sidebar */}
+                <div className={`
+                  ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+                  lg:translate-x-0 
+                  fixed lg:static 
+                  top-0 left-0 
+                  h-full lg:h-auto
+                  w-[260px] 
+                  bg-background 
+                  border-r 
+                  p-4 
+                  z-50 lg:z-auto
+                  transition-transform duration-300 ease-in-out
+                  overflow-y-auto
+                `}>
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium">
@@ -1256,8 +1584,8 @@ export default function Calendar() {
                           <button
                             key={day.toString()}
                             className={`h-7 w-7 flex items-center justify-center rounded-full ${
-                              isCurrent ? 'bg-blue-600 text-white' : 
-                              isToday(day) ? 'bg-blue-100 text-blue-700' : 
+                              isCurrent ? 'bg-primary text-white' : 
+                              isToday(day) ? 'bg-primary/20 dark:bg-primary/30 text-primary dark:text-primary/90' : 
                               !isCurrentMonth ? 'text-gray-400' : ''
                             }`}
                             onClick={() => setSelectedDate(day)}
@@ -1389,23 +1717,23 @@ export default function Calendar() {
                         ))}
                       </div>
                       
-                      <div className="grid grid-cols-7">
+                      <div className="grid grid-cols-7 gap-0 md:gap-1">
                         {calendarData.flat().map(day => renderMonthCell(day))}
                       </div>
                     </div>
                   )}
                   
                   {viewMode === 'week' && (
-                    <div className="flex h-full">
-                      <div className="w-16 pt-10 bg-gray-50 border-r">
+                    <div className="flex h-full overflow-x-auto md:overflow-x-visible">
+                      <div className="w-12 md:w-16 pt-10 bg-gray-50 border-r flex-shrink-0">
                         {hourSlots.map(hour => (
-                          <div key={hour} className="h-[60px] border-b px-2 text-xs text-gray-500">
+                          <div key={hour} className="h-[50px] md:h-[60px] border-b px-2 text-xs text-gray-500">
                             {hour}
                           </div>
                         ))}
                       </div>
                       
-                      <div className="flex-1 flex">
+                      <div className="flex-1 flex min-w-[100px] md:min-w-0 overflow-x-auto">
                         {(calendarData as Date[]).map((day) => renderWeekDayCell(day, hourSlots))}
                       </div>
                     </div>
@@ -1413,9 +1741,9 @@ export default function Calendar() {
                   
                   {viewMode === 'day' && (
                     <div className="flex h-full">
-                      <div className="w-16 pt-10 bg-gray-50 border-r">
+                      <div className="w-12 md:w-16 pt-10 bg-gray-50 border-r flex-shrink-0">
                         {hourSlots.map(hour => (
-                          <div key={hour} className="h-[60px] border-b px-2 text-xs text-gray-500">
+                          <div key={hour} className="h-[50px] md:h-[60px] border-b px-2 text-xs text-gray-500">
                             {hour}
                           </div>
                         ))}
@@ -1450,7 +1778,7 @@ export default function Calendar() {
       </div>
       
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-w-full h-full sm:h-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <span>{t('calendar.schedule_new_appointment', 'Schedule New Appointment')}</span>
@@ -1459,7 +1787,7 @@ export default function Calendar() {
                 <div className="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded-md">
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      selectedProvider === 'google' ? 'bg-blue-500' :
+                      selectedProvider === 'google' ? 'bg-primary' :
                       selectedProvider === 'zoho' ? 'bg-orange-500' : 'bg-purple-500'
                     }`}
                   />
@@ -1522,13 +1850,13 @@ export default function Calendar() {
                 <SelectContent>
                   <SelectItem value="1">
                     <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                      <div className="w-3 h-3 rounded-full bg-primary mr-2"></div>
                       <span>{t('calendar.color.blue', 'Blue')}</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="2">
                     <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-500 dark:bg-green-600 mr-2"></div>
                       <span>{t('calendar.color.green', 'Green')}</span>
                     </div>
                   </SelectItem>
@@ -1564,7 +1892,7 @@ export default function Calendar() {
                   </SelectItem>
                   <SelectItem value="8">
                     <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                      <div className="w-3 h-3 rounded-full bg-muted mr-2"></div>
                       <span>{t('calendar.color.gray', 'Gray')}</span>
                     </div>
                   </SelectItem>
@@ -1648,7 +1976,7 @@ export default function Calendar() {
       </Dialog>
       
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-w-full h-full sm:h-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <span>{t('calendar.edit_appointment', 'Edit Appointment')}</span>
@@ -1658,7 +1986,7 @@ export default function Calendar() {
                   <div className="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded-md">
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        detectEventProvider(selectedEvent) === 'google' ? 'bg-blue-500' :
+                        detectEventProvider(selectedEvent) === 'google' ? 'bg-primary' :
                         detectEventProvider(selectedEvent) === 'zoho' ? 'bg-orange-500' : 'bg-purple-500'
                       }`}
                     />
@@ -1722,13 +2050,13 @@ export default function Calendar() {
                 <SelectContent>
                   <SelectItem value="1">
                     <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                      <div className="w-3 h-3 rounded-full bg-primary mr-2"></div>
                       <span>{t('calendar.color.blue', 'Blue')}</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="2">
                     <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-500 dark:bg-green-600 mr-2"></div>
                       <span>{t('calendar.color.green', 'Green')}</span>
                     </div>
                   </SelectItem>
@@ -1764,7 +2092,7 @@ export default function Calendar() {
                   </SelectItem>
                   <SelectItem value="8">
                     <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                      <div className="w-3 h-3 rounded-full bg-muted mr-2"></div>
                       <span>{t('calendar.color.gray', 'Gray')}</span>
                     </div>
                   </SelectItem>
@@ -1875,7 +2203,7 @@ export default function Calendar() {
                     <div className="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded-md">
                       <div
                         className={`w-2 h-2 rounded-full ${
-                          detectEventProvider(selectedEvent) === 'google' ? 'bg-blue-500' :
+                          detectEventProvider(selectedEvent) === 'google' ? 'bg-primary' :
                           detectEventProvider(selectedEvent) === 'zoho' ? 'bg-orange-500' : 'bg-purple-500'
                         }`}
                       />

@@ -227,7 +227,7 @@ export function InstagramConnectionForm({ isOpen, onClose, onSuccess }: Props) {
             </div>
             
             <div className="grid gap-2">
-              <Label htmlFor="accessToken">Page Access Token *</Label>
+              <Label htmlFor="accessToken">Access Token *</Label>
               <Input
                 id="accessToken"
                 name="accessToken"

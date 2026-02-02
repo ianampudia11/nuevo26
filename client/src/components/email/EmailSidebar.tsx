@@ -88,8 +88,8 @@ export default function EmailSidebar({
             variant={selectedFolder === folder.id ? "secondary" : "ghost"}
             className={`w-full justify-start mb-1 ${
               selectedFolder === folder.id
-                ? 'bg-gray-100 border-gray-300'
-                : 'text-gray-700 hover:bg-gray-50'
+                ? 'bg-accent border-border'
+                : 'text-foreground hover:bg-accent'
             }`}
             style={selectedFolder === folder.id ? { color: 'var(--brand-primary-color)' } : {}}
             onClick={() => onFolderSelect(folder.id)}

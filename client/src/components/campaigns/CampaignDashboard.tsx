@@ -479,7 +479,7 @@ export function CampaignDashboard() {
               {t('campaigns.dashboard_description', 'Manage and monitor your mass messaging campaigns')}
             </p>
             <div className="flex items-center gap-2 text-xs">
-              <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500 dark:bg-green-600' : 'bg-red-500 dark:bg-red-600'}`}></div>
               <span className="text-muted-foreground">
                 {wsConnected ? t('campaigns.live_updates', 'Live updates') : t('campaigns.polling_mode', 'Polling mode')}
               </span>
@@ -580,7 +580,7 @@ export function CampaignDashboard() {
       </div>
 
       <div className="flex space-x-2">
-        {['all', 'draft', 'running', 'paused', 'completed'].map((status) => (
+        {['all', 'draft', 'scheduled', 'running', 'paused', 'completed'].map((status) => (
           <Button
             key={status}
             variant={filter === status ? 'default' : 'outline'}
@@ -687,12 +687,12 @@ export function CampaignDashboard() {
                       </span>
                       <span className="font-medium">{calculateProgress(campaign)}%</span>
                     </div>
-                    <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+                    <div className="w-full  rounded-full h-3 overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-primary to-primary/80 h-3 rounded-full transition-all duration-500 ease-out relative"
                         style={{ width: `${calculateProgress(campaign)}%` }}
                       >
-                        <div className="absolute inset-0 bg-white/20 animate-pulse rounded-full"></div>
+                        <div className="absolute inset-0 bg-foreground/20 animate-pulse rounded-full"></div>
                       </div>
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">

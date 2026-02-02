@@ -49,10 +49,11 @@ export function TikTokMessageWithReactionsAndMentions({
   const {
     availableEmojis,
     getReactions,
-    toggleReaction
+    toggleReaction,
+    supported: reactionsSupported
   } = useTikTokReactions(conversationId);
 
-  const reactions = getReactions(message.id);
+  const reactions = reactionsSupported ? getReactions(message.id) : [];
   const isOutgoing = message.senderType === 'agent';
 
 
@@ -66,15 +67,17 @@ export function TikTokMessageWithReactionsAndMentions({
   };
 
   const handleReactionClick = (emoji: string) => {
-    toggleReaction(message.id, emoji, currentUserId);
+    if (!reactionsSupported) return;
+    toggleReaction(message.id, emoji);
   };
 
   const handleAddReaction = () => {
+    if (!reactionsSupported) return;
     setShowReactionPicker(true);
   };
 
   const handleMouseEnter = (_e: React.MouseEvent) => {
-    if (!isOutgoing) return; // Only show for outgoing messages
+    if (!reactionsSupported || !isOutgoing) return; // Only show for outgoing messages when supported
 
     const rect = messageRef.current?.getBoundingClientRect();
     if (rect) {
@@ -107,8 +110,8 @@ export function TikTokMessageWithReactionsAndMentions({
           className={cn(
             'rounded-2xl px-4 py-2 shadow-sm',
             isOutgoing
-              ? 'bg-blue-500 text-white rounded-br-sm'
-              : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+              ? 'bg-primary text-primary-foreground rounded-br-sm'
+              : 'bg-muted text-foreground rounded-bl-sm'
           )}
         >
           {/* Message content with mentions */}
@@ -148,8 +151,8 @@ export function TikTokMessageWithReactionsAndMentions({
           </div>
         </div>
 
-        {/* Reactions */}
-        {reactions.length > 0 && (
+        {/* Reactions (only when supported) */}
+        {reactionsSupported && reactions.length > 0 && (
           <ReactionDisplay
             reactions={reactions}
             currentUserId={currentUserId}
@@ -159,22 +162,23 @@ export function TikTokMessageWithReactionsAndMentions({
           />
         )}
 
-        {/* Message actions (visible on hover) */}
+        {/* Message actions (visible on hover; reaction UI only when supported) */}
         <div className={cn(
           'absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity',
           isOutgoing ? 'left-0 -translate-x-full -ml-2' : 'right-0 translate-x-full -mr-2'
         )}>
           <div className="flex items-center gap-1">
-            {/* Quick reaction button */}
-            <button
-              onClick={handleAddReaction}
-              className="w-8 h-8 flex items-center justify-center bg-white hover:bg-gray-100 rounded-full shadow-md transition-colors"
-              title="Add reaction"
-            >
-              <Smile className="w-4 h-4 text-gray-600" />
-            </button>
+            {reactionsSupported && (
+              <button
+                onClick={handleAddReaction}
+                className="w-8 h-8 flex items-center justify-center bg-background hover:bg-accent rounded-full shadow-md transition-colors"
+                title="Add reaction"
+              >
+                <Smile className="w-4 h-4 text-gray-600" />
+              </button>
+            )}
 
-            {/* More actions */}
+            {/* More actions (Reply always; Add Reaction only when supported) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="w-8 h-8 flex items-center justify-center bg-white hover:bg-gray-100 rounded-full shadow-md transition-colors">
@@ -188,33 +192,39 @@ export function TikTokMessageWithReactionsAndMentions({
                     Reply
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={handleAddReaction}>
-                  <Smile className="w-4 h-4 mr-2" />
-                  Add Reaction
-                </DropdownMenuItem>
+                {reactionsSupported && (
+                  <DropdownMenuItem onClick={handleAddReaction}>
+                    <Smile className="w-4 h-4 mr-2" />
+                    Add Reaction
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
-        {/* Reaction picker */}
-        <ReactionPicker
-          availableEmojis={availableEmojis}
-          onSelect={(emoji) => {
-            handleReactionClick(emoji);
-            setShowReactionPicker(false);
-          }}
-          onClose={() => setShowReactionPicker(false)}
-          open={showReactionPicker}
-        />
+        {/* Reaction picker (only when supported) */}
+        {reactionsSupported && (
+          <ReactionPicker
+            availableEmojis={availableEmojis}
+            onSelect={(emoji) => {
+              handleReactionClick(emoji);
+              setShowReactionPicker(false);
+            }}
+            onClose={() => setShowReactionPicker(false)}
+            open={showReactionPicker}
+          />
+        )}
 
-        {/* Floating quick reaction picker */}
-        <FloatingReactionPicker
-          isVisible={showFloatingPicker}
-          position={floatingPickerPosition}
-          onSelect={handleReactionClick}
-          onShowAll={() => setShowReactionPicker(true)}
-        />
+        {/* Floating quick reaction picker (only when supported) */}
+        {reactionsSupported && (
+          <FloatingReactionPicker
+            isVisible={showFloatingPicker}
+            position={floatingPickerPosition}
+            onSelect={handleReactionClick}
+            onShowAll={() => setShowReactionPicker(true)}
+          />
+        )}
       </div>
     </div>
   );

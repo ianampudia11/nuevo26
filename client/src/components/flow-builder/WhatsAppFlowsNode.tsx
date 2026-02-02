@@ -77,7 +77,7 @@ export function WhatsAppFlowsNode({ id, data, isConnectable }: WhatsAppFlowsNode
   ]);
 
   return (
-    <div className="node-whatsapp-flows p-3 rounded-lg bg-white border border-green-200 shadow-sm max-w-[320px] group">
+    <div className="node-whatsapp-flows p-3 rounded-lg bg-card border border-border shadow-sm max-w-[320px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -117,9 +117,9 @@ export function WhatsAppFlowsNode({ id, data, isConnectable }: WhatsAppFlowsNode
       </div>
 
       <div className="font-medium flex items-center gap-2 mb-2">
-        <MessageSquare className="h-4 w-4 text-green-600" />
+        <img src="https://cdn-icons-png.flaticon.com/128/1587/1587495.png" alt="WhatsApp Flows" className="h-4 w-4" />
         <span>WhatsApp Flows</span>
-        <span className="px-1.5 py-0.5 text-[9px] font-medium bg-green-100 text-green-700 rounded border border-green-200">
+        <span className="px-1.5 py-0.5 text-[9px] font-medium bg-primary/10 text-primary rounded border border-primary/20">
           Official API
         </span>
         <button
@@ -140,10 +140,10 @@ export function WhatsAppFlowsNode({ id, data, isConnectable }: WhatsAppFlowsNode
         </button>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="font-medium text-green-600">FLOW</span>
+          <span className="font-medium text-primary">FLOW</span>
           <span className="text-muted-foreground">•</span>
           <span className="text-xs text-muted-foreground truncate">
             {flowId || 'No Flow ID'}
@@ -186,10 +186,10 @@ export function WhatsAppFlowsNode({ id, data, isConnectable }: WhatsAppFlowsNode
 
 
             {/* API Info */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
               <div className="flex items-start gap-2">
-                <MessageSquare className="h-4 w-4 text-blue-600 mt-0.5" />
-                <div className="text-xs text-blue-800">
+                <MessageSquare className="h-4 w-4 text-primary mt-0.5" />
+                <div className="text-xs text-primary">
                   <p className="font-medium mb-1">{t('whatsapp_flows.api_info_title', 'WhatsApp Flows')}</p>
                   <p>{t('whatsapp_flows.api_info_description', 'Only works with Official WhatsApp Business API connections. Flows provide interactive experiences within WhatsApp conversations.')}</p>
                 </div>

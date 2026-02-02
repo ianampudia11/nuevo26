@@ -288,7 +288,7 @@ export default function AiCredentialsTab() {
   const getStatusBadge = (credential: SystemAiCredential) => {
     switch (credential.validationStatus) {
       case 'valid':
-        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Valid</Badge>;
+        return <Badge variant="success"><CheckCircle className="w-3 h-3 mr-1" />Valid</Badge>;
       case 'invalid':
         return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Invalid</Badge>;
       case 'expired':

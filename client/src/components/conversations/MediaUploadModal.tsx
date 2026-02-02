@@ -306,11 +306,11 @@ export default function MediaUploadModal({
       );
     } else {
       return (
-        <div className="flex items-center justify-center p-6 bg-gray-100 rounded-lg w-full">
+        <div className="flex items-center justify-center p-6 bg-muted rounded-lg w-full">
           <div className="text-center">
-            <i className="ri-file-line text-4xl text-gray-600 mb-2"></i>
-            <p className="text-sm text-gray-600 break-all">{file.name}</p>
-            <p className="text-xs text-gray-500 mt-1">
+            <i className="ri-file-line text-4xl text-muted-foreground mb-2"></i>
+            <p className="text-sm text-muted-foreground break-all">{file.name}</p>
+            <p className="text-xs text-muted-foreground mt-1">
               {t('media_upload.file_size_kb', '{{size}} KB', { size: (file.size / 1024).toFixed(2) })}
             </p>
           </div>
@@ -321,20 +321,12 @@ export default function MediaUploadModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg md:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t('media_upload.title', 'Send Media')}</DialogTitle>
           <DialogDescription>
             {t('media_upload.description', 'Preview and send media files through WhatsApp')}
           </DialogDescription>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-2 top-2"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </DialogHeader>
         
         <div className="flex flex-col gap-4 py-4">
@@ -357,8 +349,8 @@ export default function MediaUploadModal({
               {isSchedulerOpen && (
                 <div className="border-t pt-4 mt-4">
                   <div className="flex items-center gap-2 mb-4">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    <h3 className="text-sm font-medium text-gray-900">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-medium text-foreground">
                       {t('scheduler.title', 'Schedule Message')}
                     </h3>
                   </div>
@@ -366,7 +358,7 @@ export default function MediaUploadModal({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Date Input */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">
+                      <label className="text-sm font-medium text-foreground">
                         {t('scheduler.date', 'Date')}
                       </label>
                       <input
@@ -374,33 +366,33 @@ export default function MediaUploadModal({
                         value={scheduledDate}
                         onChange={(e) => setScheduledDate(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
                       />
                     </div>
                     
                     {/* Time Input */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">
+                      <label className="text-sm font-medium text-foreground">
                         {t('scheduler.time', 'Time')}
                       </label>
                       <input
                         type="time"
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
                       />
                     </div>
                   </div>
                   
                   {/* Timezone Selector */}
                   <div className="mt-4 space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       {t('scheduler.timezone', 'Timezone')}
                     </label>
                     <select
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-background text-foreground"
                     >
                       {timezoneOptions.map((tz) => (
                         <option key={tz.value} value={tz.value}>
@@ -409,7 +401,7 @@ export default function MediaUploadModal({
                       ))}
                     </select>
                     {timezone && (
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         {t('scheduler.auto_detected', 'Auto-detected: {{timezone}}', { timezone })}
                       </p>
                     )}
@@ -417,8 +409,8 @@ export default function MediaUploadModal({
                   
                   {/* Preview */}
                   {scheduledDate && scheduledTime && timezone && (
-                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                      <p className="text-sm text-blue-800">
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <p className="text-sm text-blue-800 dark:text-blue-400">
                         <strong>{t('scheduler.preview', 'Scheduled for:')}</strong>{' '}
                         {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString('en-US', {
                           weekday: 'long',

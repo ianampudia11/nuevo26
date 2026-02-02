@@ -228,9 +228,9 @@ export default function EmailComposer({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-background">
       {/* Composer Header */}
-      <div className="border-b border-gray-200 p-4">
+      <div className="border-b border-border p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">
             {replyTo ? t('email.reply', 'Reply') : forwardFrom ? t('email.forward', 'Forward') : t('email.compose', 'Compose')}

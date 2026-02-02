@@ -244,7 +244,7 @@ export function KnowledgeBaseTester({
               <div key={index} className="border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-gray-500" />
+                    <FileText className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{result.document.originalName}</span>
                     <Badge variant="secondary" className="text-xs">
                       Chunk {result.chunk.index + 1}

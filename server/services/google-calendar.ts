@@ -1,7 +1,11 @@
 import { google, calendar_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { storage } from '../storage';
+import { CalendarBooking } from '@shared/schema';
+import type { CalendarAdvancedSettings } from '@shared/types/calendar-types';
+import { isValidAdvancedSettings, getDayName } from '@shared/types/calendar-types';
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
@@ -42,9 +46,7 @@ class GoogleCalendarService {
       if (shouldRetry) {
 
         const delayMs = Math.pow(2, retryCount) * 1000;
-        console.log(
-          `Retrying Google Calendar API call (attempt ${retryCount + 1}/${MAX_RETRIES}) after ${delayMs}ms. Error: ${error.message}`
-        );
+       
 
         await new Promise(resolve => setTimeout(resolve, delayMs));
         return this.withRetry(apiCall, retryCount + 1);
@@ -227,12 +229,6 @@ class GoogleCalendarService {
    * Check if a time slot is available before booking
    * Uses Google Calendar freebusy.query API to detect conflicts
    * 
-   * NOTE: This method performs a non-atomic read-then-write check. In rare concurrent
-   * scenarios, overlapping bookings can still occur because free/busy is checked before
-   * event insertion. For stronger guarantees, consider implementing application-level
-   * locking or reservation mechanisms (e.g., a database record keyed by calendar/time slot)
-   * and enforce it in the flow before calling the calendar service.
-   * 
    * @param userId The user ID
    * @param companyId The company ID
    * @param startDateTime ISO string of the event start time
@@ -251,6 +247,7 @@ class GoogleCalendarService {
       const calendar = await this.getCalendarClient(userId, companyId);
 
       if (!calendar) {
+        console.warn('Google Calendar Service: Calendar client not available for availability check');
         return {
           available: true, // Fail-open: if we can't check, allow creation
           error: 'Calendar client not available for availability check'
@@ -260,11 +257,34 @@ class GoogleCalendarService {
 
       const startDate = new Date(startDateTime);
       const endDate = new Date(endDateTime);
-      startDate.setMinutes(startDate.getMinutes() - bufferMinutes);
-      endDate.setMinutes(endDate.getMinutes() + bufferMinutes);
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        console.error('Google Calendar Service: Invalid date format in availability check', { startDateTime, endDateTime });
+        return {
+          available: false,
+          error: 'Invalid date format provided'
+        };
+      }
 
-      const timeMin = startDate.toISOString();
-      const timeMax = endDate.toISOString();
+      if (startDate >= endDate) {
+        console.error('Google Calendar Service: Start time must be before end time', { startDateTime, endDateTime });
+        return {
+          available: false,
+          error: 'Start time must be before end time'
+        };
+      }
+
+
+      const queryStartDate = new Date(startDate);
+      queryStartDate.setMinutes(queryStartDate.getMinutes() - bufferMinutes);
+      const queryEndDate = new Date(endDate);
+      queryEndDate.setMinutes(queryEndDate.getMinutes() + bufferMinutes);
+
+      const requestedStart = queryStartDate.getTime();
+      const requestedEnd = queryEndDate.getTime();
+
+      const timeMin = queryStartDate.toISOString();
+      const timeMax = queryEndDate.toISOString();
 
 
       const busyTimeSlotsResponse = await this.withRetry(() =>
@@ -280,42 +300,27 @@ class GoogleCalendarService {
       const busySlots = busyTimeSlotsResponse.data.calendars?.primary?.busy || [];
 
 
-
-      const effectiveRequestedStart = new Date(startDateTime);
-      const effectiveRequestedEnd = new Date(endDateTime);
-      effectiveRequestedStart.setMinutes(effectiveRequestedStart.getMinutes() - bufferMinutes);
-      effectiveRequestedEnd.setMinutes(effectiveRequestedEnd.getMinutes() + bufferMinutes);
-
-      const requestedStart = effectiveRequestedStart.getTime();
-      const requestedEnd = effectiveRequestedEnd.getTime();
-
       const conflictingSlots = busySlots.filter((busySlot: any) => {
+        if (!busySlot.start || !busySlot.end) {
+          return false;
+        }
+
         const busyStart = new Date(busySlot.start).getTime();
         const busyEnd = new Date(busySlot.end).getTime();
 
 
 
-        return (
-          (requestedStart < busyEnd && requestedEnd > busyStart)
-        );
+        return (requestedStart <= busyEnd && requestedEnd >= busyStart);
       });
 
       if (conflictingSlots.length > 0) {
-        return {
-          available: false,
-          conflictingEvents: conflictingSlots
-        };
+        return { available: false, conflictingEvents: conflictingSlots };
       }
 
       return { available: true };
     } catch (error: any) {
-      console.error('Google Calendar Service: Error checking time slot availability:', {
-        error: error.message,
-        userId,
-        companyId,
-        startDateTime,
-        endDateTime
-      });
+      console.error('Google Calendar Service: Error checking time slot availability:', error.message);
+
 
       return {
         available: true,
@@ -325,17 +330,29 @@ class GoogleCalendarService {
   }
 
   /**
+   * Check if the same user has booked the same slot within the last 2 minutes
+   * This prevents duplicate bookings from AI retries or user double-clicks
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param startDateTime Start datetime ISO string
+   * @param endDateTime End datetime ISO string
+   * @returns true if a recent booking exists, false otherwise
+   */
+
+  /**
    * Create a calendar event
-   * Now includes conflict detection to prevent double bookings
+   * Includes conflict detection to prevent double bookings
    * 
-   * NOTE: Conflict detection is non-atomic (read-then-write). Concurrent requests can still
-   * result in overlapping bookings in rare scenarios. See checkTimeSlotAvailability() documentation
-   * for details on implementing stronger guarantees.
+   * Buffer time is applied to prevent back-to-back bookings.
+   * This allows for overrun/setup time between appointments and ensures proper spacing.
    * 
    * @param userId The user ID
    * @param companyId The company ID
    * @param eventData Event data including start, end, summary, etc.
    * @param eventData.bufferMinutes Optional buffer minutes to respect when checking for conflicts
+   *                                 Buffer is applied before and after the event to prevent adjacent bookings
+   *                                 CRITICAL: This is the single source of truth for buffer configuration.
+   *                                 Must match the bufferMinutes used in getAvailableTimeSlots for consistency.
    * @returns Success status with event ID and link, or error message
    */
   public async createCalendarEvent(
@@ -343,7 +360,6 @@ class GoogleCalendarService {
     companyId: number,
     eventData: any
   ): Promise<{ success: boolean, eventId?: string, error?: string, eventLink?: string }> {
-
 
     const {
       summary,
@@ -354,7 +370,8 @@ class GoogleCalendarService {
       attendees = [],
       send_updates = true,
       organizer_email,
-      time_zone
+      time_zone,
+      colorId
     } = eventData;
 
     const startDateTime = start?.dateTime;
@@ -362,6 +379,7 @@ class GoogleCalendarService {
 
 
     const eventTimeZone = time_zone || start?.timeZone || end?.timeZone || 'UTC';
+   
 
     if (!startDateTime || !endDateTime) {
       console.error('Google Calendar Service: Missing start or end time');
@@ -369,7 +387,46 @@ class GoogleCalendarService {
     }
 
 
+    const startDate = new Date(startDateTime);
+    const endDate = new Date(endDateTime);
+    
+   
+
     const bufferMinutes = eventData.bufferMinutes || 0;
+    
+
+    const bookingStartWithBuffer = new Date(startDate);
+    bookingStartWithBuffer.setMinutes(bookingStartWithBuffer.getMinutes() - bufferMinutes);
+    const bookingEndWithBuffer = new Date(endDate);
+    bookingEndWithBuffer.setMinutes(bookingEndWithBuffer.getMinutes() + bufferMinutes);
+    
+    const hasConflict = await storage.checkBookingConflict(
+      userId,
+      companyId,
+      'google',
+      bookingStartWithBuffer,
+      bookingEndWithBuffer
+    );
+    
+    if (hasConflict) {
+
+      const conflictingBookings = await storage.getCalendarBookings(
+        userId,
+        companyId,
+        'google',
+        bookingStartWithBuffer,
+        bookingEndWithBuffer
+      );
+      
+      const conflictDetails = conflictingBookings.map(booking => 
+        `Booking ${booking.id} (${booking.startDateTime.toISOString()} - ${booking.endDateTime.toISOString()}, eventId: ${booking.eventId})`
+      ).join('; ');
+      
+      return {
+        success: false,
+        error: `Database conflict detected. Conflicting booking(s): ${conflictDetails}`
+      };
+    }
 
 
     const availabilityCheck = await this.checkTimeSlotAvailability(
@@ -381,31 +438,23 @@ class GoogleCalendarService {
     );
 
     if (!availabilityCheck.available) {
+      const conflictDetails = availabilityCheck.conflictingEvents?.map((event: any) => 
+        `Event (${event.start} - ${event.end})`
+      ).join('; ') || 'Unknown conflict';
       
       return {
         success: false,
-        error: 'The requested time slot is not available. Please choose a different time.'
+        error: `Google Calendar conflict detected. Conflicting event(s): ${conflictDetails}`
       };
     }
 
-
-    if (availabilityCheck.error) {
-      console.warn('Google Calendar Service: Availability check failed, proceeding with creation', {
-        error: availabilityCheck.error,
-        userId,
-        companyId
-      });
-    }
-
     try {
-
       const calendar = await this.getCalendarClient(userId, companyId);
 
       if (!calendar) {
         console.error('Google Calendar Service: Calendar client not available');
         return { success: false, error: 'Google Calendar client not available' };
       }
-
 
       let processedAttendees: calendar_v3.Schema$EventAttendee[] | undefined;
       if (attendees && attendees.length > 0) {
@@ -433,6 +482,7 @@ class GoogleCalendarService {
         },
         attendees: processedAttendees,
         organizer: organizer_email ? { email: organizer_email } : undefined,
+        colorId: colorId || undefined,
         reminders: {
           useDefault: false,
           overrides: [
@@ -441,7 +491,6 @@ class GoogleCalendarService {
           ],
         },
       };
-
 
       const sendUpdatesParam = send_updates ? 'all' : 'none';
 
@@ -453,9 +502,25 @@ class GoogleCalendarService {
         })
       );
 
-
-
       if (response.status === 200 && response.data.id) {
+
+        const bookingResult = await storage.createCalendarBooking({
+          userId,
+          companyId,
+          calendarType: 'google',
+          startDateTime: startDate,
+          endDateTime: endDate,
+          eventId: response.data.id,
+          eventLink: response.data.htmlLink || undefined
+        });
+
+        if (!bookingResult.success) {
+          console.warn('Google Calendar Service: Failed to save booking record, but event was created:', {
+            eventId: response.data.id,
+            error: bookingResult.error
+          });
+        }
+
         const result: {
           success: boolean;
           eventId?: string;
@@ -467,12 +532,17 @@ class GoogleCalendarService {
 
         if (response.data.htmlLink) {
           result.eventLink = response.data.htmlLink;
-        }
 
+        }
 
         return result;
       } else {
-        console.error('Google Calendar Service: Unexpected response status:', response.status);
+        console.error('Google Calendar Service: Unexpected response status:', {
+          status: response.status,
+          data: response.data,
+          startDateTime,
+          endDateTime
+        });
         return {
           success: false,
           error: `Failed to create event, status code: ${response.status}`
@@ -557,13 +627,7 @@ class GoogleCalendarService {
       if (items.length > 0) {
 
         items.forEach((event: any, index: number) => {
-          console.log(`  Event ${index + 1}:`, {
-            id: event.id,
-            summary: event.summary,
-            start: event.start?.dateTime || event.start?.date,
-            organizer: event.organizer?.email,
-            attendees: event.attendees?.map((a: any) => a.email) || []
-          });
+          
         });
       }
 
@@ -611,14 +675,16 @@ class GoogleCalendarService {
    * Delete (cancel) a calendar event
    * @param userId The user ID
    * @param companyId The company ID
-   * @param eventId The ID of the event to delete
+   * @param eventId The ID of the event to delete (optional if eventLink is provided)
    * @param sendUpdates Whether to send cancellation notifications to attendees
+   * @param eventLink The event link URL (used to lookup eventId if eventId is not provided)
    */
   public async deleteCalendarEvent(
     userId: number,
     companyId: number,
-    eventId: string,
-    sendUpdates: boolean = true
+    eventId?: string,
+    sendUpdates: boolean = true,
+    eventLink?: string
   ): Promise<{ success: boolean, error?: string }> {
     try {
       const calendar = await this.getCalendarClient(userId, companyId);
@@ -628,17 +694,41 @@ class GoogleCalendarService {
       }
 
 
+      let finalEventId: string | null = eventId || null;
+      if (eventLink && !eventId) {
+
+        const booking = await storage.getCalendarBookingByEventLink(userId, companyId, 'google', eventLink);
+        if (booking && booking.eventId) {
+          finalEventId = booking.eventId;
+        } else {
+
+          finalEventId = storage.extractEventIdFromLink(eventLink);
+          if (!finalEventId) {
+            return { success: false, error: 'Could not extract event ID from event link' };
+          }
+        }
+      }
+
+
+      if (!finalEventId) {
+        return { success: false, error: 'Event ID is required to delete the event' };
+      }
+
+
+
       const sendUpdatesParam = sendUpdates ? 'all' : 'none';
 
       const response = await this.withRetry(() =>
         calendar.events.delete({
           calendarId: 'primary',
-          eventId: eventId,
+          eventId: finalEventId,
           sendUpdates: sendUpdatesParam
         })
       );
 
       if (response.status === 204 || response.status === 200) {
+
+        await storage.deleteCalendarBooking(userId, companyId, 'google', finalEventId);
         return { success: true };
       } else {
         return {
@@ -652,6 +742,34 @@ class GoogleCalendarService {
         success: false,
         error: error.message || 'Failed to delete calendar event'
       };
+    }
+  }
+
+  /**
+   * Get a calendar booking by event link
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param eventLink The Google Calendar event link
+   * @returns The calendar booking if found, null otherwise
+   */
+  public async getBookingByEventLink(userId: number, companyId: number, eventLink: string): Promise<CalendarBooking | null> {
+    try {
+
+      const booking = await storage.getCalendarBookingByEventLink(userId, companyId, 'google', eventLink);
+      if (booking) {
+        return booking;
+      }
+
+
+      const eventId = storage.extractEventIdFromLink(eventLink);
+      if (!eventId) {
+        return null;
+      }
+
+      return await storage.getCalendarBookingByEventId(userId, companyId, 'google', eventId);
+    } catch (error: any) {
+      console.error('Error getting booking by event link:', error);
+      return null;
     }
   }
 
@@ -675,7 +793,20 @@ class GoogleCalendarService {
       }
 
 
-      const { send_updates = true, time_zone, attendees, ...restEventData } = eventData;
+      const existingEventResponse = await this.withRetry(() =>
+        calendar.events.get({
+          calendarId: 'primary',
+          eventId: eventId
+        })
+      );
+
+      if (!existingEventResponse.data) {
+        return { success: false, error: 'Event not found' };
+      }
+
+      const existingEvent = existingEventResponse.data;
+
+      const { send_updates = true, time_zone, attendees, colorId, ...restEventData } = eventData;
 
 
       let processedAttendees: calendar_v3.Schema$EventAttendee[] | undefined;
@@ -691,7 +822,14 @@ class GoogleCalendarService {
       }
 
 
-      const updatedEventData = { ...restEventData };
+      const updatedEventData: any = {
+        ...existingEvent,
+        ...restEventData,
+        summary: restEventData.summary !== undefined ? restEventData.summary : existingEvent.summary,
+        description: restEventData.description !== undefined ? restEventData.description : existingEvent.description,
+        location: restEventData.location !== undefined ? restEventData.location : existingEvent.location,
+      };
+
       if (time_zone) {
         if (updatedEventData.start) {
           updatedEventData.start.timeZone = time_zone;
@@ -705,6 +843,10 @@ class GoogleCalendarService {
         updatedEventData.attendees = processedAttendees;
       }
 
+
+      if (colorId !== undefined) {
+        updatedEventData.colorId = colorId;
+      }
 
       const sendUpdatesParam = send_updates ? 'all' : 'none';
 
@@ -744,6 +886,62 @@ class GoogleCalendarService {
         success: false,
         error: error.message || 'Failed to update calendar event'
       };
+    }
+  }
+
+  /**
+   * Helper function to convert local time to UTC ISO string
+   * @param date Date string in YYYY-MM-DD format
+   * @param hour Hour (0-23)
+   * @param minute Minute (0-59)
+   * @param timeZone IANA timezone identifier
+   * @returns UTC ISO string representing that local time
+   */
+  private convertLocalTimeToUTC(date: string, hour: number, minute: number, timeZone: string): string {
+    try {
+
+      const dateTimeString = `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+      
+
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
+
+
+      const tempDate = new Date(dateTimeString + 'Z'); // Start with UTC assumption
+      
+
+      const parts = formatter.formatToParts(tempDate);
+      const partsMap = parts.reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {} as Record<string, string>);
+
+      const localYear = parseInt(partsMap.year || '0');
+      const localMonth = parseInt(partsMap.month || '0');
+      const localDay = parseInt(partsMap.day || '0');
+      const localHour = parseInt(partsMap.hour || '0');
+      const localMinute = parseInt(partsMap.minute || '0');
+
+
+      const [year, month, day] = date.split('-').map(Number);
+      const wantedMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+      const gotMs = Date.UTC(localYear, localMonth - 1, localDay, localHour, localMinute, 0, 0);
+      const offsetMs = wantedMs - gotMs;
+
+      const result = new Date(tempDate.getTime() + offsetMs);
+      return result.toISOString();
+    } catch (error) {
+      console.error('[convertLocalTimeToUTC] Error converting timezone:', error);
+
+      return `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
     }
   }
 
@@ -895,13 +1093,7 @@ class GoogleCalendarService {
 
 
             altEvents.items.forEach((event: any, index: number) => {
-              console.log(`  Event ${index + 1}:`, {
-                id: event.id,
-                summary: event.summary,
-                start: event.start?.dateTime || event.start?.date,
-                organizer: event.organizer?.email,
-                attendees: event.attendees?.map((a: any) => a.email) || []
-              });
+              
             });
 
 
@@ -932,13 +1124,7 @@ class GoogleCalendarService {
 
 
       events.items.forEach((event: any, index: number) => {
-        console.log(`  Event ${index + 1}:`, {
-          id: event.id,
-          summary: event.summary,
-          start: event.start?.dateTime || event.start?.date,
-          organizer: event.organizer?.email,
-          attendees: event.attendees?.map((a: any) => a.email) || []
-        });
+        
       });
 
 
@@ -1028,6 +1214,7 @@ class GoogleCalendarService {
    * @param businessHoursEnd Business hours end (hour, 0-23)
    * @param timeZone Timezone for slot generation (e.g., 'Pakistan/Islamabad')
    * @param bufferMinutes Buffer time to add before/after busy slots
+   * @param advancedSettings Advanced settings with day-specific hours and off-days
    */
   public async getAvailableTimeSlots(
     userId: number,
@@ -1039,7 +1226,8 @@ class GoogleCalendarService {
     businessHoursStart: number = 9,
     businessHoursEnd: number = 18,
     timeZone: string = 'UTC',
-    bufferMinutes: number = 0
+    bufferMinutes: number = 0,
+    advancedSettings?: CalendarAdvancedSettings
   ): Promise<{
     success: boolean,
     timeSlots?: Array<{
@@ -1052,13 +1240,29 @@ class GoogleCalendarService {
 
     try {
 
+      const useAdvancedSettings = advancedSettings && isValidAdvancedSettings(advancedSettings);
+      
+      if (useAdvancedSettings) {
+
+
+        const enabledDays = advancedSettings.weeklySchedule.filter(day => day.enabled && !advancedSettings.offDays.includes(day.dayIndex));
+        if (enabledDays.length === 0) {
+          console.warn('Google Calendar: All days are disabled in advanced settings, falling back to simple settings');
+
+        }
+      } else {
+        if (advancedSettings) {
+          console.warn('Google Calendar: Advanced settings provided but validation failed, falling back to simple settings');
+        }
+
+      }
+
       const calendar = await this.getCalendarClient(userId, companyId);
 
       if (!calendar) {
         console.error('Google Calendar Service: Calendar client not available for availability check');
         return { success: false, error: 'Google Calendar client not available' };
       }
-
 
 
       let startDateTime: string;
@@ -1082,13 +1286,52 @@ class GoogleCalendarService {
         dateArray = [formattedToday];
       }
 
+
+
+      const startDateTimeObj = new Date(startDateTime);
+      const endDateTimeObj = new Date(endDateTime);
       
+
+
+      const expandedStart = new Date(startDateTimeObj);
+      expandedStart.setMinutes(expandedStart.getMinutes() - bufferMinutes);
+      const expandedEnd = new Date(endDateTimeObj);
+      expandedEnd.setMinutes(expandedEnd.getMinutes() + bufferMinutes);
+      
+      const existingBookings = await storage.getCalendarBookings(
+        userId,
+        companyId,
+        'google',
+        expandedStart,
+        expandedEnd
+      );
+
+
+
+
+
+      const bookingBusySlots = existingBookings.map((booking) => {
+        const bookingStart = new Date(booking.startDateTime);
+        const bookingEnd = new Date(booking.endDateTime);
+        
+        bookingStart.setMinutes(bookingStart.getMinutes() - bufferMinutes);
+        bookingEnd.setMinutes(bookingEnd.getMinutes() + bufferMinutes);
+        
+        return {
+          start: bookingStart.toISOString(),
+          end: bookingEnd.toISOString()
+        };
+      });
+
+
+
 
       const busyTimeSlotsResponse = await this.withRetry(() =>
         calendar.freebusy.query({
           requestBody: {
             timeMin: startDateTime,
             timeMax: endDateTime,
+            timeZone: timeZone, // Specify timezone for proper interpretation
             items: [{ id: 'primary' }],
           },
         })
@@ -1097,10 +1340,9 @@ class GoogleCalendarService {
       const busySlots = busyTimeSlotsResponse.data.calendars?.primary?.busy || [];
 
 
-      const bufferedBusySlots = busySlots.map((busySlot: any) => {
+      const bufferedGoogleBusySlots = busySlots.map((busySlot: any) => {
         const busyStart = new Date(busySlot.start);
         const busyEnd = new Date(busySlot.end);
-
 
         busyStart.setMinutes(busyStart.getMinutes() - bufferMinutes);
         busyEnd.setMinutes(busyEnd.getMinutes() + bufferMinutes);
@@ -1111,50 +1353,236 @@ class GoogleCalendarService {
         };
       });
 
+
+
+      const allBusySlots = this.deduplicateBusySlots([...bufferedGoogleBusySlots, ...bookingBusySlots]);
+
+
+      allBusySlots.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+
+
+
+
+
+
+      const mergedBusySlots: Array<{start: string, end: string}> = [];
+      let cursor: Date | null = null;
+
+      for (const busySlot of allBusySlots) {
+        const busyStart = new Date(busySlot.start);
+        const busyEnd = new Date(busySlot.end);
+
+        if (cursor === null) {
+
+          mergedBusySlots.push({ start: busyStart.toISOString(), end: busyEnd.toISOString() });
+          cursor = busyEnd;
+        } else {
+
+
+
+          if (busyStart.getTime() <= cursor.getTime()) {
+
+            const lastSlot = mergedBusySlots[mergedBusySlots.length - 1];
+            const lastEnd = new Date(lastSlot.end);
+            if (busyEnd.getTime() > lastEnd.getTime()) {
+              lastSlot.end = busyEnd.toISOString();
+              cursor = busyEnd;
+            }
+
+
+          } else {
+
+            mergedBusySlots.push({ start: busyStart.toISOString(), end: busyEnd.toISOString() });
+            cursor = busyEnd;
+          }
+        }
+      }
+
+      const bufferedBusySlots = mergedBusySlots;
+
       const allAvailableSlots: Array<{date: string, slots: string[]}> = [];
 
       for (const currentDate of dateArray) {
-        const availableSlots: string[] = [];
-        const dateObj = new Date(`${currentDate}T00:00:00Z`);
 
-        dateObj.setHours(businessHoursStart, 0, 0, 0);
+        if (useAdvancedSettings && advancedSettings) {
+          const dayOfWeek = new Date(currentDate).getDay(); // 0 = Sunday, 6 = Saturday
+          if (advancedSettings.offDays.includes(dayOfWeek)) {
 
-
-        while (dateObj.getHours() < businessHoursEnd) {
-          const slotStart = new Date(dateObj);
-          const slotEnd = new Date(dateObj);
-          slotEnd.setMinutes(slotEnd.getMinutes() + durationMinutes);
-
-          if (slotEnd.getHours() > businessHoursEnd ||
-              (slotEnd.getHours() === businessHoursEnd && slotEnd.getMinutes() > 0)) {
-            break;
+            continue;
           }
+        }
+        
+        const availableSlots: string[] = [];
+        
+
+        let currentBusinessHoursStartHour: number;
+        let currentBusinessHoursStartMinute: number;
+        let currentBusinessHoursEndHour: number;
+        let currentBusinessHoursEndMinute: number;
+        
+        if (useAdvancedSettings && advancedSettings) {
+          const dayOfWeek = new Date(currentDate).getDay();
+          const dayConfig = advancedSettings.weeklySchedule[dayOfWeek];
+          
+          if (!dayConfig || !dayConfig.enabled) {
+
+            continue;
+          }
+          
+
+          const [startHour, startMin] = dayConfig.startTime.split(':').map(Number);
+          const [endHour, endMin] = dayConfig.endTime.split(':').map(Number);
+          
+          currentBusinessHoursStartHour = startHour;
+          currentBusinessHoursStartMinute = startMin;
+          currentBusinessHoursEndHour = endHour;
+          currentBusinessHoursEndMinute = endMin;
+          
+
+        } else {
+          currentBusinessHoursStartHour = businessHoursStart;
+          currentBusinessHoursStartMinute = 0;
+          currentBusinessHoursEndHour = businessHoursEnd;
+          currentBusinessHoursEndMinute = 0;
+        }
+        
 
 
-          const isSlotAvailable = !bufferedBusySlots.some((busySlot: any) => {
+        const businessStartUTC = this.convertLocalTimeToUTC(
+          currentDate, 
+          currentBusinessHoursStartHour, 
+          currentBusinessHoursStartMinute, 
+          timeZone
+        );
+        const businessStart = new Date(businessStartUTC);
+        
+        const businessEndUTC = this.convertLocalTimeToUTC(
+          currentDate, 
+          currentBusinessHoursEndHour, 
+          currentBusinessHoursEndMinute, 
+          timeZone
+        );
+        const businessEnd = new Date(businessEndUTC);
+
+
+        const dayBusySlots = bufferedBusySlots.filter((busySlot: any) => {
+          const busyStart = new Date(busySlot.start);
+          const busyEnd = new Date(busySlot.end);
+          
+
+          return busyStart.getTime() < businessEnd.getTime() && busyEnd.getTime() > businessStart.getTime();
+        });
+
+
+        dayBusySlots.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+
+
+
+        
+
+
+        const slotIntervalMs = durationMinutes * 60 * 1000;
+        const slotDurationMs = durationMinutes * 60 * 1000;
+        
+
+        let candidateSlotStart = new Date(businessStart);
+
+
+        const nowUTC = new Date();
+        const nowInTargetZone = new Date(nowUTC.toLocaleString('en-US', { timeZone }));
+
+        while (candidateSlotStart.getTime() + slotDurationMs <= businessEnd.getTime()) {
+          const candidateSlotEnd = new Date(candidateSlotStart.getTime() + slotDurationMs);
+
+
+
+
+
+          
+
+
+
+
+          
+
+
+
+          const nowInUserTimeZone = new Date().toLocaleDateString('sv-SE', { timeZone });
+          const isToday = nowInUserTimeZone === currentDate;
+          
+          if (isToday) {
+
+
+             if (candidateSlotStart.getTime() < Date.now() + 5 * 60 * 1000) {
+                candidateSlotStart = new Date(candidateSlotStart.getTime() + slotDurationMs);
+                continue;
+             }
+          }
+          
+
+
+
+
+          const effectiveSlotStart = new Date(candidateSlotStart);
+          effectiveSlotStart.setMinutes(effectiveSlotStart.getMinutes() - bufferMinutes);
+          const effectiveSlotEnd = new Date(candidateSlotEnd);
+          effectiveSlotEnd.setMinutes(effectiveSlotEnd.getMinutes() + bufferMinutes);
+          
+
+
+
+          const slotFitsInGap = !dayBusySlots.some((busySlot: any) => {
             const busyStart = new Date(busySlot.start);
             const busyEnd = new Date(busySlot.end);
+            
 
-            return (
-              (slotStart >= busyStart && slotStart < busyEnd) ||
-              (slotEnd > busyStart && slotEnd <= busyEnd) ||
-              (slotStart <= busyStart && slotEnd >= busyEnd)
+            const clippedBusyStart = busyStart.getTime() < businessStart.getTime() ? businessStart : busyStart;
+            const clippedBusyEnd = busyEnd.getTime() > businessEnd.getTime() ? businessEnd : busyEnd;
+            
+
+
+
+
+
+            const hasConflict = (
+              effectiveSlotStart.getTime() <= clippedBusyEnd.getTime() && 
+              effectiveSlotEnd.getTime() >= clippedBusyStart.getTime()
             );
+            
+            return hasConflict;
           });
+          
+          if (slotFitsInGap) {
 
-          if (isSlotAvailable) {
 
-            const formattedStart = slotStart.toLocaleTimeString('en-US', {
+            let formattedStart = candidateSlotStart.toLocaleTimeString('en-US', {
               hour: '2-digit',
               minute: '2-digit',
               hour12: true,
               timeZone: timeZone
             });
+            
+
+
+            formattedStart = formattedStart.trim().replace(/\s+/g, ' ').toUpperCase();
+            
+
+            const formatPattern = /^\d{2}:\d{2} (AM|PM)$/;
+            if (!formatPattern.test(formattedStart)) {
+              console.warn('Google Calendar: Unexpected time format produced:', {
+                original: candidateSlotStart.toISOString(),
+                formatted: formattedStart,
+                timeZone
+              });
+            }
+            
             availableSlots.push(formattedStart);
           }
+          
 
-
-          dateObj.setMinutes(dateObj.getMinutes() + durationMinutes);
+          candidateSlotStart = new Date(candidateSlotStart.getTime() + slotIntervalMs);
         }
 
         allAvailableSlots.push({
@@ -1194,6 +1622,45 @@ class GoogleCalendarService {
     }
 
     return dateArray;
+  }
+
+  /**
+   * Deduplicate busy slots that exist in both database and Google Calendar
+   * Compares slots by start/end times with small tolerance for timezone rounding (±1 minute)
+   * 
+   * @param busySlots Array of busy slots with {start: string, end: string}
+   * @returns Deduplicated array of busy slots
+   */
+  private deduplicateBusySlots(busySlots: Array<{start: string, end: string}>): Array<{start: string, end: string}> {
+    if (busySlots.length === 0) {
+      return [];
+    }
+
+    const deduplicated: Array<{start: string, end: string}> = [];
+    const toleranceMs = 60 * 1000; // 1 minute tolerance for timezone rounding
+
+    for (const slot of busySlots) {
+      const slotStart = new Date(slot.start).getTime();
+      const slotEnd = new Date(slot.end).getTime();
+
+
+      const isDuplicate = deduplicated.some(existing => {
+        const existingStart = new Date(existing.start).getTime();
+        const existingEnd = new Date(existing.end).getTime();
+
+
+        const startDiff = Math.abs(slotStart - existingStart);
+        const endDiff = Math.abs(slotEnd - existingEnd);
+
+        return startDiff <= toleranceMs && endDiff <= toleranceMs;
+      });
+
+      if (!isDuplicate) {
+        deduplicated.push(slot);
+      }
+    }
+
+    return deduplicated;
   }
 }
 

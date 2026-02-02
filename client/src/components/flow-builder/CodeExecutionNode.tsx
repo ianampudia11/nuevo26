@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useReactFlow } from 'reactflow';
-import { Trash2, Copy, Code2, Settings, Play, Loader2, Eye, EyeOff, Check, HelpCircle, X, Code, Network, AlertCircle, CheckCircle, Variable, Globe, Clock, Shield } from 'lucide-react';
+import { Trash2, Copy, Settings, Play, Loader2, Eye, EyeOff, Check, HelpCircle, X, Code, Network, AlertCircle, CheckCircle, Variable, Globe, Clock, Shield } from 'lucide-react';
 import { useFlowContext } from '../../pages/flow-builder';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -142,7 +142,7 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
   };
 
   return (
-    <div className="node-code-execution rounded-lg bg-white border border-gray-200 shadow-sm max-w-[380px] group relative">
+    <div className="node-code-execution rounded-lg bg-card border border-border shadow-sm max-w-[380px] group relative">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -181,9 +181,13 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
         </TooltipProvider>
       </div>
 
-      <div className="p-3 border-b bg-gray-50/60">
+      <div className="p-3 border-b bg-muted/60">
         <div className="font-medium flex items-center gap-2">
-          <Code2 className="h-4 w-4 text-gray-700" />
+          <img 
+            src="https://cdn-icons-png.flaticon.com/128/4205/4205106.png" 
+            alt="Code Execution" 
+            className="h-4 w-4"
+          />
           <span>{t('flow_builder.code_execution', 'Code Execution')}</span>
           <div className="ml-auto flex items-center gap-1">
             <TooltipProvider>
@@ -194,7 +198,7 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="h-7 w-7 text-primary hover:text-primary/80 hover:bg-primary/10"
                       >
                         <HelpCircle className="h-3.5 w-3.5" />
                       </Button>
@@ -205,7 +209,7 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
                       >
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2">
-                            <Code className="h-5 w-5 text-blue-600" />
+                            <Code className="h-5 w-5 text-primary" />
                             Code Execution Node - Help & Documentation
                           </DialogTitle>
                           <DialogDescription>
@@ -247,21 +251,21 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
 
       <div className={`${isEditing ? 'max-h-[520px]' : 'max-h-[220px]'} overflow-y-auto custom-scrollbar`}>
         <div className="p-3 space-y-3">
-          <div className="text-sm p-3 bg-secondary/40 rounded border border-border">
+          <div className="text-sm p-3  rounded border border-border">
             <div className="flex items-center gap-2">
               <Settings className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs text-muted-foreground truncate">Async JavaScript • variables + fetch available</span>
             </div>
-            <div className="mt-2 text-xs text-blue-600 font-medium">
+            <div className="mt-2 text-xs text-primary font-medium">
               Output: <code 
-                className="bg-blue-50 px-1 rounded cursor-pointer hover:bg-blue-100 transition-colors"
+                className="bg-primary/10 px-1 rounded cursor-pointer hover:bg-primary/20 transition-colors"
                 onClick={() => copyToClipboard('code_execution_output')}
                 title="Click to copy"
               >
                 code_execution_output
               </code>
               {copied && (
-                <span className="ml-2 text-green-600 flex items-center gap-1">
+                <span className="ml-2 text-primary flex items-center gap-1">
                   <Check className="h-3 w-3" />
                   Copied!
                 </span>
@@ -270,7 +274,7 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
           </div>
 
           {isEditing && (
-            <div className="text-xs space-y-3 border rounded p-2 bg-secondary/10">
+            <div className="text-xs space-y-3 border rounded p-2 ">
               <div>
                 <Label className="block mb-1 font-medium">Timeout (ms)</Label>
                 <Input
@@ -295,7 +299,7 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
                   </div>
                 </div>
                 <Textarea
-                  placeholder={"// You can use 'variables' and 'fetch' here.\n// Example: variables.foo = 'bar'"}
+                  placeholder={"// You can use 'variables' and 'fetch' here.\n// Example: variables.order = 'invoice_number'"}
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   className="text-xs min-h-[160px] resize-y font-mono"
@@ -316,13 +320,13 @@ export function CodeExecutionNode({ id, data, isConnectable }: CodeExecutionNode
                   {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 </Button>
                 {testResult && (
-                  <span className={`text-[10px] ${testResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                  <span className={`text-[10px] ${testResult.success ? 'text-primary' : 'text-destructive'}`}>
                     {testResult.success ? 'Success' : (testResult.error || 'Error')}
                   </span>
                 )}
               </div>
               {testResult?.success && (
-                <div className="mt-2 text-[10px] bg-gray-50 border p-2 rounded font-mono max-h-40 overflow-y-auto">
+                <div className="mt-2 text-[10px] bg-muted border p-2 rounded font-mono max-h-40 overflow-y-auto">
                   <div className="mb-1 text-xs font-medium">Result</div>
                   <pre className="whitespace-pre-wrap">{JSON.stringify(testResult.result, null, 2)}</pre>
                   <div className="mt-2 mb-1 text-xs font-medium">Variables</div>
@@ -357,16 +361,16 @@ function CodeExecutionHelpContent() {
         {/* Node Overview */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Code className="h-4 w-4 text-blue-600" />
+            <Code className="h-4 w-4 text-primary" />
             Node Overview
           </h3>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-gray-700 mb-2">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+            <p className="text-sm text-foreground mb-2">
               The <strong>Code Execution Node</strong> allows you to run custom JavaScript code within your flows.
               It provides a secure sandbox environment where you can execute complex logic, make API calls,
               and manipulate data using modern JavaScript features like async/await.
             </p>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-foreground">
               <strong>Key Benefits:</strong> Custom business logic, API integrations, data transformation,
               conditional processing, and dynamic content generation.
             </p>
@@ -376,7 +380,7 @@ function CodeExecutionHelpContent() {
         {/* Available APIs */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Network className="h-4 w-4 text-green-600" />
+            <Network className="h-4 w-4 text-primary" />
             Available APIs & Variables
           </h3>
           <div className="space-y-4">
@@ -385,10 +389,10 @@ function CodeExecutionHelpContent() {
                 <Variable className="h-3 w-3" />
                 Variables Object
               </h4>
-              <p className="text-xs text-gray-600 mb-2">
-                Access and modify flow variables using the <code className="bg-gray-200 px-1 rounded">variables</code> object.
+              <p className="text-xs text-muted-foreground mb-2">
+                Access and modify flow variables using the <code className="bg-muted px-1 rounded">variables</code> object.
               </p>
-              <div className="bg-gray-50 rounded p-2 text-xs font-mono space-y-1">
+              <div className="bg-muted rounded p-2 text-xs font-mono space-y-1">
                 <div><strong>Reading:</strong> const name = variables.user_name;</div>
                 <div><strong>Writing:</strong> variables.result = "Hello World";</div>
                 <div><strong>Updating:</strong> variables.counter = (variables.counter || 0) + 1;</div>
@@ -400,10 +404,10 @@ function CodeExecutionHelpContent() {
                 <Globe className="h-3 w-3" />
                 Fetch API
               </h4>
-              <p className="text-xs text-gray-600 mb-2">
+              <p className="text-xs text-muted-foreground mb-2">
                 Make HTTP requests to external APIs using the standard fetch API.
               </p>
-              <div className="bg-gray-50 rounded p-2 text-xs font-mono space-y-1">
+              <div className="bg-muted rounded p-2 text-xs font-mono space-y-1">
                 <div><strong>GET Request:</strong></div>
                 <div>const response = await fetch('https://api.example.com/data');</div>
                 <div>const data = await response.json();</div>
@@ -421,13 +425,13 @@ function CodeExecutionHelpContent() {
         {/* Security & Sandbox */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Shield className="h-4 w-4 text-purple-600" />
+            <Shield className="h-4 w-4 text-primary" />
             Security & Sandbox
           </h3>
           <div className="space-y-3">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-green-800">✅ What's Allowed</h4>
-              <ul className="text-xs text-green-700 space-y-1">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-primary">✅ What's Allowed</h4>
+              <ul className="text-xs text-primary space-y-1">
                 <li>• Standard JavaScript (ES6+) features</li>
                 <li>• Async/await for asynchronous operations</li>
                 <li>• HTTP requests via fetch API</li>
@@ -436,9 +440,9 @@ function CodeExecutionHelpContent() {
                 <li>• Mathematical calculations</li>
               </ul>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-red-800">❌ What's Restricted</h4>
-              <ul className="text-xs text-red-700 space-y-1">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-destructive">❌ What's Restricted</h4>
+              <ul className="text-xs text-destructive space-y-1">
                 <li>• File system access</li>
                 <li>• Network access beyond fetch</li>
                 <li>• Process manipulation</li>
@@ -455,17 +459,17 @@ function CodeExecutionHelpContent() {
         {/* Output System */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Variable className="h-4 w-4 text-orange-600" />
+            <Variable className="h-4 w-4 text-primary" />
             Output System
           </h3>
           <div className="space-y-4">
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
               <h4 className="font-medium text-sm mb-2">How Output Works</h4>
-              <p className="text-xs text-gray-700 mb-2">
+              <p className="text-xs text-foreground mb-2">
                 All variables you create in your code are automatically saved and made available to other nodes
-                through the <code className="bg-gray-200 px-1 rounded">code_execution_output</code> variable.
+                through the <code className="bg-muted px-1 rounded">code_execution_output</code> variable.
               </p>
-              <div className="bg-white rounded p-2 text-xs font-mono">
+              <div className="bg-card rounded p-2 text-xs font-mono">
                 <div><strong>In Code Execution Node:</strong></div>
                 <div>variables.wiki_summary = "Pakistan is a country...";</div>
                 <div>variables.user_score = 95;</div>
@@ -481,26 +485,26 @@ function CodeExecutionHelpContent() {
         {/* Configuration Options */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Settings className="h-4 w-4 text-gray-600" />
+            <Settings className="h-4 w-4 text-muted-foreground" />
             Configuration Options
           </h3>
           <div className="space-y-3">
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1 flex items-center gap-2">
-                <Clock className="h-3 w-3 text-blue-600" />
+                <Clock className="h-3 w-3 text-primary" />
                 Execution Timeout
               </h4>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 Set the maximum execution time in milliseconds (100ms - 30,000ms).
                 Code that runs longer will be automatically terminated.
               </p>
             </div>
             <div className="border rounded-lg p-3">
               <h4 className="font-medium text-sm mb-1 flex items-center gap-2">
-                <CheckCircle className="h-3 w-3 text-green-600" />
+                <CheckCircle className="h-3 w-3 text-primary" />
                 Test Code Feature
               </h4>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 Use the Test button to execute your code in a safe environment and see the results
                 before deploying to your flow.
               </p>
@@ -513,22 +517,22 @@ function CodeExecutionHelpContent() {
         {/* Code Templates */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Code className="h-4 w-4 text-indigo-600" />
+            <Code className="h-4 w-4 text-primary" />
             Code Templates
           </h3>
           <div className="space-y-4">
-            <div className="border rounded-lg p-4 bg-indigo-50">
+            <div className="border rounded-lg p-4 bg-primary/10">
               <h4 className="font-medium text-sm mb-2">API Call Template</h4>
-              <div className="bg-white rounded p-2 text-xs font-mono">
+              <div className="bg-card rounded p-2 text-xs font-mono">
                 <div>const response = await fetch('https://api.example.com/data');</div>
                 <div>const data = await response.json();</div>
                 <div>variables.result = data;</div>
               </div>
             </div>
 
-            <div className="border rounded-lg p-4 bg-green-50">
+            <div className="border rounded-lg p-4 bg-primary/10">
               <h4 className="font-medium text-sm mb-2">Conditional Logic Template</h4>
-              <div className="bg-white rounded p-2 text-xs font-mono">
+              <div className="bg-card rounded p-2 text-xs font-mono">
                 <div>if (variables.score &gt; 80) &#123;</div>
                 <div>  variables.result = "Pass";</div>
                 <div>&#125; else &#123;</div>
@@ -537,9 +541,9 @@ function CodeExecutionHelpContent() {
               </div>
             </div>
 
-            <div className="border rounded-lg p-4 bg-yellow-50">
+            <div className="border rounded-lg p-4 bg-secondary/10">
               <h4 className="font-medium text-sm mb-2">Error Handling Template</h4>
-              <div className="bg-white rounded p-2 text-xs font-mono">
+              <div className="bg-card rounded p-2 text-xs font-mono">
                 <div>try &#123;</div>
                 <div>  const res = await fetch('https://api.example.com/user');</div>
                 <div>  const user = await res.json();</div>
@@ -550,9 +554,9 @@ function CodeExecutionHelpContent() {
               </div>
             </div>
 
-            <div className="border rounded-lg p-4 bg-blue-50">
+            <div className="border rounded-lg p-4 bg-primary/10">
               <h4 className="font-medium text-sm mb-2">Wikipedia API Template</h4>
-              <div className="bg-white rounded p-2 text-xs font-mono">
+              <div className="bg-card rounded p-2 text-xs font-mono">
                 <div>const query = variables.query || "Pakistan";</div>
                 <div>const url = `https://en.wikipedia.org/api/rest_v1/page/summary/$&#123;encodeURIComponent(query)&#125;`;</div>
                 <div>const response = await fetch(url);</div>
@@ -569,13 +573,13 @@ function CodeExecutionHelpContent() {
         {/* Best Practices */}
         <section>
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CheckCircle className="h-4 w-4 text-primary" />
             Best Practices & Tips
           </h3>
           <div className="space-y-3">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-green-800">✅ Do's</h4>
-              <ul className="text-xs text-green-700 space-y-1">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-primary">✅ Do's</h4>
+              <ul className="text-xs text-primary space-y-1">
                 <li>• Use descriptive variable names (user_data, api_response, processed_result)</li>
                 <li>• Always handle errors with try/catch blocks</li>
                 <li>• Test your code using the Test button before deploying</li>
@@ -584,9 +588,9 @@ function CodeExecutionHelpContent() {
                 <li>• Use async/await for cleaner asynchronous code</li>
               </ul>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-red-800">❌ Don'ts</h4>
-              <ul className="text-xs text-red-700 space-y-1">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-destructive">❌ Don'ts</h4>
+              <ul className="text-xs text-destructive space-y-1">
                 <li>• Don't write infinite loops or blocking code</li>
                 <li>• Don't make synchronous calls that could timeout</li>
                 <li>• Don't store sensitive data in variables</li>
@@ -594,9 +598,9 @@ function CodeExecutionHelpContent() {
                 <li>• Don't ignore error handling</li>
               </ul>
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <h4 className="font-medium text-sm mb-2 text-blue-800">💡 Pro Tips</h4>
-              <ul className="text-xs text-blue-700 space-y-1">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <h4 className="font-medium text-sm mb-2 text-primary">💡 Pro Tips</h4>
+              <ul className="text-xs text-primary space-y-1">
                 <li>• Use the Test button to debug your code before deploying</li>
                 <li>• Click on "code_execution_output" to copy the variable name</li>
                 <li>• Use templates as starting points for common scenarios</li>

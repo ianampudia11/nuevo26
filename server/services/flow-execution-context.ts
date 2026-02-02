@@ -72,6 +72,13 @@ export class FlowExecutionContext {
 
   /**
    * Load captured variables from storage into context
+   * 
+   * NOTE: HTTP and Webhook execution state persistence
+   * This method loads all variables from storage, including http.* and webhook.* execution
+   * flags and cached responses. This means that HTTP/webhook nodes that have been executed
+   * in a previous session will not re-execute when the session is resumed, as their execution
+   * state is restored from storage. This is intentional behavior to prevent duplicate API calls
+   * across session boundaries, but maintainers should be aware of this persistence behavior.
    */
   async loadCapturedVariables(sessionId: string, scope?: string): Promise<void> {
     try {
@@ -365,11 +372,204 @@ export class FlowExecutionContext {
   }
 
   /**
+   * Mark a webhook node as executed
+   * 
+   * NOTE: Single-execution semantics scope
+   * The execution flags (webhook.executed.*, http.executed.*) are designed for single in-memory
+   * flow execution runs. They prevent duplicate executions within the same execution context.
+   * These flags are preserved in clearUserVariables() and will persist across session restarts
+   * if variables are saved to storage, which means HTTP/webhook nodes will not re-execute
+   * even after server restarts or session resumption. This behavior is intentional to prevent
+   * duplicate API calls, but maintainers should be aware that these nodes will not re-execute
+   * in subsequent flow runs within the same session.
+   * 
+   * @param nodeId The ID of the webhook node
+   * @param responseData The response data from the webhook call
+   * @param pathId Optional path identifier to track execution per path
+   */
+  markWebhookExecuted(nodeId: string, responseData?: any, pathId?: string): void {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    this.setVariable(`webhook.executed.${keySuffix}`, true);
+    this.setVariable(`webhook.executedAt.${keySuffix}`, new Date().toISOString());
+    if (responseData !== undefined) {
+      this.setVariable(`webhook.cachedResponse.${keySuffix}`, responseData);
+    }
+  }
+
+  /**
+   * Check if a webhook node has been executed
+   * @param nodeId The ID of the webhook node
+   * @param pathId Optional path identifier to check execution per path
+   * @returns True if the webhook has been executed, false otherwise
+   */
+  isWebhookExecuted(nodeId: string, pathId?: string): boolean {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    return this.getVariable(`webhook.executed.${keySuffix}`) === true;
+  }
+
+  /**
+   * Get cached response data from a previously executed webhook node
+   * @param nodeId The ID of the webhook node
+   * @param pathId Optional path identifier to retrieve cached response per path
+   * @returns The cached response data, or null if not available
+   */
+  getWebhookCachedResponse(nodeId: string, pathId?: string): any {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    return this.getVariable(`webhook.cachedResponse.${keySuffix}`) || null;
+  }
+
+  /**
+   * Mark an HTTP request node as executed
+   * 
+   * NOTE: Single-execution semantics scope
+   * The execution flags (webhook.executed.*, http.executed.*) are designed for single in-memory
+   * flow execution runs. They prevent duplicate executions within the same execution context.
+   * These flags are preserved in clearUserVariables() and will persist across session restarts
+   * if variables are saved to storage, which means HTTP/webhook nodes will not re-execute
+   * even after server restarts or session resumption. This behavior is intentional to prevent
+   * duplicate API calls, but maintainers should be aware that these nodes will not re-execute
+   * in subsequent flow runs within the same session.
+   * 
+   * @param nodeId The ID of the HTTP request node
+   * @param responseData The response data from the HTTP request call
+   * @param pathId Optional path identifier to track execution per path
+   */
+  markHttpExecuted(nodeId: string, responseData?: any, pathId?: string): void {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    this.setVariable(`http.executed.${keySuffix}`, true);
+    this.setVariable(`http.executedAt.${keySuffix}`, new Date().toISOString());
+    if (responseData !== undefined) {
+      this.setVariable(`http.cachedResponse.${keySuffix}`, responseData);
+    }
+  }
+
+  /**
+   * Check if an HTTP request node has been executed
+   * @param nodeId The ID of the HTTP request node
+   * @param pathId Optional path identifier to check execution per path
+   * @returns True if the HTTP request has been executed, false otherwise
+   */
+  isHttpExecuted(nodeId: string, pathId?: string): boolean {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    return this.getVariable(`http.executed.${keySuffix}`) === true;
+  }
+
+  /**
+   * Get cached response data from a previously executed HTTP request node
+   * @param nodeId The ID of the HTTP request node
+   * @param pathId Optional path identifier to retrieve cached response per path
+   * @returns The cached response data, or null if not available
+   */
+  getHttpCachedResponse(nodeId: string, pathId?: string): any {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    return this.getVariable(`http.cachedResponse.${keySuffix}`) || null;
+  }
+
+  /**
    * Set HTTP request response data
    */
   setHttpResponse(response: any): void {
     this.setVariable('http.response', response);
     this.setVariable('http.lastResponse', response);
+  }
+
+  /**
+   * Set CallAgent response data
+   */
+  setCallAgentResponse(response: any): void {
+    this.setVariable('callAgent.response', response);
+    this.setVariable('callAgent.lastResponse', response);
+  }
+
+  /**
+   * Set contact notification response data
+   */
+  setContactNotificationResponse(response: any): void {
+    this.setVariable('contactNotification.response', response);
+    this.setVariable('contactNotification.lastResponse', response);
+  }
+
+  /**
+   * Mark a contact notification node as executed
+   * 
+   * NOTE: Single-execution semantics scope
+   * The execution flags (contactNotification.executed.*) are designed for single in-memory
+   * flow execution runs. They prevent duplicate executions within the same execution context.
+   * These flags are preserved in clearUserVariables() and will persist across session restarts
+   * if variables are saved to storage, which means contact notification nodes will not re-execute
+   * even after server restarts or session resumption. This behavior is intentional to prevent
+   * duplicate messages, but maintainers should be aware that these nodes will not re-execute
+   * in subsequent flow runs within the same session.
+   * 
+   * @param nodeId The ID of the contact notification node
+   * @param responseData The response data from the notification call
+   * @param pathId Optional path identifier to track execution per path
+   */
+  markContactNotificationExecuted(nodeId: string, responseData?: any, pathId?: string): void {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    this.setVariable(`contactNotification.executed.${keySuffix}`, true);
+    this.setVariable(`contactNotification.executedAt.${keySuffix}`, new Date().toISOString());
+    if (responseData !== undefined) {
+      this.setVariable(`contactNotification.cachedResponse.${keySuffix}`, responseData);
+    }
+  }
+
+  /**
+   * Check if a contact notification node has been executed
+   * @param nodeId The ID of the contact notification node
+   * @param pathId Optional path identifier to check execution per path
+   * @returns True if the contact notification has been executed, false otherwise
+   */
+  isContactNotificationExecuted(nodeId: string, pathId?: string): boolean {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    return this.getVariable(`contactNotification.executed.${keySuffix}`) === true;
+  }
+
+  /**
+   * Mark a CallAgent node as executed
+   * 
+   * NOTE: Single-execution semantics scope
+   * The execution flags (callAgent.executed.*) are designed for single in-memory
+   * flow execution runs. They prevent duplicate executions within the same execution context.
+   * These flags are preserved in clearUserVariables() and will persist across session restarts
+   * if variables are saved to storage, which means CallAgent nodes will not re-execute
+   * even after server restarts or session resumption. This behavior is intentional to prevent
+   * duplicate calls, but maintainers should be aware that these nodes will not re-execute
+   * in subsequent flow runs within the same session.
+   * 
+   * @param nodeId The ID of the CallAgent node
+   * @param responseData The response data from the call
+   * @param pathId Optional path identifier to track execution per path
+   */
+  markCallAgentExecuted(nodeId: string, responseData?: any, pathId?: string): void {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    this.setVariable(`callAgent.executed.${keySuffix}`, true);
+    this.setVariable(`callAgent.executedAt.${keySuffix}`, new Date().toISOString());
+    if (responseData !== undefined) {
+      this.setVariable(`callAgent.cachedResponse.${keySuffix}`, responseData);
+    }
+  }
+
+  /**
+   * Check if a CallAgent node has been executed
+   * @param nodeId The ID of the CallAgent node
+   * @param pathId Optional path identifier to check execution per path
+   * @returns True if the CallAgent has been executed, false otherwise
+   */
+  isCallAgentExecuted(nodeId: string, pathId?: string): boolean {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    return this.getVariable(`callAgent.executed.${keySuffix}`) === true;
+  }
+
+  /**
+   * Get cached response data from a previously executed CallAgent node
+   * @param nodeId The ID of the CallAgent node
+   * @param pathId Optional path identifier to retrieve cached response per path
+   * @returns The cached response data, or null if not available
+   */
+  getCallAgentCachedResponse(nodeId: string, pathId?: string): any {
+    const keySuffix = pathId ? `${nodeId}.${pathId}` : nodeId;
+    return this.getVariable(`callAgent.cachedResponse.${keySuffix}`) || null;
   }
 
   /**
@@ -386,19 +586,42 @@ export class FlowExecutionContext {
 
   /**
    * Clear all variables except system variables
+   * 
+   * NOTE: HTTP and Webhook execution state preservation
+   * This method preserves http.* and webhook.* variables (including execution flags and
+   * cached responses) to maintain single-execution semantics across variable clearing
+   * operations. This ensures that HTTP/webhook nodes do not re-execute when variables
+   * are cleared, maintaining the intended behavior of executing these nodes only once
+   * per flow execution context.
    */
   clearUserVariables(): void {
-    const systemKeys = Array.from(this.variables.keys()).filter(key =>
-      key.startsWith('date.') ||
-      key.startsWith('time.') ||
-      key.startsWith('execution.')
-    );
+
+    const preserved = new Map<string, any>();
+    
+    this.variables.forEach((value, key) => {
+      if (
+        key.startsWith('date.') ||
+        key.startsWith('time.') ||
+        key.startsWith('execution.') ||
+        key.startsWith('webhook.') ||
+        key.startsWith('http.') ||
+        key.startsWith('contactNotification.') ||
+        key.startsWith('callAgent.')
+      ) {
+        preserved.set(key, value);
+      }
+    });
+
 
     this.variables.clear();
 
-    systemKeys.forEach(key => {
-      this.setSystemVariables();
+
+    preserved.forEach((value, key) => {
+      this.setVariable(key, value);
     });
+
+
+    this.setSystemVariables();
   }
 
   /**

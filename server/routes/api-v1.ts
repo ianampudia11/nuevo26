@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticateApiKey, requirePermission, rateLimitMiddleware, logApiUsage } from '../middleware/api-auth';
 import apiMessageService from '../services/api-message-service';
 import { storage } from '../storage';
+import { dataUsageTracker } from '../services/data-usage-tracker';
 import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
@@ -96,6 +97,8 @@ router.post('/messages/send', requirePermission('messages:send'), async (req, re
     
     const result = await apiMessageService.sendMessage(req.companyId!, validatedData);
     
+    res.locals.messageId = result.id;
+    
     res.status(201).json({
       success: true,
       data: result
@@ -109,6 +112,14 @@ router.post('/messages/send', requirePermission('messages:send'), async (req, re
         error: 'VALIDATION_ERROR',
         message: 'Invalid request data',
         details: error.errors
+      });
+    }
+    
+    if (error.message?.includes('conversion') || error.message?.includes('audio')) {
+      return res.status(400).json({
+        success: false,
+        error: 'AUDIO_CONVERSION_FAILED',
+        message: error.message || 'Audio conversion failed'
       });
     }
     
@@ -130,6 +141,8 @@ router.post('/messages/send-media', requirePermission('messages:send'), async (r
     
     const result = await apiMessageService.sendMedia(req.companyId!, validatedData);
     
+    res.locals.messageId = result.id;
+    
     res.status(201).json({
       success: true,
       data: result
@@ -146,10 +159,297 @@ router.post('/messages/send-media', requirePermission('messages:send'), async (r
       });
     }
     
+    if (error.message?.includes('conversion') || error.message?.includes('audio')) {
+      return res.status(400).json({
+        success: false,
+        error: 'AUDIO_CONVERSION_FAILED',
+        message: error.message || 'Audio conversion failed'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       error: 'MEDIA_SEND_ERROR',
       message: error.message || 'Failed to send media message'
+    });
+  }
+});
+
+/**
+ * POST /api/v1/messages/send-batch
+ * Send multiple messages in a single request
+ */
+const sendBatchSchema = z.object({
+  messages: z.array(z.object({
+    channelId: z.number().int().positive(),
+    to: z.string().min(1).max(20),
+    message: z.string().min(1).max(4096),
+    messageType: z.literal('text').optional().default('text')
+  })).min(1).max(100)
+});
+
+router.post('/messages/send-batch', requirePermission('messages:send:batch'), async (req, res) => {
+  try {
+    const validatedData = sendBatchSchema.parse(req.body);
+    
+    const results = await apiMessageService.sendBatchMessages(req.companyId!, validatedData.messages);
+    
+
+    const firstSuccessId = results.find(r => r.status === 'sent' && r.id > 0)?.id;
+    if (firstSuccessId) {
+      res.locals.messageId = firstSuccessId;
+    }
+    
+    res.status(201).json({
+      success: true,
+      data: results,
+      count: results.length
+    });
+  } catch (error: any) {
+    console.error('Error sending batch messages:', error);
+    
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Invalid request data',
+        details: error.errors
+      });
+    }
+    
+
+    if (error.name === 'BatchSizeExceededError' || 
+        error.message?.includes('Batch size') || error.message?.includes('batch size') || 
+        error.message?.includes('exceed') || error.message?.includes('100')) {
+      return res.status(400).json({
+        success: false,
+        error: 'BATCH_SIZE_EXCEEDED',
+        message: error.message || 'Batch size cannot exceed 100 messages'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'BATCH_SEND_ERROR',
+      message: error.message || 'Failed to send batch messages'
+    });
+  }
+});
+
+/**
+ * POST /api/v1/messages/send-template
+ * Send a template message (WhatsApp official/meta only)
+ */
+const sendTemplateSchema = z.object({
+  channelId: z.number().int().positive(),
+  to: z.string().min(1).max(20),
+  templateName: z.string().min(1).max(255),
+  templateLanguage: z.string().min(2).max(10).default('en'),
+  components: z.array(z.object({
+    type: z.enum(['header', 'body', 'button']),
+    parameters: z.array(z.union([
+      z.string(),
+      z.object({ type: z.literal('text'), text: z.string() })
+    ]))
+  })).optional().default([])
+});
+
+router.post('/messages/send-template', requirePermission('messages:send:template'), async (req, res) => {
+  try {
+    const validatedData = sendTemplateSchema.parse(req.body);
+    
+    const result = await apiMessageService.sendTemplateMessage(req.companyId!, validatedData);
+    
+    res.locals.messageId = result.id;
+    
+    res.status(201).json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    console.error('Error sending template message:', error);
+    
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Invalid request data',
+        details: error.errors
+      });
+    }
+    
+    if (error.message?.includes('template') || error.message?.includes('Template')) {
+      return res.status(404).json({
+        success: false,
+        error: 'TEMPLATE_NOT_FOUND',
+        message: error.message || 'Template not found'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'TEMPLATE_SEND_ERROR',
+      message: error.message || 'Failed to send template message'
+    });
+  }
+});
+
+/**
+ * POST /api/v1/messages/send-interactive
+ * Send an interactive message (WhatsApp only)
+ */
+const sendInteractiveSchema = z.object({
+  channelId: z.number().int().positive(),
+  to: z.string().min(1).max(20),
+  interactiveType: z.enum(['button', 'list']),
+  content: z.object({
+    header: z.object({
+      type: z.enum(['text', 'image', 'video', 'document']),
+      text: z.string().optional(),
+      mediaUrl: z.string().url().optional()
+    }).optional(),
+    body: z.object({
+      text: z.string().min(1).max(1024)
+    }),
+    footer: z.object({
+      text: z.string().max(60)
+    }).optional()
+  }),
+  options: z.union([
+    z.object({
+      type: z.literal('button'),
+      buttons: z.array(z.object({
+        id: z.string().min(1).max(256),
+        title: z.string().min(1).max(20)
+      })).min(1).max(3)
+    }),
+    z.object({
+      type: z.literal('list'),
+      button: z.string().min(1).max(20),
+      sections: z.array(z.object({
+        title: z.string().max(24).optional(),
+        rows: z.array(z.object({
+          id: z.string().min(1).max(200),
+          title: z.string().min(1).max(24),
+          description: z.string().max(72).optional()
+        })).min(1).max(10)
+      })).min(1).max(10)
+    })
+  ])
+});
+
+router.post('/messages/send-interactive', requirePermission('messages:send:interactive'), async (req, res) => {
+  try {
+    const validatedData = sendInteractiveSchema.parse(req.body);
+    
+    const result = await apiMessageService.sendInteractiveMessage(req.companyId!, validatedData);
+    
+    res.locals.messageId = result.id;
+    
+    res.status(201).json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    console.error('Error sending interactive message:', error);
+    
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Invalid request data',
+        details: error.errors
+      });
+    }
+    
+    if (error.message?.includes('interactive') || error.message?.includes('Interactive')) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_INTERACTIVE_MESSAGE',
+        message: error.message || 'Invalid interactive message structure'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'INTERACTIVE_SEND_ERROR',
+      message: error.message || 'Failed to send interactive message'
+    });
+  }
+});
+
+/**
+ * GET /api/v1/conversations
+ * List conversations for the authenticated company
+ */
+router.get('/conversations', requirePermission('conversations:read'), async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const channelId = req.query.channelId ? parseInt(req.query.channelId as string) : undefined;
+    const status = req.query.status as string | undefined;
+    const isGroup = req.query.isGroup === 'true' ? true : req.query.isGroup === 'false' ? false : undefined;
+    
+    const result = await apiMessageService.getConversations(req.companyId!, {
+      page,
+      limit,
+      channelId,
+      status,
+      isGroup
+    });
+    
+    res.json({
+      success: true,
+      data: result.conversations,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / limit)
+      }
+    });
+  } catch (error: any) {
+    console.error('Error getting conversations:', error);
+    res.status(500).json({
+      success: false,
+      error: 'CONVERSATIONS_FETCH_ERROR',
+      message: error.message || 'Failed to retrieve conversations'
+    });
+  }
+});
+
+/**
+ * GET /api/v1/contacts
+ * List contacts for the authenticated company
+ */
+router.get('/contacts', requirePermission('contacts:read'), async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const search = req.query.search as string | undefined;
+    
+    const result = await apiMessageService.getContacts(req.companyId!, {
+      page,
+      limit,
+      search
+    });
+    
+    res.json({
+      success: true,
+      data: result.contacts,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / limit)
+      }
+    });
+  } catch (error: any) {
+    console.error('Error getting contacts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'CONTACTS_FETCH_ERROR',
+      message: error.message || 'Failed to retrieve contacts'
     });
   }
 });
@@ -192,6 +492,10 @@ router.post('/media/upload', requirePermission('media:upload'), upload.single('f
         );
 
 
+        if (!conversionResult || !conversionResult.outputPath) {
+          throw new Error('Audio conversion failed: no output path');
+        }
+
         const mediaDir = path.join(process.cwd(), 'public', 'media', 'audio');
         await fs.ensureDir(mediaDir);
 
@@ -201,10 +505,14 @@ router.post('/media/upload', requirePermission('media:upload'), upload.single('f
         await fs.move(conversionResult.outputPath, publicMediaPath);
 
 
-        finalUrl = `${req.protocol}://${req.get('host')}/media/audio/${convertedFileName}`;
-        finalMimeType = conversionResult.mimeType;
-        finalSize = conversionResult.metadata.size || req.file.size;
+        let cleanMimeType = conversionResult.mimeType;
+        if (cleanMimeType.includes(';')) {
+          cleanMimeType = cleanMimeType.split(';')[0].trim();
+        }
 
+        finalUrl = `${req.protocol}://${req.get('host')}/media/audio/${convertedFileName}`;
+        finalMimeType = cleanMimeType;
+        finalSize = conversionResult.metadata.size || req.file.size;
 
       } catch (conversionError) {
         console.warn('API audio conversion failed, using original file:', conversionError);
@@ -212,7 +520,7 @@ router.post('/media/upload', requirePermission('media:upload'), upload.single('f
       }
     }
 
-    res.json({
+    const responseData = {
       success: true,
       data: {
         url: finalUrl,
@@ -221,7 +529,16 @@ router.post('/media/upload', requirePermission('media:upload'), upload.single('f
         size: finalSize,
         mimetype: finalMimeType
       }
-    });
+    };
+
+
+    if (req.companyId && req.file) {
+      dataUsageTracker.trackFileUpload(req.companyId, finalSize).catch(err => {
+        console.error('Failed to track API v1 media upload:', err);
+      });
+    }
+
+    res.json(responseData);
   } catch (error: any) {
     console.error('Error uploading media:', error);
 
@@ -229,6 +546,14 @@ router.post('/media/upload', requirePermission('media:upload'), upload.single('f
       fs.unlink(req.file.path).catch(console.error);
     }
 
+    if (error.message?.includes('conversion') || error.message?.includes('audio')) {
+      return res.status(400).json({
+        success: false,
+        error: 'AUDIO_CONVERSION_FAILED',
+        message: error.message || 'Audio conversion failed'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       error: 'UPLOAD_ERROR',

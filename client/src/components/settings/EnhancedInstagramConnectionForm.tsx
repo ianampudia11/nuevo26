@@ -452,7 +452,7 @@ export function EnhancedInstagramConnectionForm({ isOpen, onClose, onSuccess }: 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="accessToken">Page Access Token *</Label>
+                <Label htmlFor="accessToken">Access Token *</Label>
                 <div className="relative">
                   <Input
                     id="accessToken"
@@ -749,8 +749,8 @@ export function EnhancedInstagramConnectionForm({ isOpen, onClose, onSuccess }: 
               <div key={step.key} className="flex flex-col items-center space-y-1">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   index <= getCurrentStepIndex() 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-gray-200 text-gray-500'
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted text-muted-foreground'
                 }`}>
                   {stepStatus[step.key].completed ? (
                     <CheckCircle className="h-4 w-4" />

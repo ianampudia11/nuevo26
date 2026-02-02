@@ -1,14 +1,78 @@
 
+/**
+ * Common timezone aliases mapping to IANA identifiers
+ * Handles cases where users or AI provide non-IANA timezone strings
+ */
+const TIMEZONE_ALIASES: Record<string, string> = {
+  'PST': 'America/Los_Angeles',
+  'PDT': 'America/Los_Angeles',
+  'EST': 'America/New_York',
+  'EDT': 'America/New_York',
+  'CST': 'America/Chicago',
+  'CDT': 'America/Chicago',
+  'MST': 'America/Denver',
+  'MDT': 'America/Denver',
+  'PKT': 'Asia/Karachi',
+  'IST': 'Asia/Kolkata',
+  'GMT': 'UTC',
+  'UTC': 'UTC'
+};
+
+/**
+ * Validate if a timezone string is valid
+ * @param timezone Timezone string to validate
+ * @returns true if valid, false otherwise
+ */
+export function validateTimezone(timezone: string): boolean {
+  if (!timezone || typeof timezone !== 'string') {
+    return false;
+  }
+  
+
+  if (TIMEZONE_ALIASES[timezone.toUpperCase()]) {
+    return true;
+  }
+  
+  try {
+
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Normalize timezone string by resolving aliases to IANA identifiers
+ * @param timezone Timezone string (may be alias or IANA identifier)
+ * @returns IANA timezone identifier
+ */
+export function normalizeTimezone(timezone: string): string {
+  const upperTimezone = timezone.toUpperCase();
+  return TIMEZONE_ALIASES[upperTimezone] || timezone;
+}
 
 /**
  * Convert a datetime from a specific timezone to UTC
+ * Enhanced with logging and timezone validation
  * @param datetime Date string or Date object representing local time in the source timezone
- * @param fromTimezone Source timezone (IANA identifier like 'Asia/Karachi')
+ * @param fromTimezone Source timezone (IANA identifier like 'Asia/Karachi' or alias like 'PKT')
  * @returns UTC Date object
  */
 export function convertToUTC(datetime: string | Date, fromTimezone: string): Date {
-  if (fromTimezone === 'UTC') {
+
+  const normalizedTimezone = normalizeTimezone(fromTimezone);
+  
+
+  if (!validateTimezone(normalizedTimezone)) {
+    console.warn(`[convertToUTC] Invalid timezone: ${fromTimezone} (normalized: ${normalizedTimezone}), using UTC as fallback`);
     return new Date(datetime);
+  }
+  
+  if (normalizedTimezone === 'UTC') {
+    const result = new Date(datetime);
+    
+    return result;
   }
 
   try {
@@ -40,9 +104,17 @@ export function convertToUTC(datetime: string | Date, fromTimezone: string): Dat
 
     const offsetMs = originalDate.getTime() - localizedDate.getTime();
     const utcResult = new Date(testDate.getTime() + offsetMs);
+    
+
+    
 
     return utcResult;
   } catch (error) {
+    console.error(`[convertToUTC] Error converting timezone: ${fromTimezone}`, {
+      error: error instanceof Error ? error.message : String(error),
+      input: datetime,
+      normalizedTimezone: normalizedTimezone
+    });
     
     return new Date(datetime);
   }
@@ -50,22 +122,44 @@ export function convertToUTC(datetime: string | Date, fromTimezone: string): Dat
 
 /**
  * Convert UTC datetime to a specific timezone
+ * Enhanced with logging and timezone validation
  * @param utcDatetime UTC Date object
- * @param toTimezone Target timezone (IANA identifier)
+ * @param toTimezone Target timezone (IANA identifier or alias)
  * @returns Date object representing the time in target timezone
  */
 export function convertFromUTC(utcDatetime: Date, toTimezone: string): Date {
-  if (toTimezone === 'UTC') {
+
+  const normalizedTimezone = normalizeTimezone(toTimezone);
+  
+
+  if (!validateTimezone(normalizedTimezone)) {
+    console.warn(`[convertFromUTC] Invalid timezone: ${toTimezone} (normalized: ${normalizedTimezone}), using UTC as fallback`);
     return new Date(utcDatetime);
+  }
+  
+  if (normalizedTimezone === 'UTC') {
+    const result = new Date(utcDatetime);
+    
+    return result;
   }
   
   try {
     const targetTimeString = utcDatetime.toLocaleString('sv-SE', { 
-      timeZone: toTimezone 
+      timeZone: normalizedTimezone 
     });
     
-    return new Date(targetTimeString);
+    const result = new Date(targetTimeString);
+    
+
+    
+    
+    return result;
   } catch (error) {
+    console.error(`[convertFromUTC] Error converting timezone: ${toTimezone}`, {
+      error: error instanceof Error ? error.message : String(error),
+      inputUTC: utcDatetime.toISOString(),
+      normalizedTimezone: normalizedTimezone
+    });
     
     return new Date(utcDatetime);
   }
@@ -92,18 +186,11 @@ export function getTimezoneOffsetMinutes(timezone: string): number {
 }
 
 /**
- * Validate if a timezone identifier is valid
- * @param timezone IANA timezone identifier to validate
+ * Validate if a timezone identifier is valid (already defined above with alias support)
+ * This function is kept for backward compatibility but now uses the enhanced validation
+ * @param timezone IANA timezone identifier or alias to validate
  * @returns true if valid, false otherwise
  */
-export function isValidTimezone(timezone: string): boolean {
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Get human-readable timezone information
@@ -116,7 +203,7 @@ export function getTimezoneInfo(timezone: string): {
   offsetMinutes: number;
   isValid: boolean;
 } {
-  if (!isValidTimezone(timezone)) {
+  if (!validateTimezone(timezone)) {
     return {
       name: timezone,
       offset: 'Invalid',
@@ -235,6 +322,82 @@ export function formatDateTimeInTimezone(
     return utcDate.toLocaleString('en-US', options);
   } catch (error) {
     
+    return utcDate.toISOString();
+  }
+}
+
+/**
+ * Format a UTC datetime for user-facing messages in a specific timezone
+ * Returns a readable format like "12/2/2025, 11:00 AM PKT" or "December 2, 2025 at 11:00 AM PKT"
+ * @param utcDate UTC Date object
+ * @param timezone Target timezone for display (IANA identifier or alias)
+ * @param options Format options
+ * @returns Formatted datetime string suitable for user-facing messages
+ */
+export function formatDateTimeForUser(
+  utcDate: Date,
+  timezone: string = 'UTC',
+  options: {
+    includeTimezone?: boolean;
+    hour12?: boolean;
+    dateStyle?: 'short' | 'medium' | 'long';
+  } = {}
+): string {
+  const {
+    includeTimezone = true,
+    hour12 = true,
+    dateStyle = 'short'
+  } = options;
+
+
+  const normalizedTimezone = normalizeTimezone(timezone);
+  
+
+  if (!validateTimezone(normalizedTimezone)) {
+    console.warn(`[formatDateTimeForUser] Invalid timezone: ${timezone} (normalized: ${normalizedTimezone}), using UTC as fallback`);
+
+    try {
+      const fallbackOptions: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: dateStyle === 'long' ? 'long' : 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: hour12
+      };
+      if (includeTimezone) {
+        fallbackOptions.timeZoneName = 'short';
+      }
+      return utcDate.toLocaleString('en-US', fallbackOptions);
+    } catch {
+      return utcDate.toISOString();
+    }
+  }
+
+  try {
+    const formatOptions: Intl.DateTimeFormatOptions = {
+      timeZone: normalizedTimezone,
+      year: 'numeric',
+      month: dateStyle === 'long' ? 'long' : 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: hour12
+    };
+    
+    if (includeTimezone) {
+      formatOptions.timeZoneName = 'short';
+    }
+    
+    return utcDate.toLocaleString('en-US', formatOptions);
+  } catch (error) {
+    console.error(`[formatDateTimeForUser] Error formatting datetime: ${timezone}`, {
+      error: error instanceof Error ? error.message : String(error),
+      inputUTC: utcDate.toISOString(),
+      normalizedTimezone: normalizedTimezone
+    });
+    
+
     return utcDate.toISOString();
   }
 }

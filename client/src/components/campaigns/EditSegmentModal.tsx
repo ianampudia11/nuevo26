@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FilterSection } from '@/components/segments/FilterSection';
+import { ContactPreviewTable } from '@/components/segments/ContactPreviewTable';
+import { SegmentSummary } from '@/components/segments/SegmentSummary';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +15,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -42,7 +52,11 @@ import {
   Calendar,
   Activity,
   Trash2,
-  Undo2
+  Undo2,
+  Target,
+  Settings,
+  Download,
+  Upload
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
@@ -89,6 +103,12 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [originalSegment, setOriginalSegment] = useState<ContactSegment | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [hasContactIds, setHasContactIds] = useState(false);
+  const [pipelineStages, setPipelineStages] = useState<Array<{ id: number; name: string; color: string }>>([]);
+  const [selectedPipelineStageIds, setSelectedPipelineStageIds] = useState<number[]>([]);
+  const [dateRangeExpanded, setDateRangeExpanded] = useState(false);
+  const [tagFiltersExpanded, setTagFiltersExpanded] = useState(false);
+  const [pipelineFiltersExpanded, setPipelineFiltersExpanded] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -97,8 +117,21 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
   useEffect(() => {
     if (isOpen && segmentId) {
       loadSegment();
+      fetchPipelineStages();
     }
   }, [isOpen, segmentId]);
+
+  const fetchPipelineStages = async () => {
+    try {
+      const response = await fetch('/api/pipeline/stages');
+      if (response.ok) {
+        const stages = await response.json();
+        setPipelineStages(stages || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pipeline stages:', error);
+    }
+  };
 
   const loadSegment = async () => {
     setIsLoadingSegment(true);
@@ -113,9 +146,23 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
           name: segment.name,
           description: segment.description || '',
         });
-        const segmentCriteria = segment.criteria || { tags: [] };
+        const segmentCriteria = {
+          tags: [],
+          created_after: '',
+          created_before: '',
+          ...segment.criteria
+        };
         setCriteria(segmentCriteria);
 
+
+        if (segmentCriteria.pipelineStageIds && Array.isArray(segmentCriteria.pipelineStageIds)) {
+          setSelectedPipelineStageIds(segmentCriteria.pipelineStageIds);
+        } else {
+          setSelectedPipelineStageIds([]);
+        }
+
+        const hasContactIdsInCriteria = segmentCriteria.contactIds && Array.isArray(segmentCriteria.contactIds) && segmentCriteria.contactIds.length > 0;
+        setHasContactIds(hasContactIdsInCriteria || false);
 
         if (segmentCriteria.excludedContactIds && segmentCriteria.excludedContactIds.length > 0) {
           setExcludedContactIds(segmentCriteria.excludedContactIds);
@@ -125,9 +172,11 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
         setContactCount(segment.contactCount);
 
 
-        if (segmentCriteria.tags.length > 0 || segmentCriteria.created_after || segmentCriteria.created_before) {
-          debouncedPreview(segmentCriteria);
-        }
+        const criteriaWithPipelineStages = {
+          ...segmentCriteria,
+          pipelineStageIds: segmentCriteria.pipelineStageIds && segmentCriteria.pipelineStageIds.length > 0 ? segmentCriteria.pipelineStageIds : undefined
+        };
+        debouncedPreview(criteriaWithPipelineStages);
       } else {
         throw new Error(data.error);
       }
@@ -161,6 +210,8 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
     setExcludedContactDetails([]);
     setOriginalSegment(null);
     setRetryCount(0);
+    setHasContactIds(false);
+    setSelectedPipelineStageIds([]);
   };
 
   const retryUpdate = () => {
@@ -218,14 +269,14 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
 
 
   useEffect(() => {
-    if (isOpen && ((criteria.tags?.length ?? 0) > 0 || criteria.created_after || criteria.created_before)) {
-      debouncedPreview(criteria);
-    } else {
-      setContactCount(null);
-      setContactPreview([]);
-      setHasMoreContacts(false);
+    if (isOpen) {
+      const criteriaWithPipelineStages = {
+        ...criteria,
+        pipelineStageIds: selectedPipelineStageIds.length > 0 ? selectedPipelineStageIds : undefined
+      };
+      debouncedPreview(criteriaWithPipelineStages);
     }
-  }, [criteria, isOpen, debouncedPreview]);
+  }, [criteria, selectedPipelineStageIds, isOpen, debouncedPreview]);
 
 
   useEffect(() => {
@@ -320,7 +371,8 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
           description: formData.description.trim(),
           criteria: {
             ...criteria,
-            excludedContactIds
+            excludedContactIds,
+            pipelineStageIds: selectedPipelineStageIds.length > 0 ? selectedPipelineStageIds : undefined
           }
         })
       });
@@ -426,6 +478,21 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
     );
   }
 
+  const hasDateFilters = !!(criteria.created_after || criteria.created_before);
+  const hasTagFilters = (criteria.tags?.length ?? 0) > 0;
+  const hasPipelineFilters = selectedPipelineStageIds.length > 0;
+
+  const getDateSummary = () => {
+    if (criteria.created_after && criteria.created_before) {
+      return `${new Date(criteria.created_after).toLocaleDateString()} - ${new Date(criteria.created_before).toLocaleDateString()}`;
+    } else if (criteria.created_after) {
+      return `After ${new Date(criteria.created_after).toLocaleDateString()}`;
+    } else if (criteria.created_before) {
+      return `Before ${new Date(criteria.created_before).toLocaleDateString()}`;
+    }
+    return 'No date filter';
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => {
@@ -437,7 +504,7 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
           onClose();
         }
       }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
@@ -456,7 +523,11 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder={t('segments.edit.name_placeholder', 'e.g., VIP Customers, New Leads')}
                   required
+                  maxLength={100}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.name.length}/100 characters
+                </p>
               </div>
 
               <div>
@@ -467,7 +538,11 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder={t('segments.edit.description_placeholder', 'Describe this segment...')}
                   rows={2}
+                  maxLength={500}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.description.length}/500 characters
+                </p>
               </div>
             </div>
 
@@ -475,210 +550,260 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
 
             {/* Filter Criteria */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">{t('segments.edit.filter_criteria_title', 'Filter Criteria')}</h3>
+              <h3 className="text-lg font-semibold">{t('segments.edit.filter_criteria_title', 'Filter Criteria')}</h3>
 
-              {/* Tags */}
-              <div className="space-y-2">
-                <Label>{t('segments.edit.contact_tags_label', 'Contact Tags')}</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    placeholder={t('segments.edit.tag_placeholder', 'Add a tag...')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addTag();
+              {/* Date Range Filters */}
+              <FilterSection
+                title={t('segments.edit.date_range_filters', 'Date Range Filters')}
+                icon={<Calendar className="w-4 h-4" />}
+                summary={getDateSummary()}
+                isActive={hasDateFilters}
+                defaultExpanded={false}
+                color="blue"
+              >
+                <div className="space-y-3">
+                  <div className="flex gap-2 mb-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const date = new Date();
+                        date.setDate(date.getDate() - 30);
+                        setCriteria(prev => ({ ...prev, created_after: date.toISOString().split('T')[0] }));
+                      }}
+                    >
+                      Last 30 days
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const date = new Date();
+                        date.setDate(date.getDate() - 90);
+                        setCriteria(prev => ({ ...prev, created_after: date.toISOString().split('T')[0] }));
+                      }}
+                    >
+                      Last 90 days
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const date = new Date();
+                        date.setMonth(0, 1);
+                        setCriteria(prev => ({ ...prev, created_after: date.toISOString().split('T')[0] }));
+                      }}
+                    >
+                      This year
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="created_after" className="text-sm">{t('segments.edit.created_after_label', 'Created After')}</Label>
+                      <Input
+                        id="created_after"
+                        type="date"
+                        value={criteria.created_after}
+                        onChange={(e) => setCriteria(prev => ({ ...prev, created_after: e.target.value }))}
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="created_before" className="text-sm">{t('segments.edit.created_before_label', 'Created Before')}</Label>
+                      <Input
+                        id="created_before"
+                        type="date"
+                        value={criteria.created_before}
+                        onChange={(e) => setCriteria(prev => ({ ...prev, created_before: e.target.value }))}
+                        className="mt-1.5"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </FilterSection>
+
+              {/* Tag Filters */}
+              <FilterSection
+                title={t('segments.edit.tag_filters', 'Tag Filters')}
+                icon={<Tag className="w-4 h-4" />}
+                summary={hasTagFilters ? `${criteria.tags?.length} tags selected` : 'No tags'}
+                isActive={hasTagFilters}
+                defaultExpanded={false}
+                color="purple"
+              >
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      placeholder={t('segments.edit.tag_placeholder', 'Add a tag...')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addTag();
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <Button type="button" onClick={addTag} size="sm">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {(criteria.tags?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {(criteria.tags ?? []).map((tag) => (
+                        <Badge key={tag} variant="secondary" className="flex items-center gap-1.5 bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-900">
+                          <Tag className="w-3 h-3" />
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeTag(tag);
+                            }}
+                            className="ml-1 hover:text-destructive transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    💡 {t('segments.edit.tags_description', 'Contacts must have ALL selected tags')}
+                  </p>
+                </div>
+              </FilterSection>
+
+              {/* Pipeline Stage Filters */}
+              <FilterSection
+                title={t('segments.edit.pipeline_stage_filters', 'Pipeline Stage Filters')}
+                icon={<Target className="w-4 h-4" />}
+                summary={hasPipelineFilters ? `${selectedPipelineStageIds.length} stages selected` : 'No pipeline filter'}
+                isActive={hasPipelineFilters}
+                defaultExpanded={false}
+                color="green"
+              >
+                <div className="space-y-3">
+                  <Select
+                    value={undefined}
+                    onValueChange={(value) => {
+                      if (value && !selectedPipelineStageIds.includes(parseInt(value))) {
+                        setSelectedPipelineStageIds([...selectedPipelineStageIds, parseInt(value)]);
                       }
                     }}
-                  />
-                  <Button type="button" onClick={addTag} size="sm">
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('segments.edit.pipeline_stage_placeholder', 'Select pipeline stages')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pipelineStages
+                        .filter(stage => !selectedPipelineStageIds.includes(stage.id))
+                        .map((stage) => (
+                          <SelectItem key={stage.id} value={stage.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <div style={{ backgroundColor: stage.color }} className="w-3 h-3 rounded-full" />
+                              <span>{stage.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedPipelineStageIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPipelineStageIds.map((stageId) => {
+                        const stage = pipelineStages.find(s => s.id === stageId);
+                        return stage ? (
+                          <Badge key={stageId} variant="secondary" className="flex items-center gap-1.5 bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-900">
+                            <div style={{ backgroundColor: stage.color }} className="w-3 h-3 rounded-full" />
+                            {stage.name}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedPipelineStageIds(selectedPipelineStageIds.filter(id => id !== stageId));
+                              }}
+                              className="ml-1 hover:text-destructive transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    💡 {t('segments.edit.pipeline_stage_description', 'Contacts with deals in any of the selected stages will be included')}
+                  </p>
                 </div>
+              </FilterSection>
 
-                {(criteria.tags?.length ?? 0) > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(criteria.tags ?? []).map((tag) => (
-                      <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                        <Tag className="w-3 h-3" />
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            removeTag(tag);
-                          }}
-                          className="ml-1 hover:text-destructive"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
+              {/* Warning when contactIds are combined with other criteria */}
+              {hasContactIds && ((criteria.tags?.length ?? 0) > 0 || criteria.created_after || criteria.created_before) && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h5 className="text-sm font-medium text-amber-800 mb-1">
+                        {t('segments.edit.and_logic_warning_title', 'Filter Combination Notice')}
+                      </h5>
+                      <p className="text-sm text-amber-700">
+                        {t('segments.edit.and_logic_warning_message', 'This segment includes specific contacts (contactIds) that are combined with tags and date filters using AND logic. Only contacts that match ALL specified conditions will be included in the segment.')}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="created_after">{t('segments.edit.created_after_label', 'Created After')}</Label>
-                  <Input
-                    id="created_after"
-                    type="date"
-                    value={criteria.created_after}
-                    onChange={(e) => setCriteria(prev => ({ ...prev, created_after: e.target.value }))}
-                  />
                 </div>
-                <div>
-                  <Label htmlFor="created_before">{t('segments.edit.created_before_label', 'Created Before')}</Label>
-                  <Input
-                    id="created_before"
-                    type="date"
-                    value={criteria.created_before}
-                    onChange={(e) => setCriteria(prev => ({ ...prev, created_before: e.target.value }))}
-                  />
-                </div>
-              </div>
+              )}
 
             </div>
 
             <Separator />
 
-            {/* Contact Preview Table */}
+            {/* Contact Preview */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  {t('segments.edit.contact_preview_title', 'Contact Preview')}
-                </h4>
-                {effectiveContactCount !== null && (
-                  <div className="text-sm text-muted-foreground">
-                    {hasMoreContacts ? (
-                      <>{t('segments.edit.showing_first_50', 'Showing first 50 of')} <strong>{effectiveContactCount}</strong> {t('segments.edit.unique_contacts', 'unique contacts')}</>
-                    ) : (
-                      <><strong>{effectiveContactCount}</strong> {t('segments.edit.unique_contacts_match_criteria', 'unique contacts match these criteria')}</>
-                    )}
-                    {excludedContactIds.length > 0 && (
-                      <span className="text-orange-600 ml-2">
-                        ({excludedContactIds.length} {t('segments.edit.excluded', 'excluded')})
-                      </span>
-                    )}
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {t('segments.edit.deduplication_note', 'Note: Duplicates by phone number are automatically removed. Counts reflect unique phone numbers.')}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <h4 className="font-semibold flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                {t('segments.edit.contact_preview_title', 'Contact Preview')}
+              </h4>
+
+              {effectiveContactCount !== null && effectiveContactCount > 0 && (
+                <SegmentSummary
+                  totalContacts={effectiveContactCount}
+                  excludedCount={excludedContactIds.length}
+                  invalidCount={invalidPhoneContacts.length}
+                />
+              )}
+
+              {effectiveContactCount !== null && (
+                <div className="text-sm text-muted-foreground">
+                  {hasMoreContacts ? (
+                    <p>📊 {t('segments.edit.showing_first_50', 'Showing first 50 of')} <strong>{effectiveContactCount}</strong> {t('segments.edit.unique_contacts', 'unique contacts')}</p>
+                  ) : (
+                    <p>📊 <strong>{effectiveContactCount}</strong> {t('segments.edit.unique_contacts_match_criteria', 'unique contacts match these criteria')}</p>
+                  )}
+                  <p className="text-xs mt-1">
+                    💡 {t('segments.edit.deduplication_note', 'Note: Duplicates by phone number are automatically removed. Counts reflect unique phone numbers.')}
+                  </p>
+                </div>
+              )}
 
               {isPreviewLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t('segments.edit.loading_preview', 'Loading contact preview...')}
-                  </div>
+                <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
+                  <p className="text-sm text-muted-foreground">{t('segments.edit.loading_preview', 'Loading contact preview...')}</p>
                 </div>
               ) : filteredContacts.length > 0 ? (
-                <div className="border rounded-lg max-h-80 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t('segments.edit.table.contact_name', 'Contact Name')}</TableHead>
-                        <TableHead>{t('segments.edit.table.phone', 'Phone')}</TableHead>
-                        <TableHead>{t('segments.edit.table.email', 'Email')}</TableHead>
-                        <TableHead>{t('segments.edit.table.tags', 'Tags')}</TableHead>
-                        <TableHead>{t('segments.edit.table.created', 'Created')}</TableHead>
-                        <TableHead>{t('segments.edit.table.last_activity', 'Last Activity')}</TableHead>
-                        <TableHead className="w-20">{t('segments.edit.table.actions', 'Actions')}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredContacts.map((contact) => (
-                        <TableRow key={contact.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4 text-muted-foreground" />
-                              {contact.name || t('segments.edit.table.unknown', 'Unknown')}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Phone className="w-4 h-4 text-muted-foreground" />
-                              {contact.phone}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {contact.email ? (
-                              <div className="flex items-center gap-2">
-                                <Mail className="w-4 h-4 text-muted-foreground" />
-                                {contact.email}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {contact.tags && contact.tags.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {contact.tags.slice(0, 2).map((tag: string, index: number) => (
-                                  <Badge key={index} variant="outline" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {contact.tags.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{contact.tags.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-muted-foreground" />
-                              <span className="text-sm">
-                                {new Date(contact.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {contact.lastActivity ? (
-                              <div className="flex items-center gap-2">
-                                <Activity className="w-4 h-4 text-green-500" />
-                                <span className="text-sm">
-                                  {new Date(contact.lastActivity).toLocaleDateString()}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <Activity className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">{t('segments.edit.table.no_activity', 'No activity')}</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleExcludeContact(contact.id);
-                              }}
-                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              title={t('segments.edit.exclude_contact_tooltip', 'Exclude contact from segment')}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="max-h-96 overflow-y-auto">
+                  <ContactPreviewTable
+                    contacts={filteredContacts}
+                    onExclude={handleExcludeContact}
+                  />
                 </div>
               ) : contactPreview.length > 0 && filteredContacts.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
@@ -720,9 +845,9 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
 
               {/* Excluded Contacts Section */}
               {excludedContactIds.length > 0 && (
-                <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-orange-800">
+                    <h5 className="text-sm font-medium text-orange-800 dark:text-orange-400">
                       {t('segments.edit.excluded_contacts_title', 'Excluded Contacts')} ({excludedContactIds.length})
                     </h5>
                     <Button
@@ -735,7 +860,7 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
                         setExcludedContactIds([]);
                         setExcludedContactDetails([]);
                       }}
-                      className="text-orange-700 border-orange-300 hover:bg-orange-100"
+                      className="text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-900 hover:bg-orange-100 dark:hover:bg-orange-900/30"
                     >
                       <Undo2 className="w-4 h-4 mr-1" />
                       {t('segments.edit.restore_all', 'Restore All')}
@@ -745,9 +870,9 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
                     {excludedContactDetails.map((excludedContact) => (
                       <div
                         key={excludedContact.id}
-                        className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-orange-200"
+                        className="flex items-center gap-2 bg-card px-2 py-1 rounded border border-orange-200"
                       >
-                        <span className="text-sm text-orange-800">
+                        <span className="text-sm text-orange-800 dark:text-orange-400">
                           {excludedContact.name || excludedContact.phone || `Contact ${excludedContact.id}`}
                         </span>
                         <Button
@@ -759,7 +884,7 @@ export function EditSegmentModal({ isOpen, onClose, segmentId, onSegmentUpdated 
                             e.stopPropagation();
                             handleUndoExclusion(excludedContact.id);
                           }}
-                          className="h-5 w-5 p-0 text-orange-600 hover:text-orange-800"
+                          className="h-5 w-5 p-0 text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300"
                           title={t('segments.edit.restore_contact_tooltip', 'Restore contact')}
                         >
                           <Undo2 className="w-3 h-3" />

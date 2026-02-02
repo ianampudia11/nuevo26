@@ -10,7 +10,6 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  ExternalLink,
   Trash2
 } from 'lucide-react';
 import {
@@ -126,8 +125,8 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
 
   return (
     <div className={cn(
-      "node-whatsapp-cta-url p-3 rounded-lg bg-white border border-green-200 shadow-sm min-w-[400px] max-w-[500px] group",
-      hasErrors ? "border-red-300" : ""
+      "node-whatsapp-cta-url p-3 rounded-lg bg-card border border-border shadow-sm min-w-[400px] max-w-[500px] group",
+      hasErrors ? "border-destructive" : ""
     )}>
       {/* Input Handles */}
       <Handle
@@ -175,10 +174,10 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
       {/* Node Header */}
       <div className="font-medium flex items-center gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <ExternalLink className="h-4 w-4 text-green-600" />
+          <img src="https://cdn-icons-png.flaticon.com/128/3305/3305847.png" alt="WhatsApp CTA URL" className="h-4 w-4" />
           <span className="text-sm">{t('whatsapp_cta_url.node_title', 'WhatsApp CTA URL')}</span>
         </div>
-        <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border border-primary/20">
           {t('whatsapp_interactive.official_api', 'Official API')}
         </Badge>
         <button
@@ -201,9 +200,9 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
 
       {/* Error Indicator */}
       {hasErrors && (
-        <div className="flex items-center gap-2 mb-3 p-2 bg-red-50 border border-red-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-red-500" />
-          <span className="text-sm text-red-700">Please fix the errors below</span>
+        <div className="flex items-center gap-2 mb-3 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-sm text-destructive">Please fix the errors below</span>
         </div>
       )}
 
@@ -211,29 +210,29 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
       {!isEditing && (
         <div className="space-y-3">
           {/* WhatsApp Message Preview */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
             {headerText && (
-              <div className="font-medium text-sm text-gray-800 mb-2">
+              <div className="font-medium text-sm text-foreground mb-2">
                 {headerText}
               </div>
             )}
-            <div className="text-sm text-gray-700 mb-3">
+            <div className="text-sm text-foreground mb-3">
               {bodyText}
             </div>
             <div className="space-y-2">
-              <div className="border border-green-300 rounded-md p-2 text-center text-sm bg-white hover:bg-green-50 transition-colors relative flex items-center justify-center gap-2">
-                <ExternalLink className="h-4 w-4" />
+              <div className="border border-primary/20 rounded-md p-2 text-center text-sm bg-card hover:bg-primary/10 transition-colors relative flex items-center justify-center gap-2">
+                <img src="https://cdn-icons-png.flaticon.com/128/3305/3305847.png" alt="CTA" className="h-4 w-4" />
                 {displayText}
               </div>
             </div>
             {footerText && (
-              <div className="text-xs text-gray-500 mt-3">
+              <div className="text-xs text-muted-foreground mt-3">
                 {footerText}
               </div>
             )}
           </div>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {t('whatsapp_cta_url.url_configured', `URL: ${url}`)}
           </div>
         </div>
@@ -246,19 +245,19 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_interactive.header_text', 'Header Text')}
-              <span className="text-gray-500 ml-1">({t('common.optional', 'Optional')})</span>
+              <span className="text-muted-foreground ml-1">({t('common.optional', 'Optional')})</span>
             </Label>
             <Input
               value={headerText}
               onChange={(e) => setHeaderText(e.target.value)}
               placeholder={t('whatsapp_interactive.header_placeholder', 'Optional header text...')}
-              className={cn("text-xs", errors.headerText && "border-red-300")}
+              className={cn("text-xs", errors.headerText && "border-destructive")}
               maxLength={60}
             />
             {errors.headerText && (
-              <p className="text-xs text-red-500">{errors.headerText}</p>
+              <p className="text-xs text-destructive">{errors.headerText}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {headerText.length}/60 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -267,19 +266,19 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_interactive.body_text', 'Body Text')}
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-destructive ml-1">*</span>
             </Label>
             <Textarea
               value={bodyText}
               onChange={(e) => setBodyText(e.target.value)}
               placeholder={t('whatsapp_cta_url.body_placeholder', 'Enter your message text...')}
-              className={cn("text-xs min-h-[60px]", errors.bodyText && "border-red-300")}
+              className={cn("text-xs min-h-[60px]", errors.bodyText && "border-destructive")}
               maxLength={1024}
             />
             {errors.bodyText && (
-              <p className="text-xs text-red-500">{errors.bodyText}</p>
+              <p className="text-xs text-destructive">{errors.bodyText}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {bodyText.length}/1024 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -288,19 +287,19 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_interactive.footer_text', 'Footer Text')}
-              <span className="text-gray-500 ml-1">({t('common.optional', 'Optional')})</span>
+              <span className="text-muted-foreground ml-1">({t('common.optional', 'Optional')})</span>
             </Label>
             <Input
               value={footerText}
               onChange={(e) => setFooterText(e.target.value)}
               placeholder={t('whatsapp_interactive.footer_placeholder', 'Optional footer text...')}
-              className={cn("text-xs", errors.footerText && "border-red-300")}
+              className={cn("text-xs", errors.footerText && "border-destructive")}
               maxLength={60}
             />
             {errors.footerText && (
-              <p className="text-xs text-red-500">{errors.footerText}</p>
+              <p className="text-xs text-destructive">{errors.footerText}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {footerText.length}/60 {t('common.characters', 'characters')}
             </p>
           </div>
@@ -309,18 +308,18 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_cta_url.button_text', 'Button Text')}
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-destructive ml-1">*</span>
             </Label>
             <Input
               value={displayText}
               onChange={(e) => setDisplayText(e.target.value)}
               placeholder={t('whatsapp_cta_url.button_placeholder', 'Enter button text...')}
-              className={cn("text-xs", errors.displayText && "border-red-300")}
+              className={cn("text-xs", errors.displayText && "border-destructive")}
             />
             {errors.displayText && (
-              <p className="text-xs text-red-500">{errors.displayText}</p>
+              <p className="text-xs text-destructive">{errors.displayText}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {new Blob([displayText]).size}/20 bytes
             </p>
           </div>
@@ -329,16 +328,16 @@ const WhatsAppCTAURLNode: React.FC<WhatsAppCTAURLNodeProps> = ({ id, data, isCon
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_cta_url.url', 'URL')}
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-destructive ml-1">*</span>
             </Label>
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com"
-              className={cn("text-xs", errors.url && "border-red-300")}
+              className={cn("text-xs", errors.url && "border-destructive")}
             />
             {errors.url && (
-              <p className="text-xs text-red-500">{errors.url}</p>
+              <p className="text-xs text-destructive">{errors.url}</p>
             )}
           </div>
         </div>

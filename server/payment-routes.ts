@@ -4,6 +4,28 @@ import Stripe from "stripe";
 import paypal from "@paypal/checkout-server-sdk";
 import { affiliateService } from "./services/affiliate-service";
 
+const PAYSTACK_SUPPORTED_CURRENCIES = ['NGN', 'GHS', 'ZAR', 'USD'];
+
+/**
+ * Validates that the originUrl is safe to use
+ * Ensures it's a valid URL with http/https protocol and prevents open redirects
+ */
+function validateOriginUrl(originUrl: string): string | null {
+  try {
+    const url = new URL(originUrl);
+    
+
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return null;
+    }
+    
+
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
 
 
 const ensureAuthenticated = (req: Request, res: Response, next: NextFunction) => {
@@ -70,6 +92,16 @@ export function registerPaymentRoutes(app: Express) {
           name: 'PayPal',
           description: 'Pay with PayPal',
           testMode: (paypalSettingObj.value as any).testMode
+        });
+      }
+
+      const paystackSettingObj = await storage.getAppSetting('payment_paystack');
+      if (paystackSettingObj?.value && (paystackSettingObj.value as any).enabled) {
+        paymentMethods.push({
+          id: 'paystack',
+          name: 'Paystack',
+          description: 'Pay securely via Paystack',
+          testMode: (paystackSettingObj.value as any).testMode
         });
       }
 
@@ -236,7 +268,20 @@ export function registerPaymentRoutes(app: Express) {
         paymentMethod: 'mercadopago'
       });
 
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+      let baseUrl = `${req.protocol}://${req.get('host')}`;
+      if (req.body.originUrl) {
+        const validatedUrl = validateOriginUrl(req.body.originUrl);
+        if (validatedUrl) {
+          baseUrl = validatedUrl;
+        } else {
+          console.warn('Invalid originUrl provided, falling back to request URL');
+        }
+      }
+      
+
+
+      
       const preferenceData = {
         items: [
           {
@@ -244,7 +289,7 @@ export function registerPaymentRoutes(app: Express) {
             description: plan.description || 'Subscription plan',
             quantity: 1,
             currency_id: defaultCurrency.toUpperCase(),
-            unit_price: plan.price
+            unit_price: Number(plan.price)
           }
         ],
         back_urls: {
@@ -252,13 +297,13 @@ export function registerPaymentRoutes(app: Express) {
           failure: `${baseUrl}/payment/cancel?source=mercadopago&transaction_id=${transaction.id}`,
           pending: `${baseUrl}/payment/pending?source=mercadopago&transaction_id=${transaction.id}`
         },
-        auto_return: 'approved',
+        auto_return: 'all',
         external_reference: transaction.id.toString(),
         notification_url: `${baseUrl}/api/webhooks/mercadopago`
       };
+      
 
-      
-      
+
 
       let responseData;
 
@@ -347,16 +392,32 @@ export function registerPaymentRoutes(app: Express) {
 
       const paypalSettings = paypalSettingObj.value as any;
 
+
+      const clientId = (paypalSettings.clientId || '').trim();
+      const clientSecret = (paypalSettings.clientSecret || '').trim();
+
+
+      if (!clientId || !clientSecret) {
+        console.error('PayPal credentials validation failed:', {
+          hasClientId: !!paypalSettings.clientId,
+          hasClientSecret: !!paypalSettings.clientSecret,
+          clientIdLength: clientId?.length || 0,
+          clientSecretLength: clientSecret?.length || 0,
+          testMode: paypalSettings.testMode
+        });
+        return res.status(400).json({ error: "Invalid PayPal credentials. Please check your PayPal settings." });
+      }
+
       let environment;
       if (paypalSettings.testMode) {
         environment = new paypal.core.SandboxEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
+          clientId,
+          clientSecret
         );
       } else {
         environment = new paypal.core.LiveEnvironment(
-          paypalSettings.clientId,
-          paypalSettings.clientSecret
+          clientId,
+          clientSecret
         );
       }
 
@@ -397,8 +458,26 @@ export function registerPaymentRoutes(app: Express) {
           brand_name: 'AppName',
           landing_page: 'BILLING',
           user_action: 'PAY_NOW',
-          return_url: `${req.protocol}://${req.get('host')}/payment/success?source=paypal&transaction_id=${transaction.id}`,
-          cancel_url: `${req.protocol}://${req.get('host')}/payment/cancel?source=paypal&transaction_id=${transaction.id}`
+          return_url: `${(() => {
+            let baseUrl = `${req.protocol}://${req.get('host')}`;
+            if (req.body.originUrl) {
+              const validatedUrl = validateOriginUrl(req.body.originUrl);
+              if (validatedUrl) {
+                baseUrl = validatedUrl;
+              }
+            }
+            return baseUrl;
+          })()}/payment/success?source=paypal&transaction_id=${transaction.id}`,
+          cancel_url: `${(() => {
+            let baseUrl = `${req.protocol}://${req.get('host')}`;
+            if (req.body.originUrl) {
+              const validatedUrl = validateOriginUrl(req.body.originUrl);
+              if (validatedUrl) {
+                baseUrl = validatedUrl;
+              }
+            }
+            return baseUrl;
+          })()}/payment/cancel?source=paypal&transaction_id=${transaction.id}`
         }
       });
 
@@ -418,6 +497,101 @@ export function registerPaymentRoutes(app: Express) {
     } catch (error) {
       console.error("Error creating PayPal checkout session:", error);
       res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  app.post("/api/payment/checkout/paystack", ensureAuthenticated, async (req: any, res) => {
+    try {
+      const { planId } = req.body;
+
+      if (!planId) {
+        return res.status(400).json({ error: "Plan ID is required" });
+      }
+
+      const plan = await storage.getPlan(planId);
+      if (!plan) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+
+      const paystackSettingObj = await storage.getAppSetting('payment_paystack');
+      if (!paystackSettingObj || !paystackSettingObj.value || !(paystackSettingObj.value as any).enabled) {
+        return res.status(400).json({ error: "Paystack is not configured" });
+      }
+
+      const paystackSettings = paystackSettingObj.value as any;
+      const defaultCurrency = (await getDefaultCurrency()).toUpperCase();
+
+      if (!PAYSTACK_SUPPORTED_CURRENCIES.includes(defaultCurrency)) {
+        return res.status(400).json({
+          error: `Currency ${defaultCurrency} is not supported by Paystack. Supported currencies: ${PAYSTACK_SUPPORTED_CURRENCIES.join(', ')}`
+        });
+      }
+
+      const transaction = await storage.createPaymentTransaction({
+        companyId: req.user.companyId,
+        planId,
+        amount: plan.price,
+        currency: defaultCurrency,
+        status: 'pending',
+        paymentMethod: 'paystack'
+      });
+
+
+      let baseUrl = `${req.protocol}://${req.get('host')}`;
+      if (req.body.originUrl) {
+        const validatedUrl = validateOriginUrl(req.body.originUrl);
+        if (validatedUrl) {
+          baseUrl = validatedUrl;
+        } else {
+          console.warn('Invalid originUrl provided for Paystack, falling back to request URL');
+        }
+      }
+      const callbackUrl = `${baseUrl}/payment/success?source=paystack&transaction_id=${transaction.id}`;
+      const reference = `PC-${transaction.id}-${Date.now()}`;
+
+      const initResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${paystackSettings.secretKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: req.user.email || req.user.companyEmail || 'no-email@powerchatplus.local',
+          amount: Math.round(Number(plan.price) * 100),
+          currency: defaultCurrency,
+          reference,
+          callback_url: callbackUrl,
+          metadata: {
+            transactionId: transaction.id,
+            planId,
+            companyId: req.user.companyId
+          }
+        })
+      });
+
+      const initData = await initResponse.json().catch(() => ({}));
+      if (!initResponse.ok || !initData?.data?.authorization_url) {
+        const apiMessage = initData?.message || initResponse.statusText;
+        console.error('Paystack initialize error:', initData);
+        return res.status(500).json({ error: `Failed to initialize Paystack payment: ${apiMessage}` });
+      }
+
+      await storage.updatePaymentTransaction(transaction.id, {
+        paymentIntentId: reference,
+        externalTransactionId: initData.data.reference
+      });
+
+      res.json({
+        checkoutUrl: initData.data.authorization_url,
+        reference: initData.data.reference,
+        transactionId: transaction.id
+      });
+    } catch (error) {
+      console.error("Error creating Paystack checkout session:", error);
+      res.status(500).json({
+        error: "Failed to create checkout session",
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -649,7 +823,7 @@ export function registerPaymentRoutes(app: Express) {
 
         const stripeSettings = stripeSettingObj.value as any;
         const stripe = new Stripe(stripeSettings.secretKey, {
-          apiVersion: '2025-08-27.basil'
+          apiVersion: '2025-09-30.clover' as any
         });
 
         const session = await stripe.checkout.sessions.retrieve(session_id);
@@ -767,6 +941,110 @@ export function registerPaymentRoutes(app: Express) {
         });
       }
 
+      if (source === 'paystack' && transaction.paymentMethod === 'paystack') {
+        const paystackSettingObj = await storage.getAppSetting('payment_paystack');
+        if (!paystackSettingObj || !paystackSettingObj.value) {
+          return res.status(400).json({ error: "Paystack is not configured" });
+        }
+
+        const paystackSettings = paystackSettingObj.value as any;
+        const reference = transaction.paymentIntentId || transaction.externalTransactionId;
+
+        if (!reference) {
+          return res.status(400).json({
+            error: "Missing Paystack reference for verification"
+          });
+        }
+
+        const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+          headers: {
+            'Authorization': `Bearer ${paystackSettings.secretKey}`
+          }
+        });
+
+        const verifyData = await verifyResponse.json().catch(() => ({}));
+        if (!verifyResponse.ok) {
+          const apiMessage = verifyData?.message || verifyResponse.statusText;
+          return res.status(400).json({ error: `Failed to verify Paystack payment: ${apiMessage}` });
+        }
+
+        const paystackStatus = verifyData?.data?.status;
+        const paystackReference = verifyData?.data?.reference;
+        const paystackId = verifyData?.data?.id;
+
+        let newStatus: 'pending' | 'completed' | 'failed' | 'cancelled' = transaction.status as any;
+        if (paystackStatus === 'success') {
+          newStatus = 'completed';
+        } else if (paystackStatus === 'failed') {
+          newStatus = 'failed';
+        }
+
+        await storage.updatePaymentTransaction(transaction.id, {
+          status: newStatus,
+          externalTransactionId: paystackReference || transaction.externalTransactionId,
+          paymentIntentId: reference,
+          metadata: {
+            ...(transaction.metadata || {}),
+            paystackId,
+            paystackStatus
+          }
+        });
+
+        if (newStatus === 'completed') {
+          const plan = transaction.planId ? await storage.getPlan(transaction.planId) : null;
+          await storage.updateCompany(req.user.companyId, {
+            planId: transaction.planId,
+            plan: plan?.name.toLowerCase() || 'unknown',
+            subscriptionStatus: 'active',
+            subscriptionStartDate: new Date(),
+            subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            isInTrial: false,
+            trialStartDate: null,
+            trialEndDate: null
+          });
+
+          try {
+            if ((global as any).broadcastToCompany && plan) {
+              (global as any).broadcastToCompany({
+                type: 'plan_updated',
+                data: {
+                  companyId: req.user.companyId,
+                  newPlan: plan.name.toLowerCase(),
+                  planId: transaction.planId,
+                  timestamp: new Date().toISOString(),
+                  changeType: 'payment_upgrade',
+                  subscriptionStatus: 'active',
+                  trialCleared: true
+                }
+              }, req.user.companyId);
+            }
+          } catch (broadcastError) {
+            console.error('Error broadcasting plan update:', broadcastError);
+          }
+
+          try {
+            await affiliateService.processPaymentCommission(transaction.id);
+          } catch (affiliateError) {
+            console.error('Error processing affiliate commission:', affiliateError);
+          }
+
+          return res.json({
+            success: true,
+            status: 'completed',
+            message: "Payment has been verified and subscription activated",
+            source: 'paystack',
+            paymentId: paystackId
+          });
+        }
+
+        return res.json({
+          success: true,
+          status: newStatus,
+          message: paystackStatus ? `Payment is ${paystackStatus}` : 'Payment verification pending',
+          source: 'paystack'
+        });
+      }
+
       if (source === 'stripe' && transaction.paymentMethod === 'stripe') {
         const stripeSettingObj = await storage.getAppSetting('payment_stripe');
         if (!stripeSettingObj || !stripeSettingObj.value) {
@@ -775,7 +1053,7 @@ export function registerPaymentRoutes(app: Express) {
 
         const stripeSettings = stripeSettingObj.value as any;
         const stripe = new Stripe(stripeSettings.secretKey as string, {
-          apiVersion: '2025-08-27.basil'
+          apiVersion: '2025-09-30.clover' as any
         });
 
         if (session_id) {

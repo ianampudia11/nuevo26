@@ -88,7 +88,7 @@ export async function convertAudioForWhatsAppWithFallback(
         outputPath,
         format: formatConfig.format as any,
         bitrate: '64k',
-        sampleRate: 8000,
+        sampleRate: 48000,
         channels: 1,
         quality: undefined
       });
@@ -171,7 +171,7 @@ export async function convertAudioForWhatsApp(
       outputPath,
       format: outputFormat,
       bitrate: '64k',
-      sampleRate: 8000,
+      sampleRate: 48000,
       channels: 1,
       quality: undefined
     });
@@ -223,9 +223,16 @@ export async function convertAudio(options: AudioConversionOptions): Promise<Aud
         return reject(new Error(`Unsupported audio format: ${format}`));
     }
     
+
+    let finalSampleRate = sampleRate;
+    if (format === 'ogg' && sampleRate !== 48000) {
+      console.warn(`Warning: OGG Opus format should use 48000 Hz sample rate for WhatsApp compatibility. Adjusting from ${sampleRate} Hz to 48000 Hz.`);
+      finalSampleRate = 48000;
+    }
+    
     command = command
       .audioBitrate(bitrate)
-      .audioFrequency(sampleRate)
+      .audioFrequency(finalSampleRate)
       .audioChannels(channels)
       .format(format === 'm4a' ? 'mp4' : format);
     
@@ -256,7 +263,7 @@ export async function convertAudio(options: AudioConversionOptions): Promise<Aud
             duration: 0,
             format: format,
             bitrate: bitrate,
-            sampleRate: sampleRate,
+            sampleRate: finalSampleRate,
             channels: channels,
             size: stats.size
           };
@@ -266,7 +273,7 @@ export async function convertAudio(options: AudioConversionOptions): Promise<Aud
             duration: 0,
             format: format,
             bitrate: bitrate,
-            sampleRate: sampleRate,
+            sampleRate: finalSampleRate,
             channels: channels,
             size: 0
           });
@@ -321,7 +328,7 @@ export function getBestWhatsAppFormat(): { format: string; extension: string; co
     format: 'ogg',
     extension: '.ogg',
     codec: 'opus',
-    mimeType: 'audio/ogg; codecs=opus'
+    mimeType: 'audio/ogg'
   };
 }
 
@@ -335,7 +342,7 @@ export function getWhatsAppFallbackFormats(): Array<{ format: string; extension:
       format: 'ogg',
       extension: '.ogg',
       codec: 'opus',
-      mimeType: 'audio/ogg; codecs=opus'
+      mimeType: 'audio/ogg'
     },
     {
       format: 'm4a',
@@ -380,7 +387,7 @@ export function getWhatsAppMimeType(format: string): string {
     case 'mp3':
       return 'audio/mpeg';
     case 'ogg':
-      return 'audio/ogg; codecs=opus';
+      return 'audio/ogg';
     case 'aac':
       return 'audio/aac';
     case 'm4a':

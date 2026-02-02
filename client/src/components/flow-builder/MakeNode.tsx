@@ -10,7 +10,6 @@ import {
   Loader2,
   Play,
   Trash2,
-  Zap,
   X,
   HelpCircle,
   Copy,
@@ -76,7 +75,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
       description: t('flow_builder.make_description', 'Execute Make.com scenario with multimedia support'),
       tooltip: t('flow_builder.make_tooltip', 'Execute a Make.com scenario with AI chat capabilities. Supports text, images, videos, audio, and documents. Perfect for AI agents, chatbots, and conversational workflows.'),
       icon: '⚡',
-      color: 'text-blue-600'
+      color: 'text-primary'
     }
   ];
 
@@ -143,7 +142,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
 
   const getOperationColor = (op: string) => {
     const operationData = MAKE_OPERATIONS.find(operation => operation.id === op);
-    return operationData?.color || 'text-gray-600';
+    return operationData?.color || 'text-muted-foreground';
   };
 
   const copyToClipboard = async (text: string, fieldName: string) => {
@@ -337,7 +336,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
 
 
   return (
-    <div className="node-make p-3 rounded-lg bg-white border border-blue-200 shadow-sm min-w-[380px] max-w-[480px] group">
+    <div className="node-make p-3 rounded-lg bg-card border border-border shadow-sm min-w-[380px] max-w-[480px] group">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -362,14 +361,18 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
         type="target"
         position={Position.Left}
         isConnectable={isConnectable}
-        className="w-3 h-3 bg-blue-400 border-2 border-white"
+        className="w-3 h-3 bg-primary border-2 border-background"
       />
 
       <div className="font-medium flex items-center gap-2 mb-2">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Zap className="h-4 w-4 text-blue-600" />
+              <img 
+                src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.75.0/files/dark/make-color.png" 
+                alt="Make.com" 
+                className="h-4 w-4"
+              />
             </TooltipTrigger>
             <TooltipContent side="top">
               <p className="text-xs">{t('flow_builder.make_integration', 'Make.com Workflow Automation Integration')}</p>
@@ -386,7 +389,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                 variant={configurationProgress >= 70 ? "default" : "secondary"}
                 className={cn(
                   "text-[10px] px-1.5 py-0.5",
-                  configurationProgress >= 70 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                  configurationProgress >= 70 ? "bg-primary/10 text-primary border border-primary/20" : "bg-secondary/10 text-secondary border border-secondary/20"
                 )}
               >
                 {configurationProgress}% configured
@@ -419,7 +422,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
         </TooltipProvider>
       </div>
 
-      <div className="text-sm p-2 bg-secondary/40 rounded border border-border">
+      <div className="text-sm p-2  rounded border border-border">
         <div className="flex items-center gap-1 mb-1">
           <TooltipProvider>
             <Tooltip>
@@ -445,9 +448,9 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-1">
                   {scenarioName || webhookUrl ? (
-                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <CheckCircle className="h-3 w-3 text-primary" />
                   ) : (
-                    <AlertCircle className="h-3 w-3 text-yellow-600" />
+                    <AlertCircle className="h-3 w-3 text-secondary" />
                   )}
                   <span className="text-xs text-muted-foreground truncate">
                     {scenarioName || webhookUrl ? t('flow_builder.make_configured', 'Configured') : t('flow_builder.make_not_configured', 'Not configured')}
@@ -471,7 +474,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded cursor-help">
+                  <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded cursor-help">
                     {t('flow_builder.make_scenario_label', 'Scenario:')} {scenarioName.length > 12 ? scenarioName.slice(0, 12) + '...' : scenarioName}
                   </Badge>
                 </TooltipTrigger>
@@ -486,7 +489,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="text-[10px] bg-green-100 text-green-800 px-1 py-0.5 rounded cursor-help">
+                  <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded cursor-help">
                     {t('flow_builder.make_webhook_connected', 'Webhook Connected')}
                   </Badge>
                 </TooltipTrigger>
@@ -501,7 +504,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className="text-[10px] bg-gray-100 text-gray-800 px-1 py-0.5 rounded cursor-help">
+                <Badge className="text-[10px] bg-muted text-muted-foreground border border-border px-1 py-0.5 rounded cursor-help">
                   {t('flow_builder.make_timeout_label', 'Timeout: {{timeout}}s', { timeout })}
                 </Badge>
               </TooltipTrigger>
@@ -516,7 +519,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="text-[10px] bg-green-100 text-green-800 px-1 py-0.5 rounded cursor-help">
+                  <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded cursor-help">
                     {t('flow_builder.make_multimedia_support', '📎 Media Support')}
                   </Badge>
                 </TooltipTrigger>
@@ -536,10 +539,10 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
       </div>
 
       {isEditing && (
-        <div className="mt-3 text-xs space-y-3 border rounded p-2 bg-secondary/10">
+        <div className="mt-3 text-xs space-y-3 border rounded p-2 ">
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center gap-2 mb-2">
-              <Settings className="h-3.5 w-3.5 text-blue-600" />
+              <Settings className="h-3.5 w-3.5 text-primary" />
               <Label className="font-medium">{t('flow_builder.make_api_configuration', 'Make.com API Configuration')}</Label>
               <TooltipProvider>
                 <Tooltip>
@@ -580,8 +583,8 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                   }}
                   className={cn(
                     "text-xs h-7 pr-8",
-                    fieldValidation.apiToken?.isValid === false ? "border-red-500" :
-                    fieldValidation.apiToken?.isValid === true ? "border-green-500" : ""
+                    fieldValidation.apiToken?.isValid === false ? "border-destructive" :
+                    fieldValidation.apiToken?.isValid === true ? "border-primary" : ""
                   )}
                 />
                 {apiToken && (
@@ -595,7 +598,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                           onClick={() => copyToClipboard(apiToken, 'apiToken')}
                         >
                           {copiedField === 'apiToken' ? (
-                            <CheckCircle className="h-3 w-3 text-green-600" />
+                            <CheckCircle className="h-3 w-3 text-primary" />
                           ) : (
                             <Copy className="h-3 w-3 text-muted-foreground" />
                           )}
@@ -611,7 +614,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                 )}
               </div>
               {fieldValidation.apiToken?.message && (
-                <p className="text-[10px] text-red-600 mt-1">{fieldValidation.apiToken.message}</p>
+                <p className="text-[10px] text-destructive mt-1">{fieldValidation.apiToken.message}</p>
               )}
             </div>
 
@@ -633,7 +636,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
               <select
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
-                className="w-full text-xs h-7 border border-gray-300 rounded px-2 bg-white"
+                className="w-full text-xs h-7 border border-input rounded px-2 bg-background"
               >
                 <option value="us1">US1 (United States) - Recommended</option>
                 <option value="us2">US2 (United States)</option>
@@ -741,14 +744,14 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                 <div className={cn(
                   "p-3 rounded-md text-xs border",
                   testResult.success
-                    ? "bg-green-50 border-green-200 text-green-800"
-                    : "bg-red-50 border-red-200 text-red-800"
+                    ? "bg-primary/10 border-primary/20 text-primary"
+                    : "bg-destructive/10 border-destructive/20 text-destructive"
                 )}>
                   <div className="flex items-start gap-2">
                     {testResult.success ? (
-                      <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                     ) : (
-                      <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                     )}
                     <div className="flex-1">
                       <div className="font-medium mb-1">
@@ -800,7 +803,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
           {/* Scenario Configuration Section */}
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center gap-2 mb-2">
-              <List className="h-3.5 w-3.5 text-blue-600" />
+              <List className="h-3.5 w-3.5 text-primary" />
               <Label className="font-medium">{t('flow_builder.make_scenario_configuration', 'Scenario Configuration')}</Label>
               <TooltipProvider>
                 <Tooltip>
@@ -838,12 +841,12 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                 }}
                 className={cn(
                   "text-xs h-7",
-                  fieldValidation.scenarioName?.isValid === false ? "border-red-500" :
-                  fieldValidation.scenarioName?.isValid === true ? "border-green-500" : ""
+                  fieldValidation.scenarioName?.isValid === false ? "border-destructive" :
+                  fieldValidation.scenarioName?.isValid === true ? "border-primary" : ""
                 )}
               />
               {fieldValidation.scenarioName?.message && (
-                <p className="text-[10px] text-red-600 mt-1">{fieldValidation.scenarioName.message}</p>
+                <p className="text-[10px] text-destructive mt-1">{fieldValidation.scenarioName.message}</p>
               )}
             </div>
 
@@ -875,7 +878,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
           {/* Webhook URL Configuration Section */}
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center gap-2 mb-2">
-              <ExternalLink className="h-3.5 w-3.5 text-blue-600" />
+              <ExternalLink className="h-3.5 w-3.5 text-primary" />
               <Label className="font-medium">{t('flow_builder.make_webhook_configuration', 'Webhook Configuration')}</Label>
               <Badge variant="secondary" className="text-[9px] px-1 py-0">{t('common.optional', 'Optional')}</Badge>
               <TooltipProvider>
@@ -916,8 +919,8 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                   }}
                   className={cn(
                     "text-xs h-7 pr-8",
-                    fieldValidation.webhookUrl?.isValid === false ? "border-red-500" :
-                    fieldValidation.webhookUrl?.isValid === true ? "border-green-500" : ""
+                    fieldValidation.webhookUrl?.isValid === false ? "border-destructive" :
+                    fieldValidation.webhookUrl?.isValid === true ? "border-primary" : ""
                   )}
                 />
                 {webhookUrl && (
@@ -931,7 +934,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                           onClick={() => copyToClipboard(webhookUrl, 'webhookUrl')}
                         >
                           {copiedField === 'webhookUrl' ? (
-                            <CheckCircle className="h-3 w-3 text-green-600" />
+                            <CheckCircle className="h-3 w-3 text-primary" />
                           ) : (
                             <Copy className="h-3 w-3 text-muted-foreground" />
                           )}
@@ -947,7 +950,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                 )}
               </div>
               {fieldValidation.webhookUrl?.message && (
-                <p className="text-[10px] text-red-600 mt-1">{fieldValidation.webhookUrl.message}</p>
+                <p className="text-[10px] text-destructive mt-1">{fieldValidation.webhookUrl.message}</p>
               )}
             </div>
           </div>
@@ -955,7 +958,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
           {/* Timeout Configuration Section */}
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center gap-2 mb-2">
-              <Settings className="h-3.5 w-3.5 text-blue-600" />
+              <Settings className="h-3.5 w-3.5 text-primary" />
               <Label className="font-medium">{t('flow_builder.make_timeout_configuration', 'Timeout Configuration')}</Label>
               <TooltipProvider>
                 <Tooltip>
@@ -995,12 +998,12 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                 fallbackValue={30}
                 className={cn(
                   "text-xs h-7",
-                  fieldValidation.timeout?.isValid === false ? "border-red-500" :
-                  fieldValidation.timeout?.isValid === true ? "border-green-500" : ""
+                  fieldValidation.timeout?.isValid === false ? "border-destructive" :
+                  fieldValidation.timeout?.isValid === true ? "border-primary" : ""
                 )}
               />
               {fieldValidation.timeout?.message && (
-                <p className="text-[10px] text-red-600 mt-1">{fieldValidation.timeout.message}</p>
+                <p className="text-[10px] text-destructive mt-1">{fieldValidation.timeout.message}</p>
               )}
               <p className="text-[10px] text-muted-foreground mt-1">
                 {t('flow_builder.make_timeout_range_help', 'Range: 1-300 seconds (default: 30)')}
@@ -1009,7 +1012,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
           </div>
 
           {/* Media Configuration Section */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="mt-3 pt-3 border-t border-border">
             <div className="flex items-center gap-2 mb-2">
               <Button
                 variant="ghost"
@@ -1054,7 +1057,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
             </div>
 
             {showMediaConfig && (
-              <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded">
+              <div className="space-y-3 p-3 bg-primary/10 border border-primary/20 rounded">
                 {/* Enable Media Support Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1074,7 +1077,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                     type="checkbox"
                     checked={enableMediaSupport}
                     onChange={(e) => setEnableMediaSupport(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    className="h-4 w-4 text-primary rounded border-input focus:ring-primary"
                   />
                 </div>
 
@@ -1092,7 +1095,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                               onChange={() => toggleMediaType(mediaType.id)}
                               className="h-3 w-3"
                             />
-                            <mediaType.icon className="h-3 w-3 text-blue-600" />
+                            <mediaType.icon className="h-3 w-3 text-primary" />
                             <span className="text-xs">{mediaType.name}</span>
                           </div>
                         ))}
@@ -1137,7 +1140,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                         type="checkbox"
                         checked={includeFileMetadata}
                         onChange={(e) => setIncludeFileMetadata(e.target.checked)}
-                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        className="h-4 w-4 text-primary rounded border-input focus:ring-primary"
                       />
                     </div>
 
@@ -1147,7 +1150,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                       <select
                         value={mediaProcessingMode}
                         onChange={(e) => setMediaProcessingMode(e.target.value)}
-                        className="w-full text-xs h-7 border border-gray-300 rounded px-2 bg-white"
+                        className="w-full text-xs h-7 border border-input rounded px-2 bg-background"
                       >
                         <option value="url">{t('flow_builder.make_url_mode', 'URL Mode')}</option>
                         <option value="base64">{t('flow_builder.make_base64_mode', 'Base64 Mode')}</option>
@@ -1166,7 +1169,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
           </div>
 
           {/* Parameters Configuration Section */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="mt-3 pt-3 border-t border-border">
             <div className="flex items-center gap-2 mb-2">
               <Button
                 variant="ghost"
@@ -1211,7 +1214,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
             </div>
 
             {showParametersConfig && (
-              <div className="space-y-3 p-3 bg-gray-50 border border-gray-200 rounded">
+              <div className="space-y-3 p-3 bg-muted border border-border rounded">
                 {/* Empty Payload Option */}
                 <div className="flex items-center gap-2">
                   <input
@@ -1228,7 +1231,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
 
                 {!emptyPayload && (
                   <>
-                    <div className="text-xs font-medium text-gray-700">
+                    <div className="text-xs font-medium text-foreground">
                       {t('flow_builder.make_custom_parameters', 'Custom Parameters')}
                     </div>
                     <div className="space-y-2">
@@ -1293,9 +1296,9 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
 
           {/* Scenario Selector Modal */}
           {showScenarioSelector && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="mt-3 pt-3 border-t border-border">
               <div className="flex items-center gap-2 mb-2">
-                <List className="h-4 w-4 text-blue-600" />
+                <List className="h-4 w-4 text-primary" />
                 <Label className="font-medium">{t('flow_builder.make_select_scenario', 'Select Scenario')}</Label>
                 <Button
                   variant="ghost"
@@ -1306,7 +1309,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="max-h-48 overflow-y-auto space-y-2 p-2 bg-gray-50 border border-gray-200 rounded">
+              <div className="max-h-48 overflow-y-auto space-y-2 p-2 bg-muted border border-border rounded">
                 {scenariosList.length > 0 ? (
                   scenariosList.map((scenario, index) => (
                     <div
@@ -1314,8 +1317,8 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
                       className={cn(
                         "p-2 rounded cursor-pointer border text-xs transition-colors",
                         selectedScenarioIndex === index
-                          ? "bg-blue-100 border-blue-300"
-                          : "bg-white border-gray-200 hover:bg-gray-50"
+                          ? "bg-primary/10 border-primary/20"
+                          : "bg-card border-border hover:bg-muted"
                       )}
                       onClick={() => selectScenario(scenario, index)}
                     >
@@ -1336,7 +1339,7 @@ export function MakeNode({ id, data, isConnectable }: MakeNodeProps) {
           )}
 
           {/* Cancel/Close Button */}
-          <div className="mt-3 pt-3 border-t border-gray-200 flex justify-end">
+          <div className="mt-3 pt-3 border-t border-border flex justify-end">
             <Button
               variant="outline"
               size="sm"

@@ -104,12 +104,12 @@ export function ScrollableTabs({ children, className }: ScrollableTabsProps) {
     <div className="relative">
       {/* Left fade gradient */}
       {showLeftArrow && (
-        <div className="absolute left-8 top-0 bottom-0 w-4 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+        <div className="absolute left-8 top-0 bottom-0 w-4 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
       )}
 
       {/* Right fade gradient */}
       {showRightArrow && (
-        <div className="absolute right-8 top-0 bottom-0 w-4 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-8 top-0 bottom-0 w-4 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
       )}
 
       {/* Left scroll button */}
@@ -117,7 +117,7 @@ export function ScrollableTabs({ children, className }: ScrollableTabsProps) {
         <Button
           variant="outline"
           size="sm"
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 p-0 bg-white shadow-lg border-gray-200 hover:bg-gray-50 rounded-full"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 p-0 bg-background shadow-lg border-border hover:bg-accent rounded-full"
           onClick={scrollLeft}
           aria-label="Scroll tabs left"
         >
@@ -130,7 +130,7 @@ export function ScrollableTabs({ children, className }: ScrollableTabsProps) {
         <Button
           variant="outline"
           size="sm"
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 p-0 bg-white shadow-lg border-gray-200 hover:bg-gray-50 rounded-full"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 p-0 bg-background shadow-lg border-border hover:bg-accent rounded-full"
           onClick={scrollRight}
           aria-label="Scroll tabs right"
         >
@@ -153,7 +153,7 @@ export function ScrollableTabs({ children, className }: ScrollableTabsProps) {
 
           "touch-pan-x",
 
-          "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md",
           className
         )}
         style={{

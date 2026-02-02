@@ -94,7 +94,7 @@ export function ClearChatHistoryDialog({
               <AlertTriangle className="h-5 w-5 text-red-600" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-medium text-gray-900">
+              <DialogTitle className="text-lg font-medium text-foreground">
                 {isGroupChat
                   ? t('clear_history.confirm_group_title', 'Clear Group Chat History')
                   : t('clear_history.confirm_title', 'Clear Chat History')

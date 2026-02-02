@@ -16,15 +16,28 @@ import {
   scheduledMessages,
   PERMISSIONS,
   User,
-  campaignTemplates
+  campaignTemplates,
+  Pipeline,
+  InsertPipeline,
+  PipelineStage,
+  InsertPipelineStage
 } from "@shared/schema";
 import crypto, { randomBytes, scrypt, timingSafeEqual } from "crypto";
+import dns from "dns";
 import { eq, and } from "drizzle-orm";
 import { EventEmitter } from "events";
 import type { Express, Request, Response } from "express";
 import type { NextFunction } from "express";
+import type { CallAgentConfig } from "./services/call-agent-service";
+import {
+  validateTwilioCredentialsWithAPI,
+  configureElevenLabsAgent,
+  sanitizeCredential,
+  getTwilioAuthHeader
+} from "./services/call-agent-service";
 import express from "express";
 import axios from "axios";
+import { getLinkPreview } from 'link-preview-js';
 import fs from "fs";
 import fsExtra from "fs-extra";
 import { createServer, type Server } from "http";
@@ -34,6 +47,7 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { WebSocket, WebSocketServer } from "ws";
 import { z } from "zod";
+import type Stripe from "stripe";
 import { registerAdminRoutes } from "./admin-routes";
 import { setupAuth } from "./auth";
 import { setupSocialAuth } from "./social-auth";
@@ -47,6 +61,7 @@ import { affiliateTrackingMiddleware } from "./middleware/affiliate-tracking";
 import { requireSubdomainAuth, subdomainMiddleware } from "./middleware/subdomain";
 import { isWhatsAppGroupChatId } from "./utils/whatsapp-group-filter";
 import { validatePhoneNumber as validatePhoneNumberUtil } from "./utils/phone-validation";
+import { getCachedInitialPipelineStage, getCachedCompanySetting, getCachedPipelinesByCompany } from "./utils/pipeline-cache";
 import { insertCompanyPageSchema } from "@shared/schema";
 import { registerPaymentRoutes } from "./payment-routes";
 import { registerPlanRoutes } from "./plan-routes";
@@ -71,6 +86,7 @@ import companyDataUsageRoutes from "./routes/company-data-usage";
 import quickReplyRoutes from "./routes/quick-replies";
 import openRouterRoutes from "./routes/openrouter";
 import whatsappTemplatesRoutes from "./routes/whatsapp-templates";
+import callAgentRoutes from "./routes/call-agent-routes";
 import instagramService from "./services/channels/instagram";
 import telegramService from "./services/channels/telegram";
 import messengerService from "./services/channels/messenger";
@@ -78,12 +94,10 @@ import TikTokService from "./services/channels/tiktok";
 import emailService from "./services/channels/email";
 import webchatService from "./services/channels/webchat";
 import whatsAppService, { downloadAndSaveMedia, getConnection as getWhatsAppConnection } from "./services/channels/whatsapp";
-import whatsAppOfficialService from "./services/channels/whatsapp-official";
-import whatsAppTwilioService from "./services/channels/whatsapp-twilio";
-import whatsApp360DialogService from "./services/channels/whatsapp-360dialog";
-import whatsApp360DialogPartnerService from "./services/channels/whatsapp-360dialog-partner";
+import whatsAppOfficialService, { downloadAndSaveMedia as downloadWhatsAppOfficialMedia } from "./services/channels/whatsapp-official";
 import whatsAppMetaPartnerService from "./services/channels/whatsapp-meta-partner";
-import { parseDialog360Error, createErrorResponse } from "./services/channels/360dialog-errors";
+import { configureWebhookForWABA, subscribeToWebhookFields, retryWebhookConfiguration } from "./services/meta-webhook-configurator";
+import * as metaGraphAPI from "./services/meta-graph-api";
 import { generateApiKey, hashApiKey } from "./middleware/api-auth";
 import apiV1Routes from "./routes/api-v1";
 import channelManager from "./services/channel-manager";
@@ -97,11 +111,13 @@ import googleCalendarService from "./services/google-calendar";
 import zohoCalendarService from "./services/zoho-calendar";
 import { calendlyCalendarService } from "./services/calendly-calendar";
 import googleSheetsService from "./services/google-sheets";
+import { GOOGLE_MAPS_SCRAPE_MAX_RESULTS } from "./services/google-maps-scraper";
 import { storage, logContactAudit } from "./storage";
 import { logger } from "./utils/logger";
 import { eventEmitterMonitor } from "./utils/event-emitter-monitor";
 import { inboxBackupService } from "./services/inbox-backup";
 import { inboxBackupSchedulerService } from "./services/inbox-backup-scheduler";
+import { dataUsageTracker } from "./services/data-usage-tracker";
 
 import { smartWebSocketBroadcaster } from "./utils/smart-websocket-broadcaster";
 
@@ -129,6 +145,76 @@ const validateBody = (schema: any, body: any) => {
   return result.data;
 };
 
+const linkPreviewSchema = z.object({
+  url: z.string().url({ message: "Invalid URL format" }).min(1, "URL is required")
+});
+
+
+function isPrivateOrReservedIP(ip: string): boolean {
+
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return false;
+
+    const [a, b, c, d] = parts.map(Number);
+
+
+    if (a === 127) return true;
+
+
+    if (a === 10) return true;
+
+
+    if (a === 172 && b >= 16 && b <= 31) return true;
+
+
+    if (a === 192 && b === 168) return true;
+
+
+    if (a === 169 && b === 254) return true;
+
+
+    if (a === 0 && b === 0 && c === 0 && d === 0) return true;
+
+
+    if (a >= 224 && a <= 239) return true;
+
+
+    if (a >= 240) return true;
+
+    return false;
+  }
+
+
+  if (ip.includes(':')) {
+    const lower = ip.toLowerCase();
+
+
+    if (lower === '::1' || lower === '0:0:0:0:0:0:0:1') return true;
+
+
+    if (lower.startsWith('fe80:') || lower.startsWith('fe9') || lower.startsWith('fea') || lower.startsWith('feb')) return true;
+
+
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
+
+
+    if (lower === '::' || lower === '0:0:0:0:0:0:0:0') return true;
+
+
+    if (lower.startsWith('::ffff:')) {
+      const ipv4Part = lower.substring(7);
+      return isPrivateOrReservedIP(ipv4Part);
+    }
+
+    return false;
+  }
+
+  return false;
+}
+
+
+const linkPreviewRateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -159,7 +245,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const brandingSettings = settings.filter(s =>
         s.key === 'branding' ||
         s.key === 'branding_logo' ||
-        s.key === 'branding_favicon'
+        s.key === 'branding_favicon' ||
+        s.key === 'branding_admin_auth_background' ||
+        s.key === 'branding_user_auth_background' ||
+        s.key === 'auth_background_config'
       );
 
 
@@ -199,6 +288,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching public custom scripts:", error);
       res.status(500).json({ error: "Failed to fetch custom scripts" });
+    }
+  });
+
+  app.get('/public/custom-css', async (req, res) => {
+    try {
+      const customCssSetting = await storage.getAppSetting('custom_css');
+
+      if (!customCssSetting) {
+        const defaultConfig = {
+          enabled: false,
+          css: '',
+          lastModified: new Date().toISOString()
+        };
+        res.set('Cache-Control', 'public, max-age=60'); // Cache for 1 minute
+        return res.json(defaultConfig);
+      }
+
+      const settingValue = customCssSetting.value as any;
+      const publicConfig = {
+        enabled: settingValue?.enabled || false,
+        css: settingValue?.enabled ? (settingValue?.css || '') : '',
+        lastModified: settingValue?.lastModified || new Date().toISOString()
+      };
+
+      res.set('Cache-Control', 'public, max-age=60'); // Cache for 1 minute
+      res.json(publicConfig);
+    } catch (error) {
+      console.error("Error fetching public custom CSS:", error);
+      res.status(500).json({ error: "Failed to fetch custom CSS" });
     }
   });
 
@@ -352,6 +470,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/campaigns', requireSubdomainAuth, ensureAuthenticated, campaignRoutes);
 
 
+  const callLogsRoutes = (await import('./routes/call-logs-routes')).default;
+  app.use('/api/call-logs', requireSubdomainAuth, ensureAuthenticated, callLogsRoutes);
+
+
   app.use('/api/webchat', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -433,13 +555,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
-  
+
   app.get('/api/webhooks/messenger', async (req, res) => {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-   
+
 
     if (mode !== 'subscribe') {
       return res.status(403).send('Forbidden');
@@ -463,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (matchingConnection || isGlobalMatch) {
         res.status(200).send(challenge);
       } else {
-        
+
         res.status(403).send('Forbidden');
       }
     } catch (error) {
@@ -477,7 +599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signature = req.headers['x-hub-signature-256'] as string;
       const body = req.body;
 
-     
+
 
       let targetConnection = null;
       let pageId: string | null = null;
@@ -492,7 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (pageId) {
           const messengerConnections = await storage.getChannelConnectionsByType('messenger');
 
-       
+
 
           targetConnection = messengerConnections.find((conn: any) => {
             const connectionData = conn.connectionData as any;
@@ -559,6 +681,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use('/api/quick-replies', ensureAuthenticated, quickReplyRoutes);
 
+  app.use('/api/call-agent', ensureAuthenticated, callAgentRoutes);
+
   app.use('/api/whatsapp-templates', ensureAuthenticated, whatsappTemplatesRoutes);
 
   app.use('/api/enhanced-subscription', enhancedSubscriptionRoutes);
@@ -580,6 +704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const aiFlowAssistantRoutes = (await import('./routes/ai-flow-assistant-routes')).default;
   app.use('/api/ai-flow-assistant', ensureAuthenticated, aiFlowAssistantRoutes);
+
 
   app.post('/api/flows/test-code', ensureAuthenticated, async (req: Request, res: Response) => {
     try {
@@ -620,9 +745,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
       await jail.set('console', new ivm.ExternalCopy({
-        log: () => {},
-        error: () => {},
-        warn: () => {}
+        log: () => { },
+        error: () => { },
+        warn: () => { }
       }).copyInto());
 
 
@@ -677,9 +802,295 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/test-stripe', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const Stripe = (await import('stripe')).default;
+      const { randomUUID } = await import('crypto');
+
+      const {
+        apiKey,
+        resource,
+        operation,
+        amountFormat = 'cents',
+        metadata = [],
+        email,
+        name,
+        phone,
+        customerId,
+        amount,
+        currency = 'usd',
+        customer,
+        source,
+        paymentMethod,
+        description,
+        charge,
+        paymentIntent,
+        subscriptionId,
+        priceId,
+        plan,
+        limit,
+        startingAfter
+      } = req.body || {};
+
+      if (!apiKey || typeof apiKey !== 'string') {
+        return res.status(400).json({ success: false, error: 'Stripe API key is required' });
+      }
+
+      if (!resource || !operation) {
+        return res.status(400).json({ success: false, error: 'Resource and operation are required' });
+      }
+
+
+      const stripe = new Stripe(apiKey, { apiVersion: '2025-09-30.clover' as any });
+
+
+      const idempotencyKey = randomUUID();
+
+
+      const metadataObj: Record<string, string> = {};
+      if (Array.isArray(metadata)) {
+        metadata.forEach((item: { key?: string; value?: string }) => {
+          if (item.key && item.value !== undefined) {
+            metadataObj[item.key] = item.value;
+          }
+        });
+      }
+
+      let response: any;
+
+
+      switch (resource) {
+        case 'customer': {
+          switch (operation) {
+            case 'create': {
+              const customerData: Stripe.CustomerCreateParams = {
+                email: email || undefined,
+                name: name || undefined,
+                phone: phone || undefined,
+                metadata: Object.keys(metadataObj).length > 0 ? metadataObj : undefined
+              };
+              response = await stripe.customers.create(customerData, { idempotencyKey });
+              break;
+            }
+            case 'get': {
+              if (!customerId) {
+                return res.status(400).json({ success: false, error: 'Customer ID is required for get operation' });
+              }
+              response = await stripe.customers.retrieve(customerId);
+              break;
+            }
+            case 'update': {
+              if (!customerId) {
+                return res.status(400).json({ success: false, error: 'Customer ID is required for update operation' });
+              }
+              const updateData: Stripe.CustomerUpdateParams = {};
+              if (email) updateData.email = email;
+              if (name) updateData.name = name;
+              if (phone) updateData.phone = phone;
+              if (Object.keys(metadataObj).length > 0) updateData.metadata = metadataObj;
+              response = await stripe.customers.update(customerId, updateData);
+              break;
+            }
+            case 'delete': {
+              if (!customerId) {
+                return res.status(400).json({ success: false, error: 'Customer ID is required for delete operation' });
+              }
+              response = await stripe.customers.del(customerId);
+              break;
+            }
+            default:
+              return res.status(400).json({ success: false, error: `Unsupported customer operation: ${operation}` });
+          }
+          break;
+        }
+
+        case 'payment': {
+          switch (operation) {
+            case 'createCharge': {
+              if (!amount) {
+                return res.status(400).json({ success: false, error: 'Amount is required for createCharge operation' });
+              }
+              let amountValue: number;
+              if (amountFormat === 'decimal') {
+                const decimalAmount = parseFloat(amount);
+                if (isNaN(decimalAmount) || decimalAmount <= 0) {
+                  return res.status(400).json({ success: false, error: 'Invalid amount: must be a positive number' });
+                }
+                amountValue = Math.round(decimalAmount * 100);
+              } else {
+                amountValue = parseInt(amount);
+                if (isNaN(amountValue) || amountValue <= 0) {
+                  return res.status(400).json({ success: false, error: 'Invalid amount: must be a positive integer' });
+                }
+              }
+              const chargeData: Stripe.ChargeCreateParams = {
+                amount: amountValue,
+                currency: currency || 'usd',
+                source: source || undefined,
+                customer: customer || undefined,
+                description: description || undefined,
+                metadata: Object.keys(metadataObj).length > 0 ? metadataObj : undefined
+              };
+              response = await stripe.charges.create(chargeData, { idempotencyKey });
+              break;
+            }
+            case 'createPaymentIntent': {
+              if (!amount) {
+                return res.status(400).json({ success: false, error: 'Amount is required for createPaymentIntent operation' });
+              }
+              let amountValue: number;
+              if (amountFormat === 'decimal') {
+                const decimalAmount = parseFloat(amount);
+                if (isNaN(decimalAmount) || decimalAmount <= 0) {
+                  return res.status(400).json({ success: false, error: 'Invalid amount: must be a positive number' });
+                }
+                amountValue = Math.round(decimalAmount * 100);
+              } else {
+                amountValue = parseInt(amount);
+                if (isNaN(amountValue) || amountValue <= 0) {
+                  return res.status(400).json({ success: false, error: 'Invalid amount: must be a positive integer' });
+                }
+              }
+              const paymentIntentData: Stripe.PaymentIntentCreateParams = {
+                amount: amountValue,
+                currency: currency || 'usd',
+                customer: customer || undefined,
+                payment_method: paymentMethod || undefined,
+                metadata: Object.keys(metadataObj).length > 0 ? metadataObj : undefined
+              };
+              response = await stripe.paymentIntents.create(paymentIntentData, { idempotencyKey });
+              break;
+            }
+            case 'refund': {
+              const refundData: Stripe.RefundCreateParams = {
+                charge: charge || undefined,
+                payment_intent: paymentIntent || undefined,
+                metadata: Object.keys(metadataObj).length > 0 ? metadataObj : undefined
+              };
+
+              if (amount) {
+                let amountValue: number;
+                if (amountFormat === 'decimal') {
+                  const decimalAmount = parseFloat(amount);
+                  if (isNaN(decimalAmount) || decimalAmount <= 0) {
+                    return res.status(400).json({ success: false, error: 'Invalid refund amount: must be a positive number' });
+                  }
+                  amountValue = Math.round(decimalAmount * 100);
+                } else {
+                  amountValue = parseInt(amount);
+                  if (isNaN(amountValue) || amountValue <= 0) {
+                    return res.status(400).json({ success: false, error: 'Invalid refund amount: must be a positive integer' });
+                  }
+                }
+                refundData.amount = amountValue;
+              }
+
+              if (!refundData.charge && !refundData.payment_intent) {
+                return res.status(400).json({ success: false, error: 'Either charge or payment_intent is required for refund operation' });
+              }
+
+              response = await stripe.refunds.create(refundData, { idempotencyKey });
+              break;
+            }
+            default:
+              return res.status(400).json({ success: false, error: `Unsupported payment operation: ${operation}` });
+          }
+          break;
+        }
+
+        case 'subscription': {
+          switch (operation) {
+            case 'create': {
+              if (!customer || (!priceId && !plan)) {
+                return res.status(400).json({ success: false, error: 'Customer ID and Price ID or Plan are required for creating a subscription' });
+              }
+              const subscriptionData: Stripe.SubscriptionCreateParams = {
+                customer: customer,
+                items: priceId ? [{ price: priceId }] : plan ? [{ plan: plan }] : [],
+                metadata: Object.keys(metadataObj).length > 0 ? metadataObj : undefined
+              };
+              response = await stripe.subscriptions.create(subscriptionData, { idempotencyKey });
+              break;
+            }
+            case 'get': {
+              if (!subscriptionId) {
+                return res.status(400).json({ success: false, error: 'Subscription ID is required for get operation' });
+              }
+              response = await stripe.subscriptions.retrieve(subscriptionId);
+              break;
+            }
+            case 'update': {
+              if (!subscriptionId) {
+                return res.status(400).json({ success: false, error: 'Subscription ID is required for update operation' });
+              }
+              const updateData: Stripe.SubscriptionUpdateParams = {};
+              if (priceId) {
+                updateData.items = [{ id: subscriptionId, price: priceId }];
+              }
+              if (Object.keys(metadataObj).length > 0) updateData.metadata = metadataObj;
+              response = await stripe.subscriptions.update(subscriptionId, updateData);
+              break;
+            }
+            case 'cancel': {
+              if (!subscriptionId) {
+                return res.status(400).json({ success: false, error: 'Subscription ID is required for cancel operation' });
+              }
+              response = await stripe.subscriptions.cancel(subscriptionId);
+              break;
+            }
+            default:
+              return res.status(400).json({ success: false, error: `Unsupported subscription operation: ${operation}` });
+          }
+          break;
+        }
+
+        case 'balance': {
+          switch (operation) {
+            case 'getBalance': {
+              response = await stripe.balance.retrieve();
+              break;
+            }
+            case 'listTransactions': {
+              const params: Stripe.BalanceTransactionListParams = {};
+              if (limit) params.limit = parseInt(limit) || 10;
+              if (startingAfter) params.starting_after = startingAfter;
+              response = await stripe.balanceTransactions.list(params);
+              break;
+            }
+            default:
+              return res.status(400).json({ success: false, error: `Unsupported balance operation: ${operation}` });
+          }
+          break;
+        }
+
+        default:
+          return res.status(400).json({ success: false, error: `Unsupported resource type: ${resource}` });
+      }
+
+      return res.json({
+        success: true,
+        data: response,
+        idempotencyKey
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: error?.message || error?.type || 'Stripe API error',
+        code: error?.code,
+        type: error?.type
+      });
+    }
+  });
+
   const ensureSuperAdmin = (req: Request, res: Response, next: any) => {
     if (req.isAuthenticated() && req.user && (req.user as any).isSuperAdmin) {
       return next();
+    }
+
+    if (req.path === '/api/company-settings/google-maps' && req.method === 'POST') {
+      return res.status(403).json({
+        error: 'Only super administrators can configure app-level settings like the Google Maps API key'
+      });
     }
     res.status(403).json({ message: 'Super admin access required' });
   };
@@ -710,7 +1121,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const brandingSettings = settings.filter(s =>
         s.key === 'branding' ||
         s.key === 'branding_logo' ||
-        s.key === 'branding_favicon'
+        s.key === 'branding_favicon' ||
+        s.key === 'branding_admin_auth_background' ||
+        s.key === 'branding_user_auth_background' ||
+        s.key === 'auth_background_config'
       );
 
       res.json(brandingSettings);
@@ -816,6 +1230,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  app.get('/api/company-settings/auto-add-to-pipeline', ensureAuthenticated, ensureCompanyAdmin, async (req: any, res: Response) => {
+    try {
+      const companyId = req.user.companyId;
+      const setting = await storage.getCompanySetting(companyId, 'autoAddContactToPipeline');
+      const value = setting?.value !== undefined ? Boolean(setting.value) : false;
+      res.json({ autoAddContactToPipeline: value });
+    } catch (error: any) {
+      console.error('Error fetching auto-add to pipeline setting:', error);
+      res.status(500).json({ error: error?.message || 'Failed to fetch setting' });
+    }
+  });
+
+  app.post('/api/company-settings/auto-add-to-pipeline', ensureAuthenticated, ensureCompanyAdmin, async (req: any, res: Response) => {
+    try {
+      const companyId = req.user.companyId;
+      const { autoAddContactToPipeline } = req.body;
+
+      if (autoAddContactToPipeline === undefined) {
+        return res.status(400).json({ error: 'autoAddContactToPipeline is required' });
+      }
+
+      await storage.saveCompanySetting(companyId, 'autoAddContactToPipeline', Boolean(autoAddContactToPipeline));
+
+
+      const { invalidatePipelineStageCache } = await import('./utils/pipeline-cache');
+
+
+      res.json({
+        message: 'Auto-add to pipeline setting saved successfully',
+        autoAddContactToPipeline: Boolean(autoAddContactToPipeline)
+      });
+    } catch (error: any) {
+      console.error('Error saving auto-add to pipeline setting:', error);
+      res.status(500).json({ error: error?.message || 'Failed to save setting' });
+    }
+  });
+
+  app.get('/api/company-settings/custom-css', ensureAuthenticated, ensureCompanyAdmin, async (req: any, res: Response) => {
+    try {
+      const companyId = req.user.companyId;
+      const customCssSetting = await storage.getCompanySetting(companyId, 'custom_css');
+
+      if (!customCssSetting) {
+        const defaultConfig = {
+          enabled: false,
+          css: '',
+          lastModified: new Date().toISOString()
+        };
+        return res.json(defaultConfig);
+      }
+
+      res.json(customCssSetting.value);
+    } catch (error: any) {
+      console.error('Error fetching company custom CSS:', error);
+      res.status(500).json({ error: error?.message || 'Failed to fetch custom CSS settings' });
+    }
+  });
+
+  app.post('/api/company-settings/custom-css', ensureAuthenticated, ensureCompanyAdmin, async (req: any, res: Response) => {
+    try {
+      const companyId = req.user.companyId;
+      const { enabled, css } = req.body;
+
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "Enabled must be a boolean value" });
+      }
+
+      if (typeof css !== 'string') {
+        return res.status(400).json({ error: "CSS must be a string" });
+      }
+
+      const customCssSettings = {
+        enabled: Boolean(enabled),
+        css: css || '',
+        lastModified: new Date().toISOString()
+      };
+
+      await storage.saveCompanySetting(companyId, 'custom_css', customCssSettings);
+
+      res.json({
+        message: "Custom CSS settings saved successfully",
+        settings: customCssSettings
+      });
+    } catch (error: any) {
+      console.error('Error saving company custom CSS:', error);
+      res.status(500).json({ error: error?.message || 'Failed to save custom CSS settings' });
+    }
+  });
+
+  app.get('/api/company-settings/google-maps', ensureAuthenticated, ensureCompanyAdmin, async (req: any, res: Response) => {
+    try {
+      const setting = await storage.getAppSetting('google_maps_api_key');
+
+      if (!setting || !setting.value) {
+        return res.json({ apiKey: null, configured: false });
+      }
+
+      const apiKey = typeof setting.value === 'string'
+        ? setting.value
+        : (setting.value as any).apiKey || setting.value;
+
+
+      if (typeof apiKey === 'string' && apiKey.length > 14) {
+        const masked = apiKey.substring(0, 10) + '...' + apiKey.substring(apiKey.length - 4);
+        return res.json({ apiKey: masked, configured: true });
+      }
+
+      return res.json({ apiKey: '***', configured: true });
+    } catch (error: any) {
+      console.error('Error fetching Google Maps API key:', error);
+      res.status(500).json({ error: error?.message || 'Failed to fetch API key' });
+    }
+  });
+
+
+  app.post('/api/company-settings/google-maps', ensureAuthenticated, ensureSuperAdmin, async (req: any, res: Response) => {
+    try {
+      const user = req.user as any;
+      const { apiKey } = req.body;
+
+
+
+
+      if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+        return res.status(400).json({ error: 'API key is required' });
+      }
+
+      await storage.saveAppSetting('google_maps_api_key', apiKey.trim());
+
+      res.json({ success: true, message: 'Google Maps API key saved successfully' });
+    } catch (error: any) {
+      console.error('Error saving Google Maps API key:', error);
+      res.status(500).json({ error: error?.message || 'Failed to save API key' });
+    }
+  });
 
   app.post('/api/company-settings/whatsapp-proxy/test', ensureAuthenticated, ensureCompanyAdmin, async (req: any, res: Response) => {
     try {
@@ -1380,7 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      
+
       const widgetJsPath = path.join(getWidgetsBasePath(), 'webchat-widget.js');
       if (await fsExtra.pathExists(widgetJsPath)) {
         res.setHeader('Content-Type', 'application/javascript');
@@ -1401,7 +1951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!connection) {
         return res.status(404).send('// Invalid WebChat token');
       }
-      
+
 
       const redirectUrl = `/api/webchat/widget.js?token=${encodeURIComponent(token)}`;
       res.redirect(302, redirectUrl);
@@ -1418,12 +1968,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!connection) {
         return res.status(404).send('// Invalid WebChat token');
       }
-      
+
 
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-      
+
 
       const widgetJsPath = path.join(getWidgetsBasePath(), 'webchat-widget.js');
       if (await fsExtra.pathExists(widgetJsPath)) {
@@ -1489,7 +2039,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const connection = await webchatService.verifyWidgetToken(token);
       if (!connection) return res.status(404).json({ error: 'Not found' });
       const data = (connection.connectionData || {}) as any;
-      
+
 
       const teamAvatars = [];
       if (connection.companyId) {
@@ -1503,7 +2053,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           });
         }
       }
-      
+
       const cfg = {
         token,
         widgetColor: data.widgetColor || '#6366f1',
@@ -1765,13 +2315,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ error: 'User not associated with a company' });
       }
 
-      const agents = await storage.getUsersByCompany(user.companyId);
+      const userSummaries = await storage.getCompanyUserSummaries(user.companyId);
 
-
-      const availableAgents = agents.filter(agent =>
+      const availableAgents = userSummaries.filter(agent =>
         (agent.role === 'agent' || agent.role === 'admin') && !agent.isSuperAdmin
       );
-
 
       res.json(availableAgents);
     } catch (error) {
@@ -1879,6 +2427,769 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       console.error('Error unassigning conversation:', error);
       res.status(500).json({ error: 'Failed to unassign conversation' });
     }
+  });
+
+
+  app.post('/api/conversations/:conversationId/initiate-call',
+    ensureAuthenticated,
+    requirePermission(PERMISSIONS.MANAGE_CALL_LOGS),
+    async (req, res) => {
+      try {
+
+        const conversationId = parseInt(req.params.conversationId);
+        if (isNaN(conversationId)) {
+          return res.status(400).json({ error: 'Invalid conversation ID' });
+        }
+
+
+        const conversation = await storage.getConversation(conversationId);
+        if (!conversation) {
+          return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+
+        if (!req.user || conversation.companyId !== req.user.companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+
+
+        if (conversation.isGroup === true) {
+          return res.status(400).json({ error: 'Cannot initiate calls to group conversations' });
+        }
+
+
+        const contact = await storage.getContact(conversation.contactId!);
+        if (!contact) {
+          return res.status(404).json({ error: 'Contact not found' });
+        }
+
+        const permissions = await getUserPermissions(req.user as any);
+        if (!(req.user as any).isSuperAdmin && permissions[PERMISSIONS.VIEW_CONTACT_PHONE] !== true) {
+          return res.status(403).json({ error: 'You do not have permission to view or use contact phone numbers' });
+        }
+
+
+        const phoneNumber = contact.phone;
+        if (!phoneNumber || phoneNumber.trim() === '') {
+          return res.status(400).json({ error: 'Contact does not have a phone number' });
+        }
+
+
+        if (!conversation.channelId) {
+          return res.status(400).json({
+            error: 'Conversation does not have an associated channel connection'
+          });
+        }
+
+        const channelConnection = await storage.getChannelConnection(conversation.channelId);
+        if (!channelConnection) {
+          return res.status(404).json({
+            error: 'Channel connection not found for this conversation'
+          });
+        }
+
+
+        if (channelConnection.companyId !== req.user.companyId) {
+          return res.status(403).json({
+            error: 'Access denied: Channel connection does not belong to your company'
+          });
+        }
+
+        if (channelConnection.status !== 'active') {
+          return res.status(400).json({
+            error: 'Channel connection is not active'
+          });
+        }
+
+
+        if (channelConnection.channelType !== 'twilio_voice') {
+          return res.status(400).json({
+            error: 'This channel is not a Twilio Voice channel'
+          });
+        }
+
+
+        const { callType } = req.body;
+
+
+        const connectionData = channelConnection.connectionData as any;
+        const {
+          accountSid,
+          authToken,
+          fromNumber,
+          elevenLabsApiKey,
+          elevenLabsAgentId,
+          elevenLabsPrompt,
+          voiceId
+        } = connectionData;
+
+
+        if (!accountSid || !authToken || !fromNumber) {
+          return res.status(400).json({
+            error: 'Twilio Voice channel is missing required credentials (Account SID, Auth Token, or From Number)'
+          });
+        }
+
+
+        const { initiateOutboundCall } = await import('./services/call-agent-service');
+        const { callLogsService } = await import('./services/call-logs-service');
+        const { CallLogsEventEmitter } = await import('./utils/websocket');
+
+
+        const hasElevenLabs = !!(elevenLabsApiKey && elevenLabsApiKey.trim() !== '');
+
+
+        let useElevenLabs = hasElevenLabs;
+        let actualCallType = hasElevenLabs ? 'ai-powered' : 'direct';
+
+        if (callType) {
+          if (callType === 'direct') {
+            useElevenLabs = false;
+            actualCallType = 'direct';
+          } else if (callType === 'ai-powered') {
+            if (!hasElevenLabs) {
+              return res.status(400).json({
+                error: 'ElevenLabs credentials not configured for AI-powered calls'
+              });
+            }
+
+            if (!elevenLabsAgentId && !elevenLabsPrompt) {
+              return res.status(400).json({
+                error: 'Either ElevenLabs Agent ID or custom prompt must be configured for AI-powered calls. Please configure an agent in your ElevenLabs dashboard or provide a custom prompt.',
+                suggestion: 'Go to Settings > AI Credentials > ElevenLabs to configure your agent ID'
+              });
+            }
+            if (!elevenLabsAgentId && elevenLabsPrompt) {
+              console.warn('[Initiate Call] Using custom prompt with AI-powered call - signed URL authentication not available for custom prompts');
+            }
+            useElevenLabs = true;
+            actualCallType = 'ai-powered';
+          } else {
+            return res.status(400).json({
+              error: 'Invalid callType. Must be "direct" or "ai-powered"'
+            });
+          }
+        }
+
+
+
+
+        const config: CallAgentConfig = {
+          twilioAccountSid: accountSid,
+          twilioAuthToken: authToken,
+          twilioFromNumber: fromNumber,
+          toNumber: phoneNumber,
+          elevenLabsApiKey: useElevenLabs ? (elevenLabsApiKey || '') : '',
+          elevenLabsAgentId: useElevenLabs ? elevenLabsAgentId : undefined,
+          elevenLabsPrompt: useElevenLabs ? elevenLabsPrompt : undefined,
+          elevenLabsVoiceId: useElevenLabs ? voiceId : undefined,
+          timeout: 30,
+          maxDuration: 300,
+          recordCall: true,
+          executionMode: 'async'
+        };
+
+
+        const webhookBaseUrl = process.env.WEBHOOK_BASE_URL ||
+          process.env.PUBLIC_URL?.replace(/^https?:\/\//, '') ||
+          'localhost:3000';
+
+
+        const result = await initiateOutboundCall(config, webhookBaseUrl);
+        const { callSid, from, to, startTime, metadata } = result;
+
+
+        if (metadata?.callType) {
+          actualCallType = metadata.callType;
+        }
+        
+
+        if (metadata?.elevenLabsFallback) {
+          actualCallType = 'direct';
+        }
+
+
+        const savedCall = await callLogsService.upsertCallLog({
+          companyId: req.user?.companyId || 0,
+          channelId: channelConnection.id,
+          contactId: contact.id,
+          conversationId: conversationId,
+          flowId: null,
+          nodeId: null,
+          direction: 'outbound',
+          status: 'initiated',
+          from: from,
+          to: to,
+          twilioCallSid: callSid,
+          startedAt: startTime,
+          agentConfig: elevenLabsAgentId ? {
+            elevenLabsAgentId,
+            elevenLabsPrompt,
+            voiceId
+          } : undefined,
+          metadata: {
+            ...metadata,
+            hasElevenLabs: hasElevenLabs,
+            callType: actualCallType,
+            userSelectedCallType: !!callType,
+            elevenLabsConversationId: result.metadata?.elevenLabsConversationId,
+            conferenceName: result.metadata?.conferenceName
+          }
+        });
+
+
+        CallLogsEventEmitter.emitCallStatusUpdate(
+          savedCall.id,
+          req.user?.companyId || 0,
+          'initiated',
+          { callSid, from, to }
+        );
+
+        const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+
+        res.json({
+          success: true,
+          callSid: callSid,
+          callId: savedCall.id,
+          status: 'initiated',
+          from: from,
+          to: to,
+          message: 'Call initiated successfully',
+          conferenceName: result.metadata?.conferenceName,
+          channelId: channelConnection.id,
+          callType: actualCallType,
+          contactName: contact.name,
+          contactPhone: canViewPhone ? contact.phone : null,
+          contactAvatar: contact.avatarUrl
+        });
+
+      } catch (error) {
+        console.error('[Initiate Call]', error);
+
+
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        if (errorMessage?.includes('Invalid credentials') ||
+          errorMessage?.includes('authentication')) {
+          return res.status(400).json({ error: 'Invalid Twilio credentials' });
+        }
+
+        if (errorMessage?.includes('Twilio API')) {
+          return res.status(500).json({ error: 'Twilio API error: ' + errorMessage });
+        }
+
+
+        res.status(500).json({ error: 'Failed to initiate call: ' + errorMessage });
+      }
+    }
+  );
+
+  /**
+   * Generate Twilio Voice SDK Access Token
+   * Used by the frontend to connect to Twilio Voice via WebRTC
+   */
+  app.get('/api/twilio/voice-token',
+    ensureAuthenticated,
+    requirePermission(PERMISSIONS.MANAGE_CALL_LOGS),
+    async (req, res) => {
+      try {
+        const user = req.user;
+        if (!user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+
+        const channelId = req.query.channelId ? parseInt(req.query.channelId as string) : null;
+        
+        if (!channelId) {
+          return res.status(400).json({ 
+            error: 'Channel ID is required for voice token generation',
+            setup: {
+              step1: 'Create API Key in Twilio Console > Account > API Keys',
+              step2: 'Create TwiML App in Twilio Console > Voice > TwiML Apps',
+              step3: 'Set Voice Request URL to: https://your-domain.com/api/twilio/voice-app-twiml',
+              step4: 'Add API Key, API Secret, and TwiML App SID to channel connection settings'
+            },
+            documentation: 'https://www.twilio.com/docs/voice/sdks/javascript/get-started'
+          });
+        }
+
+
+        const channelConnection = await storage.getChannelConnection(channelId);
+        if (!channelConnection) {
+          return res.status(404).json({ error: 'Channel connection not found' });
+        }
+        if (channelConnection.companyId !== user.companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        if (channelConnection.channelType !== 'twilio_voice') {
+          return res.status(400).json({ error: 'Not a Twilio Voice channel' });
+        }
+
+        const connectionData = channelConnection.connectionData as any;
+        const accountSid = connectionData?.accountSid;
+        const apiKey = connectionData?.apiKey;
+        const apiSecret = connectionData?.apiSecret;
+        const twimlAppSid = connectionData?.twimlAppSid;
+
+
+        if (!accountSid || !apiKey || !apiSecret) {
+          return res.status(400).json({ 
+            error: 'Twilio Voice SDK credentials not configured in channel connection',
+            setup: {
+              step1: 'Create API Key in Twilio Console > Account > API Keys',
+              step2: 'Create TwiML App in Twilio Console > Voice > TwiML Apps',
+              step3: 'Set Voice Request URL to: https://your-domain.com/api/twilio/voice-app-twiml',
+              step4: 'Add API Key, API Secret, and TwiML App SID to channel connection settings'
+            },
+            documentation: 'https://www.twilio.com/docs/voice/sdks/javascript/get-started'
+          });
+        }
+
+
+        if (!twimlAppSid) {
+          return res.status(400).json({ 
+            error: 'TwiML Application SID not configured in channel connection',
+            setup: {
+              step1: 'Create TwiML App in Twilio Console > Voice > TwiML Apps',
+              step2: 'Set Voice Request URL to: https://your-domain.com/api/twilio/voice-app-twiml',
+              step3: 'Add TwiML App SID to channel connection settings'
+            },
+            documentation: 'https://www.twilio.com/docs/voice/sdks/javascript/get-started'
+          });
+        }
+
+
+        const twilioModule = await import('twilio');
+        const twilio = twilioModule.default || twilioModule;
+        const AccessToken = twilio.jwt?.AccessToken;
+        
+
+        if (!AccessToken) {
+          return res.status(500).json({ 
+            error: 'Failed to load Twilio AccessToken - Twilio module structure is invalid',
+            details: 'The Twilio JWT AccessToken class could not be found. This may indicate a module compatibility issue.'
+          });
+        }
+        
+        const VoiceGrant = AccessToken.VoiceGrant;
+
+
+        const identity = `agent-${user.id}-${user.companyId}`;
+
+
+        const voiceGrant = new VoiceGrant({
+          outgoingApplicationSid: twimlAppSid,
+          incomingAllow: true
+        });
+
+
+        const token = new AccessToken(
+          accountSid,
+          apiKey,
+          apiSecret,
+          { identity, ttl: 3600 } // 1 hour TTL
+        );
+        token.addGrant(voiceGrant);
+
+
+
+        res.json({
+          token: token.toJwt(),
+          identity
+        });
+
+      } catch (error) {
+        console.error('[Twilio Voice Token] Error:', error);
+        res.status(500).json({ 
+          error: 'Failed to generate voice token',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+  );
+
+  /**
+   * Voice SDK Setup Validation Endpoint
+   * Validates Twilio Voice SDK configuration for a channel connection
+   */
+  app.post('/api/twilio/voice-setup/validate',
+    ensureAuthenticated,
+    requirePermission(PERMISSIONS.MANAGE_CALL_LOGS),
+    async (req, res) => {
+      try {
+        const user = req.user;
+        if (!user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { channelId } = req.body;
+        if (!channelId) {
+          return res.status(400).json({ error: 'Channel ID is required' });
+        }
+
+
+        let channelConnection;
+        try {
+          channelConnection = await storage.getChannelConnection(channelId);
+        } catch (error) {
+          console.error('[Voice SDK Setup Validation] Database error:', error);
+          return res.status(500).json({ 
+            error: 'Failed to fetch channel connection',
+            details: error instanceof Error ? error.message : 'Database error',
+            validationResults: {
+              overallStatus: 'error',
+              message: 'Could not access channel connection data'
+            }
+          });
+        }
+
+        if (!channelConnection) {
+          return res.status(404).json({ error: 'Channel connection not found' });
+        }
+        if (channelConnection.companyId !== user.companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        if (channelConnection.channelType !== 'twilio_voice') {
+          return res.status(400).json({ error: 'Not a Twilio Voice channel' });
+        }
+
+        const connectionData = channelConnection.connectionData as any;
+        const accountSid = connectionData?.accountSid;
+        const authToken = connectionData?.authToken;
+        const apiKey = connectionData?.apiKey;
+        const apiSecret = connectionData?.apiSecret;
+        const twimlAppSid = connectionData?.twimlAppSid;
+        const fromNumber = connectionData?.fromNumber;
+
+        const validationResults: any = {
+          channelId,
+          timestamp: new Date().toISOString(),
+          checks: {}
+        };
+
+
+        validationResults.checks.restApiCredentials = {
+          status: 'unknown',
+          message: ''
+        };
+        if (accountSid && authToken) {
+          try {
+            const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
+              headers: {
+                'Authorization': `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`
+              },
+              signal: AbortSignal.timeout(5000)
+            });
+            validationResults.checks.restApiCredentials.status = response.ok ? 'valid' : 'invalid';
+            validationResults.checks.restApiCredentials.message = response.ok 
+              ? 'REST API credentials are valid'
+              : 'REST API credentials are invalid';
+          } catch (error) {
+            validationResults.checks.restApiCredentials.status = 'error';
+            validationResults.checks.restApiCredentials.message = 'Failed to validate REST API credentials';
+          }
+        } else {
+          validationResults.checks.restApiCredentials.status = 'missing';
+          validationResults.checks.restApiCredentials.message = 'REST API credentials not configured';
+        }
+
+
+        validationResults.checks.voiceSDKCredentials = {
+          status: 'unknown',
+          message: ''
+        };
+        if (apiKey && apiSecret && accountSid) {
+          try {
+
+            const twilioModule = await import('twilio');
+            const twilio = twilioModule.default || twilioModule;
+            const AccessToken = twilio.jwt?.AccessToken;
+            
+
+            if (!AccessToken) {
+              validationResults.checks.voiceSDKCredentials.status = 'error';
+              validationResults.checks.voiceSDKCredentials.message = 'Failed to load Twilio AccessToken - Twilio module structure is invalid';
+            } else {
+              const VoiceGrant = AccessToken.VoiceGrant;
+              
+              const voiceGrant = new VoiceGrant({
+                outgoingApplicationSid: twimlAppSid || 'test',
+                incomingAllow: true
+              });
+              
+              const token = new AccessToken(
+                accountSid,
+                apiKey,
+                apiSecret,
+                { identity: 'validation-test', ttl: 60 }
+              );
+              token.addGrant(voiceGrant);
+              
+              const jwt = token.toJwt();
+              validationResults.checks.voiceSDKCredentials.status = jwt && jwt.length > 0 ? 'valid' : 'invalid';
+              validationResults.checks.voiceSDKCredentials.message = jwt && jwt.length > 0
+                ? 'Voice SDK credentials can generate valid tokens'
+                : 'Failed to generate Voice SDK token';
+            }
+          } catch (error) {
+            validationResults.checks.voiceSDKCredentials.status = 'error';
+            validationResults.checks.voiceSDKCredentials.message = error instanceof Error ? error.message : 'Voice SDK credential validation failed';
+          }
+        } else {
+          validationResults.checks.voiceSDKCredentials.status = 'missing';
+          validationResults.checks.voiceSDKCredentials.message = 'Voice SDK credentials (API Key, API Secret) not configured';
+        }
+
+
+        validationResults.checks.twimlApp = {
+          status: 'unknown',
+          message: ''
+        };
+        if (twimlAppSid && accountSid && authToken) {
+          try {
+            const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Applications/${twimlAppSid}.json`, {
+              headers: {
+                'Authorization': `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`
+              },
+              signal: AbortSignal.timeout(3000)
+            });
+            if (response.ok) {
+              const appData = await response.json();
+              validationResults.checks.twimlApp.status = 'valid';
+              validationResults.checks.twimlApp.message = 'TwiML App exists and is accessible';
+              validationResults.checks.twimlApp.voiceUrl = appData.voice_url;
+              
+
+              const protocol = req.protocol || (req.get('x-forwarded-proto') || 'https');
+              const host = req.get('host') || req.get('x-forwarded-host');
+              const actualServerUrl = host ? `${protocol}://${host}` : (process.env.PUBLIC_URL || process.env.WEBHOOK_BASE_URL || 'https://your-domain.com');
+              const expectedVoiceUrl = `${actualServerUrl}/api/twilio/voice-app-twiml`;
+              
+
+              const configuredUrl = appData.voice_url || '';
+              const normalizedConfigured = configuredUrl.replace(/\/$/, '');
+              const normalizedExpected = expectedVoiceUrl.replace(/\/$/, '');
+              const urlsMatch = normalizedConfigured === normalizedExpected;
+              
+              validationResults.checks.twimlApp.voiceUrlConfigured = urlsMatch;
+              validationResults.checks.twimlApp.configuredVoiceUrl = configuredUrl;
+              validationResults.checks.twimlApp.expectedVoiceUrl = expectedVoiceUrl;
+              
+
+              if (configuredUrl && !configuredUrl.startsWith('https://')) {
+                validationResults.checks.twimlApp.warning = 'Voice URL should use HTTPS in production';
+              }
+              
+
+              if (!urlsMatch) {
+                validationResults.checks.twimlApp.message = `TwiML App Voice URL mismatch. Expected: ${expectedVoiceUrl}, Got: ${configuredUrl}`;
+              } else {
+                validationResults.checks.twimlApp.message = 'TwiML App Voice URL is correctly configured';
+              }
+            } else {
+              validationResults.checks.twimlApp.status = 'invalid';
+              validationResults.checks.twimlApp.message = 'TwiML App SID not found or not accessible';
+            }
+          } catch (error) {
+            validationResults.checks.twimlApp.status = 'error';
+            validationResults.checks.twimlApp.message = 'Failed to validate TwiML App';
+          }
+        } else {
+          validationResults.checks.twimlApp.status = 'missing';
+          validationResults.checks.twimlApp.message = 'TwiML App SID not configured';
+        }
+
+
+        validationResults.checks.accountBalance = {
+          status: 'unknown',
+          message: ''
+        };
+        if (accountSid && authToken) {
+          try {
+            const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
+              headers: {
+                'Authorization': `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`
+              },
+              signal: AbortSignal.timeout(3000)
+            });
+            if (response.ok) {
+              const accountData = await response.json();
+              validationResults.checks.accountBalance.status = 'checked';
+              validationResults.checks.accountBalance.balance = accountData.balance;
+              validationResults.checks.accountBalance.currency = accountData.currency;
+              validationResults.checks.accountBalance.message = accountData.balance && parseFloat(accountData.balance) > 0
+                ? 'Account has sufficient balance'
+                : 'Account balance is low or zero';
+            }
+          } catch (error) {
+            validationResults.checks.accountBalance.status = 'error';
+            validationResults.checks.accountBalance.message = 'Could not check account balance';
+          }
+        }
+
+
+        validationResults.checks.phoneNumber = {
+          status: fromNumber ? 'configured' : 'missing',
+          message: fromNumber ? 'Phone number is configured' : 'Phone number not configured',
+          fromNumber: fromNumber || null
+        };
+
+
+        const allChecks = Object.values(validationResults.checks);
+        const criticalChecks = ['restApiCredentials', 'voiceSDKCredentials', 'twimlApp'];
+        const criticalStatuses = criticalChecks.map(key => validationResults.checks[key]?.status);
+        
+        if (criticalStatuses.every(s => s === 'valid')) {
+          validationResults.overallStatus = 'valid';
+          validationResults.message = 'All critical checks passed';
+        } else if (criticalStatuses.some(s => s === 'error' || s === 'invalid')) {
+          validationResults.overallStatus = 'invalid';
+          validationResults.message = 'Some critical checks failed';
+        } else {
+          validationResults.overallStatus = 'incomplete';
+          validationResults.message = 'Configuration is incomplete';
+        }
+
+
+        validationResults.setup = {
+          step1: 'Create API Key in Twilio Console > Account > API Keys',
+          step2: 'Create TwiML App in Twilio Console > Voice > TwiML Apps',
+          step3: `Set Voice Request URL to: ${process.env.PUBLIC_URL || process.env.WEBHOOK_BASE_URL || 'https://your-domain.com'}/api/twilio/voice-app-twiml`,
+          step4: 'Add API Key, API Secret, and TwiML App SID to channel connection settings',
+          documentation: 'https://www.twilio.com/docs/voice/sdks/javascript/get-started'
+        };
+
+        res.json(validationResults);
+
+      } catch (error) {
+        console.error('[Voice SDK Setup Validation] Error:', error);
+        res.status(500).json({ 
+          error: 'Failed to validate Voice SDK setup',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+  );
+
+  /**
+   * TwiML Application endpoint for Twilio Voice SDK
+   * Returns TwiML to connect the agent to a conference
+   * Validates requests using Twilio signature verification (no session auth required)
+   */
+  app.post('/api/twilio/voice-app-twiml',
+    express.urlencoded({ extended: false }),
+    async (req, res) => {
+      try {
+        const { conferenceName } = req.body;
+        const signature = req.headers['x-twilio-signature'] as string | undefined;
+        
+        if (!conferenceName) {
+          console.error('[Voice App TwiML] Missing conferenceName parameter');
+          return res.type('text/xml').send(
+            '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
+          );
+        }
+
+
+        const { callLogsService } = await import('./services/call-logs-service');
+        const { callAgentService } = await import('./services/call-agent-service');
+        const calls = await callLogsService.getCallLogsByConferenceName(conferenceName);
+        
+        if (!calls || calls.length === 0) {
+          console.warn(`[Voice App TwiML] No call log found for conference: ${conferenceName}`);
+          return res.type('text/xml').send(
+            '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
+          );
+        }
+
+
+        const call = calls[0];
+        
+
+        let authToken: string | undefined;
+        if (call.channelId) {
+          const connection = await storage.getChannelConnection(call.channelId);
+          if (connection && connection.connectionData) {
+            const connectionData = connection.connectionData as any;
+            authToken = connectionData.authToken;
+          }
+        }
+
+        if (!authToken) {
+          console.error(`[Voice App TwiML] No channel connection or auth token found for conference: ${conferenceName}`);
+          return res.type('text/xml').send(
+            '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
+          );
+        }
+
+
+        if (signature) {
+          const protocol = req.get('x-forwarded-proto') || req.protocol;
+          const host = req.get('x-forwarded-host') || req.get('host');
+          const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+          
+          const isValid = callAgentService.verifyTwilioCallSignature(
+            fullUrl,
+            req.body as Record<string, string>,
+            signature,
+            authToken
+          );
+          
+          if (!isValid) {
+            console.error('[Voice App TwiML] Invalid Twilio signature');
+            return res.type('text/xml').send(
+              '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
+            );
+          }
+        } else {
+          console.warn('[Voice App TwiML] Missing X-Twilio-Signature header');
+          return res.type('text/xml').send(
+            '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
+          );
+        }
+
+
+
+
+
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial>
+    <Conference 
+      startConferenceOnEnter="false" 
+      endConferenceOnExit="true"
+      beep="false"
+      muted="false"
+      waitUrl=""
+      waitMethod="GET"
+      statusCallbackEvent="start end join leave">
+      ${conferenceName}
+    </Conference>
+  </Dial>
+</Response>`;
+
+        res.type('text/xml');
+        res.send(twiml);
+
+      } catch (error) {
+        console.error('[Voice App TwiML] Error:', error);
+        res.type('text/xml').send(
+          '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
+        );
+      }
+    }
+  );
+
+  /**
+   * GET version of TwiML Application endpoint (for Twilio webhook verification)
+   */
+  app.get('/api/twilio/voice-app-twiml', (req, res) => {
+    res.type('text/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say>This endpoint is for Twilio Voice SDK connections.</Say>
+</Response>`);
   });
 
 
@@ -2218,20 +3529,27 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const mediaUrl = `/uploads/webchat/${req.file.filename}`;
       const isImage = req.file.mimetype.startsWith('image/');
       const isVideo = req.file.mimetype.startsWith('video/');
-      
+
 
       const content = caption || '';
-      
+
       const saved: any = await webchatService.processWebhook({
         token,
         eventType: 'message',
-        data: { 
-          sessionId, 
-          message: content, 
+        data: {
+          sessionId,
+          message: content,
           messageType: isImage ? 'image' : isVideo ? 'video' : 'document',
-          mediaUrl 
+          mediaUrl
         }
       }, connection.companyId);
+
+
+      if (connection.companyId && req.file) {
+        dataUsageTracker.trackFileUpload(connection.companyId, req.file.size).catch(err => {
+          console.error('Failed to track webchat upload:', err);
+        });
+      }
 
       res.json({ success: true, mediaUrl, message: saved });
     } catch (e: any) {
@@ -2284,7 +3602,38 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const avatarUrl = `/uploads/${req.file.filename}`;
 
 
+      const userBeforeUpdate = req.user;
+      let previousAvatarSize = 0;
+
+
+      if (userBeforeUpdate?.avatarUrl && userBeforeUpdate.avatarUrl.startsWith('/uploads/')) {
+        try {
+          const previousAvatarPath = path.join(process.cwd(), userBeforeUpdate.avatarUrl.substring(1));
+          if (await fsExtra.pathExists(previousAvatarPath)) {
+            const stats = await fsExtra.stat(previousAvatarPath);
+            previousAvatarSize = stats.size;
+          }
+        } catch (error) {
+
+        }
+      }
+
       const updatedUser = await storage.updateUser(userId, { avatarUrl });
+
+
+      if (userBeforeUpdate?.companyId && req.file) {
+
+        dataUsageTracker.trackFileUpload(userBeforeUpdate.companyId, req.file.size).catch(err => {
+          console.error('Failed to track avatar upload:', err);
+        });
+
+
+        if (previousAvatarSize > 0) {
+          dataUsageTracker.trackFileDelete(userBeforeUpdate.companyId, previousAvatarSize).catch(err => {
+            console.error('Failed to track avatar deletion:', err);
+          });
+        }
+      }
 
       res.json({
         message: 'Avatar updated successfully',
@@ -2315,10 +3664,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       if (message.mediaUrl) {
         const mediaPath = path.join(process.cwd(), 'public', message.mediaUrl.substring(1));
         if (await fsExtra.pathExists(mediaPath)) {
+
           const fetchedAt = Date.now();
           res.setHeader('X-Media-Fetched-At', fetchedAt.toString());
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-          return res.status(200).json({ 
+          return res.status(200).json({
             mediaUrl: message.mediaUrl,
             fetchedAt,
             cacheHint: 'local'
@@ -2363,6 +3713,135 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         });
       }
 
+
+      const conversation = await db.query.conversations.findFirst({
+        where: eq(conversations.id, message.conversationId)
+      });
+
+      if (!conversation || !conversation.channelId) {
+        return res.status(400).json({ error: 'Conversation not found or has no channel ID' });
+      }
+
+
+
+      if (conversation.channelType === 'whatsapp_official') {
+
+
+        const connection = await storage.getChannelConnection(conversation.channelId);
+        if (!connection) {
+          console.error('❌ [DOWNLOAD MEDIA] Connection not found:', {
+            channelId: conversation.channelId
+          });
+          return res.status(400).json({ error: 'WhatsApp connection not found' });
+        }
+
+
+        if (!metadata.mediaId) {
+          console.error('❌ [DOWNLOAD MEDIA] No mediaId in metadata:', {
+            messageId,
+            metadataKeys: Object.keys(metadata)
+          });
+          return res.status(400).json({ error: 'Media ID not found in message metadata' });
+        }
+
+
+        const connectionData = connection.connectionData as any;
+        const accessToken = connection.accessToken || connectionData?.accessToken;
+
+        if (!accessToken) {
+          console.error('❌ [DOWNLOAD MEDIA] Access token not found:', {
+            connectionId: connection.id,
+            hasConnectionAccessToken: !!connection.accessToken,
+            hasConnectionDataAccessToken: !!connectionData?.accessToken,
+            isEmbeddedSignup: !!connectionData?.partnerManaged
+          });
+          return res.status(400).json({ error: 'WhatsApp access token not available' });
+        }
+
+
+
+        const mediaUrl = await downloadWhatsAppOfficialMedia(
+          metadata.mediaId,
+          accessToken,
+          message.type || 'image'
+        );
+
+        if (!mediaUrl) {
+          console.error('❌ [DOWNLOAD MEDIA] Failed to download media:', {
+            messageId,
+            mediaId: metadata.mediaId
+          });
+          return res.status(202).json({
+            error: 'Media download failed',
+            message: 'The media file could not be downloaded from WhatsApp servers. This may be due to expired media or network issues.',
+            canRetry: true,
+            mediaType: message.type || 'unknown'
+          });
+        }
+
+
+
+
+        await db.update(messages)
+          .set({ mediaUrl })
+          .where(eq(messages.id, messageId));
+
+        const fetchedAt = Date.now();
+        res.setHeader('X-Media-Fetched-At', fetchedAt.toString());
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+
+        return res.status(200).json({
+          mediaUrl,
+          fetchedAt,
+          cacheHint: 'external'
+        });
+      }
+
+
+      if (conversation.channelType === 'instagram' || conversation.channelType === 'messenger') {
+
+
+        
+        if (!message.mediaUrl || !message.mediaUrl.includes('lookaside.fbsbx.com')) {
+          return res.status(400).json({ error: 'Instagram media URL not found or invalid' });
+        }
+
+
+        const connection = await storage.getChannelConnection(conversation.channelId);
+        if (!connection) {
+          return res.status(400).json({ error: 'Instagram connection not found' });
+        }
+
+
+        const instagramService = await import('./services/channels/instagram');
+        const downloadedMediaUrl = await instagramService.downloadInstagramMedia(
+          message.mediaUrl,
+          connection.accessToken || '',
+          message.type || 'image',
+          messageId
+        );
+
+        if (!downloadedMediaUrl) {
+          return res.status(404).json({ error: 'Failed to download Instagram media' });
+        }
+
+
+        await db.update(messages)
+          .set({ mediaUrl: downloadedMediaUrl })
+          .where(eq(messages.id, messageId));
+
+        const fetchedAt = Date.now();
+        res.setHeader('X-Media-Fetched-At', fetchedAt.toString());
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+
+        return res.status(200).json({
+          mediaUrl: downloadedMediaUrl,
+          fetchedAt,
+          cacheHint: 'local'
+        });
+      }
+
+
       const waMessage = metadata.waMessage ||
         metadata.message ||
         (metadata.messageData && metadata.messageData.message);
@@ -2382,14 +3861,6 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           simulated: true,
           fetchedAt
         });
-      }
-
-      const conversation = await db.query.conversations.findFirst({
-        where: eq(conversations.id, message.conversationId)
-      });
-
-      if (!conversation || !conversation.channelId) {
-        return res.status(400).json({ error: 'Conversation not found or has no channel ID' });
       }
 
       if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial') {
@@ -2422,11 +3893,14 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         .set({ mediaUrl })
         .where(eq(messages.id, messageId));
 
+
+
+
       const fetchedAt = Date.now();
       res.setHeader('X-Media-Fetched-At', fetchedAt.toString());
       res.setHeader('Cache-Control', 'public, max-age=86400');
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         mediaUrl,
         fetchedAt,
         cacheHint: 'external'
@@ -2457,6 +3931,18 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         if (await fsExtra.pathExists(mediaPath)) {
           const stats = await fsExtra.stat(mediaPath);
           const filename = generateDownloadFilename(message, message.mediaUrl);
+
+
+          const conversation = await db.query.conversations.findFirst({
+            where: eq(conversations.id, message.conversationId)
+          });
+
+
+          if (conversation?.companyId) {
+            dataUsageTracker.trackBandwidthUsage(conversation.companyId, stats.size).catch(err => {
+              console.error('Failed to track bandwidth usage:', err);
+            });
+          }
 
           res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
           res.setHeader('Content-Length', stats.size);
@@ -2497,6 +3983,66 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ error: 'Conversation not found or has no channel ID' });
       }
 
+
+      if (conversation.channelType === 'whatsapp_official') {
+
+
+        const connection = await storage.getChannelConnection(conversation.channelId);
+
+        if (!connection) {
+          return res.status(400).json({ error: 'WhatsApp connection not found' });
+        }
+
+
+        if (!metadata.mediaId) {
+          return res.status(400).json({ error: 'Media ID not found in message metadata' });
+        }
+
+
+        const connectionData = connection.connectionData as any;
+        const accessToken = connection.accessToken || connectionData?.accessToken;
+
+        if (!accessToken) {
+          return res.status(400).json({ error: 'WhatsApp access token not available' });
+        }
+
+
+        const mediaUrl = await downloadWhatsAppOfficialMedia(
+          metadata.mediaId,
+          accessToken,
+          message.type || 'image'
+        );
+
+        if (!mediaUrl) {
+          return res.status(404).json({ error: 'Failed to download media from WhatsApp servers' });
+        }
+
+
+        await db.update(messages)
+          .set({ mediaUrl })
+          .where(eq(messages.id, messageId));
+
+
+        const mediaPath = path.join(process.cwd(), 'public', mediaUrl.substring(1));
+        const stats = await fsExtra.stat(mediaPath);
+        const filename = generateDownloadFilename(message, mediaUrl);
+
+
+        if (conversation?.companyId) {
+          dataUsageTracker.trackBandwidthUsage(conversation.companyId, stats.size).catch(err => {
+            console.error('Failed to track bandwidth usage:', err);
+          });
+        }
+
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', stats.size);
+        res.setHeader('Content-Type', getContentType(message.type || 'document', mediaUrl || ''));
+
+        const fileStream = fs.createReadStream(mediaPath);
+        fileStream.pipe(res);
+        return;
+      }
+
       if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial') {
         return res.status(400).json({ error: 'Media download only supported for WhatsApp channels' });
       }
@@ -2519,6 +4065,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const mediaPath = path.join(process.cwd(), 'public', mediaUrl.substring(1));
       const stats = await fsExtra.stat(mediaPath);
       const filename = generateDownloadFilename(message, mediaUrl);
+
+
+      if (conversation?.companyId) {
+        dataUsageTracker.trackBandwidthUsage(conversation.companyId, stats.size).catch(err => {
+          console.error('Failed to track bandwidth usage:', err);
+        });
+      }
 
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', stats.size);
@@ -2582,7 +4135,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       '.mp4': 'video/mp4',
       '.avi': 'video/avi',
       '.mov': 'video/quicktime',
-      '.ogg': 'audio/ogg; codecs=opus', // Best WhatsApp Android compatibility
+      '.ogg': 'audio/ogg', // Best WhatsApp Android compatibility (Opus codec)
       '.mp3': 'audio/mpeg',
       '.m4a': 'audio/mp4',
       '.wav': 'audio/wav',
@@ -2602,7 +4155,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       case 'audio':
 
         if (mediaUrl.includes('_ogg_') || mediaUrl.includes('.ogg')) {
-          return 'audio/ogg; codecs=opus';
+          return 'audio/ogg';
         } else if (mediaUrl.includes('_m4a_') || mediaUrl.includes('.m4a')) {
           return 'audio/mp4';
         }
@@ -2625,100 +4178,42 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
 
-  app.post('/api/webhooks/twilio-whatsapp', express.urlencoded({ extended: true }), async (req, res) => {
+  app.get('/api/admin/tiktok/health', ensureAuthenticated, ensureSuperAdmin, async (req: Request, res: Response) => {
     try {
-
-
-      const payload = req.body;
-
-      if (!payload.EventType) {
-
-        return res.status(400).send('Bad Request');
+      const stats = TikTokService.getHealthMonitoringStats();
+      const connections = await storage.getChannelConnectionsByType('tiktok');
+      const byStatus: Record<string, number> = {};
+      let avgTokenAgeMs = 0;
+      const upcomingExpirations: { connectionId: number; expiresAt: number; accountName: string }[] = [];
+      const now = Date.now();
+      const twelveHours = 12 * 60 * 60 * 1000;
+      for (const c of connections) {
+        byStatus[c.status || 'unknown'] = (byStatus[c.status || 'unknown'] ?? 0) + 1;
+        const data = c.connectionData as { tokenExpiresAt?: number; accountName?: string } | undefined;
+        if (data?.tokenExpiresAt) {
+          avgTokenAgeMs += data.tokenExpiresAt - now;
+          if (data.tokenExpiresAt < now + twelveHours) {
+            upcomingExpirations.push({
+              connectionId: c.id,
+              expiresAt: data.tokenExpiresAt,
+              accountName: data.accountName || c.accountName || ''
+            });
+          }
+        }
       }
-
-      await whatsAppTwilioService.processWebhook(payload);
-
-      res.status(200).send('OK');
-    } catch (error) {
-      console.error('Error processing Twilio WhatsApp webhook:', error);
-      res.status(500).send('Internal Server Error');
-    }
-  });
-
-  app.post('/api/webhooks/360dialog-partner', express.json(), async (req, res) => {
-    try {
-
-
-      const payload = req.body;
-
-      if (!payload.id || !payload.event) {
-
-        return res.status(400).send('Bad Request');
-      }
-
-      await whatsApp360DialogPartnerService.processPartnerWebhook(payload);
-
-      res.status(200).send('OK');
-    } catch (error) {
-      console.error('Error processing 360Dialog Partner webhook:', error);
-      res.status(500).send('Internal Server Error');
-    }
-  });
-
-  app.post('/api/webhooks/360dialog-messaging', express.json(), async (req, res) => {
-    try {
-
-
-      const payload = req.body;
-
-      if (!payload.object || !payload.entry) {
-
-        return res.status(400).send('Bad Request');
-      }
-
-      await whatsApp360DialogPartnerService.processMessagingWebhook(payload);
-
-      res.status(200).send('OK');
-    } catch (error) {
-      console.error('Error processing 360Dialog Messaging webhook:', error);
-      res.status(500).send('Internal Server Error');
-    }
-  });
-
-  app.post('/api/360dialog/onboarding-callback', ensureAuthenticated, async (req: Request, res: Response) => {
-    try {
-
-
-      const { clientId, channels } = req.body;
-      const user = req.user as any;
-
-      if (!user?.id || !user?.companyId) {
-        return res.status(401).json({ error: 'User not authenticated' });
-      }
-
-      const userId = user.id;
-      const companyId = user.companyId;
-
-      if (!clientId || !channels || !Array.isArray(channels)) {
-        return res.status(400).json({ error: 'Missing required onboarding data' });
-      }
-
-      const success = await whatsApp360DialogPartnerService.processOnboardingCallback(companyId, {
-        clientId,
-        channels
+      if (connections.length > 0) avgTokenAgeMs /= connections.length;
+      res.json({
+        ...stats,
+        connectionsByStatus: byStatus,
+        averageTokenAgeMs: avgTokenAgeMs,
+        upcomingTokenExpirations: upcomingExpirations.slice(0, 20),
+        totalConnections: connections.length
       });
-
-      if (success) {
-        res.json({ success: true, message: 'Onboarding processed successfully' });
-      } else {
-        res.status(500).json({ error: 'Failed to process onboarding callback' });
-      }
-    } catch (error: any) {
-      console.error('Error processing 360Dialog onboarding callback:', error);
-      res.status(500).json({ error: error.message || 'Failed to process onboarding callback' });
+    } catch (error) {
+      console.error('Error fetching TikTok health:', error);
+      res.status(500).json({ error: 'Failed to fetch TikTok health' });
     }
   });
-
 
   app.post('/api/tiktok/refresh-connection/:connectionId', ensureAuthenticated, async (req: Request, res: Response) => {
     try {
@@ -2760,6 +4255,199 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     }
   });
 
+
+  app.get('/api/tiktok/connections/:connectionId/diagnostics', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const connectionId = parseInt(req.params.connectionId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection || connection.companyId !== user.companyId || connection.channelType !== 'tiktok') {
+        return res.status(404).json({ error: 'Connection not found' });
+      }
+      const data = connection.connectionData as Record<string, unknown> | undefined;
+      const tokenExpiresAt = (data?.tokenExpiresAt as number) || 0;
+      const now = Date.now();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      let status: 'connected' | 'token_expiring' | 'disconnected' | 'error' = 'connected';
+      if ((connection as any).status === 'error' || (connection as any).status === 'disconnected') status = (connection as any).status === 'error' ? 'error' : 'disconnected';
+      else if (tokenExpiresAt > 0 && tokenExpiresAt - now < sevenDays) status = 'token_expiring';
+      const grantedScopes = (data?.grantedScopes as string[]) || [];
+      const requiredScopes = ['user.info.basic', 'im.chat', 'business.management'];
+      const missingScopes = requiredScopes.filter(s => !grantedScopes.includes(s));
+      let healthScore = 0;
+      if (status === 'connected') healthScore += 40;
+      else if (status === 'token_expiring') healthScore += 25;
+      if (data?.lastSyncAt && (data.lastSyncAt as number) > now - 3600000) healthScore += 30;
+      else if (data?.lastSyncAt) healthScore += 15;
+      const errCount = (data?.errorCount as number) || 0;
+      if (errCount === 0) healthScore += 20;
+      else if (errCount < 5) healthScore += 10;
+      healthScore += 10;
+      const health = {
+        connectionId,
+        status,
+        healthScore: Math.min(100, healthScore),
+        tokenExpiresAt: new Date(tokenExpiresAt || now),
+        lastSuccessfulCall: data?.lastSyncAt ? new Date(data.lastSyncAt as number) : null,
+        errorCount: (data?.errorCount as number) || 0,
+        lastError: (data?.lastError as string) || null,
+        grantedScopes,
+        missingScopes,
+        regionRestrictions: {
+          isRestricted: !!(data?.regionRestricted),
+          region: (data?.regionCode as string) || 'Unknown',
+          unavailableFeatures: (data?.restrictedFeatures as string[]) || []
+        }
+      };
+      res.json({ health });
+    } catch (error) {
+      console.error('Error fetching TikTok diagnostics:', error);
+      res.status(500).json({ error: 'Failed to fetch diagnostics' });
+    }
+  });
+
+  app.get('/api/tiktok/connections/:connectionId/window-status', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const connectionId = parseInt(req.params.connectionId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection || connection.companyId !== user.companyId || connection.channelType !== 'tiktok') {
+        return res.status(404).json({ error: 'Connection not found' });
+      }
+      const convs = await storage.getConversationsByChannel(connectionId);
+      const windowStatuses = (convs || []).map((c: any) => {
+        const meta = (c.groupMetadata || {}) as Record<string, unknown>;
+        const expiresAt = (meta.messagingWindowExpiresAt as number) || null;
+        const now = Date.now();
+        const remaining = expiresAt != null ? Math.max(0, expiresAt - now) : null;
+        let status: 'active' | 'expiring_soon' | 'expired' = 'active';
+        if (meta.messagingWindowStatus === 'closed' || meta.messagingWindowStatus === 'expired') status = 'expired';
+        else if (remaining != null && remaining < 2 * 60 * 60 * 1000) status = 'expiring_soon';
+        return {
+          conversationId: c.id,
+          isOpen: status !== 'expired',
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          lastInteractionAt: c.updatedAt ? new Date(c.updatedAt) : new Date(),
+          status,
+          remainingTime: remaining ?? 0
+        };
+      });
+      res.json({ windowStatuses });
+    } catch (error) {
+      console.error('Error fetching TikTok window status:', error);
+      res.status(500).json({ error: 'Failed to fetch window status' });
+    }
+  });
+
+  app.post('/api/tiktok/connections/:connectionId/refresh-token', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const connectionId = parseInt(req.params.connectionId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection || connection.companyId !== user.companyId || connection.channelType !== 'tiktok') {
+        return res.status(404).json({ error: 'Connection not found' });
+      }
+      await TikTokService.ensureValidToken(connectionId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error refreshing TikTok token:', error);
+      res.status(500).json({ error: 'Failed to refresh token' });
+    }
+  });
+
+  app.get('/api/tiktok/connections/:connectionId/capabilities', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const connectionId = parseInt(req.params.connectionId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection || connection.companyId !== user.companyId || connection.channelType !== 'tiktok') {
+        return res.status(404).json({ error: 'Connection not found' });
+      }
+      const data = connection.connectionData as Record<string, unknown> | undefined;
+      const grantedScopes = (data?.grantedScopes as string[]) || [];
+      const capabilities = {
+        supportsReply: true,
+        supportsDelete: false,
+        supportsQuotedMessages: false,
+        replyFormat: 'mention' as const,
+        supportsTypingIndicator: false,
+        supportsReadReceipts: false,
+        supportsReactions: false,
+        supportsRichMedia: true,
+        supportedMediaTypes: ['text', 'image', 'video', 'sticker'],
+        hasMessagingWindow: true,
+        messagingWindowDuration: 48 * 60 * 60 * 1000,
+        maxMessageLength: 2000,
+        requiresBusinessAccount: true,
+        grantedScopes
+      };
+      res.json({ capabilities });
+    } catch (error) {
+      console.error('Error fetching TikTok capabilities:', error);
+      res.status(500).json({ error: 'Failed to fetch capabilities' });
+    }
+  });
+
+  app.post('/api/tiktok/connections/:connectionId/verify-account', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const connectionId = parseInt(req.params.connectionId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection || connection.companyId !== user.companyId || connection.channelType !== 'tiktok') {
+        return res.status(404).json({ error: 'Connection not found' });
+      }
+      const data = connection.connectionData as Record<string, unknown> | undefined;
+      const isBusinessAccount = !!(data?.isBusinessAccount);
+      res.json({ isBusinessAccount, verified: isBusinessAccount });
+    } catch (error) {
+      console.error('Error verifying TikTok account:', error);
+      res.status(500).json({ error: 'Failed to verify account' });
+    }
+  });
+
+  app.get('/api/tiktok/connections/:connectionId/region-info', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const connectionId = parseInt(req.params.connectionId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection || connection.companyId !== user.companyId || connection.channelType !== 'tiktok') {
+        return res.status(404).json({ error: 'Connection not found' });
+      }
+      const data = connection.connectionData as Record<string, unknown> | undefined;
+      res.json({
+        regionCode: data?.regionCode ?? null,
+        isRestricted: !!(data?.regionRestricted),
+        unavailableFeatures: (data?.restrictedFeatures as string[]) || []
+      });
+    } catch (error) {
+      console.error('Error fetching TikTok region info:', error);
+      res.status(500).json({ error: 'Failed to fetch region info' });
+    }
+  });
+
+  app.post('/api/tiktok/conversations/:conversationId/typing', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const conversationId = parseInt(req.params.conversationId);
+      const { isTyping } = req.body;
+      const user = req.user as any;
+      if (!user?.id || !user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+      if (conversation.companyId !== user.companyId) return res.status(403).json({ error: 'Access denied' });
+      if (isTyping) TikTokService.startTypingIndicator(conversationId, user.id, user.companyId);
+      else TikTokService.stopTypingIndicator(conversationId, user.id, user.companyId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating typing indicator:', error);
+      res.status(500).json({ error: 'Failed to update typing indicator' });
+    }
+  });
 
   app.post('/api/tiktok/typing/:conversationId', ensureAuthenticated, async (req: Request, res: Response) => {
     try {
@@ -2890,6 +4578,59 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     }
   });
 
+  app.post('/api/tiktok/conversations/:conversationId/messages/:messageId/read', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const conversationId = parseInt(req.params.conversationId);
+      const messageId = parseInt(req.params.messageId);
+      const user = req.user as any;
+      if (!user?.id || !user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation || conversation.companyId !== user.companyId) return res.status(403).json({ error: 'Access denied' });
+      const message = await storage.getMessageById(messageId);
+      if (!message || message.conversationId !== conversationId) return res.status(404).json({ error: 'Message not found' });
+      await TikTokService.markMessageAsRead(messageId, user.id, user.companyId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+      res.status(500).json({ error: 'Failed to mark message as read' });
+    }
+  });
+
+  app.get('/api/tiktok/conversations/:conversationId/messages/:messageId/status', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const conversationId = parseInt(req.params.conversationId);
+      const messageId = parseInt(req.params.messageId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation || conversation.companyId !== user.companyId) return res.status(403).json({ error: 'Access denied' });
+      const message = await storage.getMessageById(messageId);
+      if (!message || message.conversationId !== conversationId) return res.status(404).json({ error: 'Message not found' });
+      const status = await TikTokService.getMessageDeliveryStatus(messageId);
+      res.json({ status });
+    } catch (error) {
+      console.error('Error getting message status:', error);
+      res.status(500).json({ error: 'Failed to get message status' });
+    }
+  });
+
+  app.get('/api/tiktok/conversations/:conversationId/messages/:messageId/receipts', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const conversationId = parseInt(req.params.conversationId);
+      const messageId = parseInt(req.params.messageId);
+      const user = req.user as any;
+      if (!user?.companyId) return res.status(401).json({ error: 'User not authenticated' });
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation || conversation.companyId !== user.companyId) return res.status(403).json({ error: 'Access denied' });
+      const message = await storage.getMessageById(messageId);
+      if (!message || message.conversationId !== conversationId) return res.status(404).json({ error: 'Message not found' });
+      const receipts = TikTokService.getMessageReadReceipts(messageId);
+      res.json({ receipts: receipts || [] });
+    } catch (error) {
+      console.error('Error getting read receipts:', error);
+      res.status(500).json({ error: 'Failed to get read receipts' });
+    }
+  });
 
   app.post('/api/tiktok/conversations/:conversationId/read', ensureAuthenticated, async (req: Request, res: Response) => {
     try {
@@ -3156,13 +4897,26 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
 
+      const codeVerifier = crypto.randomBytes(32).toString('base64url');
+      
+
+      const codeChallenge = crypto
+        .createHash('sha256')
+        .update(codeVerifier)
+        .digest('base64url');
+
       if (!req.session) {
         req.session = {} as any;
       }
       (req.session as any).tiktokOAuthState = state;
       (req.session as any).tiktokAccountName = accountName;
+      (req.session as any).tiktokCodeVerifier = codeVerifier;
 
-      res.json({ success: true });
+      res.json({ 
+        success: true,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256'
+      });
     } catch (error) {
       console.error('Error preparing TikTok OAuth:', error);
       res.status(500).json({ error: 'Failed to prepare OAuth' });
@@ -3237,31 +4991,95 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const platformConfig = await TikTokService.getPlatformConfig();
 
 
+      const codeVerifier: string | undefined = (req.session as any)?.tiktokCodeVerifier;
+
+
+
+
+
+
+
       const tokenResponse = await TikTokService.exchangeCodeForToken(
         code as string,
-        platformConfig.redirectUrl || `${process.env.BASE_URL || 'http://localhost:5000'}/api/tiktok/oauth/callback`
+        platformConfig.redirectUrl || `${process.env.BASE_URL || 'http://localhost:5000'}/api/tiktok/oauth/callback`,
+        codeVerifier
       );
 
 
       const userInfo = await TikTokService.getUserInfo(tokenResponse.access_token);
 
 
+      const businessAccountVerification = await TikTokService.verifyBusinessAccount(tokenResponse.access_token);
+      
+      if (!businessAccountVerification.isBusinessAccount) {
+        return res.status(400).send(`
+          <html>
+            <body>
+              <h1>TikTok Business Account Required</h1>
+              <p>TikTok Business Account required. Personal and Creator accounts are not supported for messaging. Please convert your account to a Business Account in TikTok settings.</p>
+              <p><a href="https://www.tiktok.com/business/en-US" target="_blank">Learn how to convert to a Business Account →</a></p>
+              <script>
+                setTimeout(() => {
+                  window.opener?.postMessage({ type: 'tiktok_oauth_error', error: 'TikTok Business Account Required' }, '*');
+                  window.close();
+                }, 3000);
+              </script>
+            </body>
+          </html>
+        `);
+      }
+
+
+      const grantedScopes = tokenResponse.scope?.split(',').map((s: string) => s.trim()) || [];
+      const requiredScopes = ['user.info.basic', 'im.chat', 'business.management'];
+      const missingScopes = requiredScopes.filter(scope => !grantedScopes.includes(scope));
+      
+      if (missingScopes.length > 0) {
+        return res.status(400).send(`
+          <html>
+            <body>
+              <h1>Required Permissions Not Granted</h1>
+              <p>Required permissions not granted. Please authorize all requested permissions to enable messaging features.</p>
+              <p>Missing scopes: ${missingScopes.join(', ')}</p>
+              <script>
+                setTimeout(() => {
+                  window.opener?.postMessage({ type: 'tiktok_oauth_error', error: 'Required Permissions Not Granted' }, '*');
+                  window.close();
+                }, 3000);
+              </script>
+            </body>
+          </html>
+        `);
+      }
+
+
+      logger.info('tiktok', 'OAuth scopes granted:', { grantedScopes, userId: user.id, companyId: user.companyId });
+
+
+      const regionInfo = await TikTokService.detectRegionRestrictions(tokenResponse.access_token, userInfo);
+
       const accountName = (req.session as any)?.tiktokAccountName || `TikTok - ${userInfo.display_name}`;
 
-
       const connectionData = {
-        openId: userInfo.open_id,
-        unionId: userInfo.union_id,
-        displayName: userInfo.display_name,
-        username: userInfo.username,
-        avatarUrl: userInfo.avatar_url,
-        isVerified: userInfo.is_verified,
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token,
         tokenExpiresAt: Date.now() + (tokenResponse.expires_in * 1000),
-        scopes: tokenResponse.scope?.split(',') || [],
+        accountId: userInfo.open_id,
+        accountName: userInfo.display_name,
+        accountHandle: userInfo.username,
+        avatarUrl: userInfo.avatar_url,
+        grantedScopes: grantedScopes,
+        isBusinessAccount: businessAccountVerification.isBusinessAccount,
+        businessAccountId: businessAccountVerification.businessAccountId,
+        regionRestricted: regionInfo.regionRestricted,
+        restrictedFeatures: regionInfo.restrictedFeatures,
+        regionCode: regionInfo.regionCode,
+        connectedAt: Date.now(),
         lastSyncAt: Date.now(),
-        status: 'active'
+        status: 'active' as const,
+        lastError: regionInfo.regionRestricted 
+          ? 'Messaging features unavailable in your region (EEA/UK/CH). Analytics and profile features remain available.'
+          : undefined
       };
 
       const connection = await storage.createChannelConnection({
@@ -3282,6 +5100,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       if (req.session) {
         delete (req.session as any).tiktokOAuthState;
         delete (req.session as any).tiktokAccountName;
+        delete (req.session as any).tiktokCodeVerifier;
       }
 
 
@@ -3335,27 +5154,70 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                 <strong>${userInfo.display_name}</strong>
                 ${userInfo.username ? `<br/>@${userInfo.username}` : ''}
               </div>
-              <p style="font-size: 0.875rem; color: #999;">This window will close automatically...</p>
+              <p style="font-size: 0.875rem; color: #999;">Redirecting to settings...</p>
             </div>
             <script>
+
               window.opener?.postMessage({ type: 'tiktok_oauth_success' }, '*');
-              setTimeout(() => window.close(), 3000);
+              
+
+              setTimeout(() => {
+                if (window.opener) {
+
+                  window.opener.location.href = '/settings';
+                  window.close();
+                } else {
+
+                  window.location.href = '/settings';
+                }
+              }, 1500);
             </script>
           </body>
         </html>
       `);
     } catch (error: any) {
       console.error('Error processing TikTok OAuth callback:', error);
+      
+
+      let errorTitle = 'Connection Error';
+      let errorMessage = error.message || 'Failed to connect TikTok account';
+      let actionableGuidance = '';
+      
+      if (error.message?.includes('Business Account') || error.response?.data?.error?.code === 'BUSINESS_ACCOUNT_REQUIRED') {
+        errorTitle = 'TikTok Business Account Required';
+        errorMessage = 'TikTok Business Account required. Personal and Creator accounts are not supported for messaging.';
+        actionableGuidance = '<p><a href="https://www.tiktok.com/business/en-US" target="_blank">Learn how to convert to a Business Account →</a></p>';
+      } else if (error.message?.includes('Required Permissions') || error.message?.includes('scope')) {
+        errorTitle = 'Required Permissions Not Granted';
+        errorMessage = 'Required permissions not granted. Please authorize all requested permissions to enable messaging features.';
+        actionableGuidance = '<p>Please try connecting again and ensure you grant all requested permissions.</p>';
+      } else if (error.message?.includes('region') || error.response?.data?.error?.code === 'REGION_NOT_SUPPORTED') {
+        errorTitle = 'Messaging Unavailable in Your Region';
+        errorMessage = 'Messaging features are not available in your region (EEA/UK/CH). Analytics and profile features remain available.';
+        actionableGuidance = '<p>Your connection will be created with limited functionality.</p>';
+      }
+      
+
+      logger.error('tiktok', 'OAuth callback error:', {
+        error: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+        status: error.response?.status,
+        userId: (req.user as any)?.id,
+        companyId: (req.user as any)?.companyId
+      });
+      
       res.status(500).send(`
         <html>
           <body>
-            <h1>Connection Error</h1>
-            <p>${error.message || 'Failed to connect TikTok account'}</p>
+            <h1>${errorTitle}</h1>
+            <p>${errorMessage}</p>
+            ${actionableGuidance}
             <script>
               setTimeout(() => {
-                window.opener?.postMessage({ type: 'tiktok_oauth_error', error: '${error.message}' }, '*');
+                window.opener?.postMessage({ type: 'tiktok_oauth_error', error: '${errorMessage.replace(/'/g, "\\'")}' }, '*');
                 window.close();
-              }, 2000);
+              }, 3000);
             </script>
           </body>
         </html>
@@ -3364,28 +5226,53 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   });
 
   app.post('/api/channel-connections/whatsapp-embedded-signup', ensureAuthenticated, ensureActiveSubscription, async (req: Request, res: Response) => {
+
+
     try {
-      const { code } = req.body;
+      const { code, connectionName } = req.body;
       const user = req.user as any;
 
       if (!code) {
+        console.error('❌ [OLD EMBEDDED SIGNUP] Missing authorization code');
         return res.status(400).json({ message: 'Authorization code is required' });
       }
 
       if (!user?.id) {
+        console.error('❌ [OLD EMBEDDED SIGNUP] User not authenticated');
         return res.status(401).json({ message: 'User not authenticated' });
       }
 
 
+      const config = await storage.getPartnerConfiguration('meta');
+      if (!config || !config.isActive) {
+        return res.status(500).json({
+          message: 'Meta partner configuration missing or inactive',
+          error: 'Contact your administrator to configure Meta partner credentials in the admin panel (Settings → Partner Configurations → Meta)'
+        });
+      }
 
-      const tokenResponse = await fetch('https://graph.facebook.com/v22.0/oauth/access_token', {
+      if (!config.partnerApiKey) {
+        return res.status(400).json({
+          message: 'Meta partner configuration incomplete',
+          error: 'App ID (partnerApiKey) is missing. Contact your administrator to configure Meta partner credentials in the admin panel.'
+        });
+      }
+
+      if (!config.partnerSecret) {
+        return res.status(400).json({
+          message: 'Meta partner configuration incomplete',
+          error: 'App Secret (partnerSecret) is missing. Contact your administrator to configure Meta partner credentials in the admin panel.'
+        });
+      }
+
+      const tokenResponse = await fetch('https://graph.facebook.com/v24.0/oauth/access_token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: process.env.FACEBOOK_APP_ID || '',
-          client_secret: process.env.FACEBOOK_APP_SECRET || '',
+          client_id: config.partnerApiKey,
+          client_secret: config.partnerSecret,
           code: code,
         }),
       });
@@ -3402,74 +5289,253 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const tokenData = await tokenResponse.json();
       const accessToken = tokenData.access_token;
 
+
+
       if (!accessToken) {
+        console.error('❌ [OLD EMBEDDED SIGNUP] No access token received');
         return res.status(400).json({ message: 'No access token received' });
       }
 
-      const wabaResponse = await fetch(`https://graph.facebook.com/v22.0/me/businesses?access_token=${accessToken}`);
 
-      if (!wabaResponse.ok) {
-        const errorData = await wabaResponse.json();
-        console.error('Failed to get business accounts:', errorData);
+
+
+
+      let wabaId: string | null = null;
+      let businessAccountName: string | null = null;
+      let phoneNumbers: any[] = [];
+
+
+      try {
+        const meResponse = await fetch(`https://graph.facebook.com/v24.0/me?fields=id,name&access_token=${accessToken}`);
+        if (meResponse.ok) {
+          const meData = await meResponse.json();
+
+        }
+      } catch (e) {
+        console.warn('⚠️ [OLD EMBEDDED SIGNUP] Could not get user info:', e);
+      }
+
+
+      try {
+        const wabaResponse = await fetch(`https://graph.facebook.com/v24.0/me?fields=owned_whatsapp_business_accounts{id,name,phone_numbers{id,display_phone_number,verified_name}}&access_token=${accessToken}`);
+
+        if (wabaResponse.ok) {
+          const wabaData = await wabaResponse.json();
+
+
+          if (wabaData.owned_whatsapp_business_accounts?.data?.length > 0) {
+            const businessAccount = wabaData.owned_whatsapp_business_accounts.data[0];
+            wabaId = businessAccount.id;
+            businessAccountName = businessAccount.name || 'WhatsApp Business Account';
+
+            if (businessAccount.phone_numbers?.data?.length > 0) {
+              phoneNumbers = businessAccount.phone_numbers.data;
+            }
+          }
+        } else {
+          const errorData = await wabaResponse.json();
+          console.warn('⚠️ [OLD EMBEDDED SIGNUP] Could not get owned WABAs:', errorData);
+        }
+      } catch (e) {
+        console.warn('⚠️ [OLD EMBEDDED SIGNUP] Error getting owned WABAs:', e);
+      }
+
+
+      if (!wabaId) {
+        try {
+          const businessesResponse = await fetch(`https://graph.facebook.com/v24.0/me/businesses?access_token=${accessToken}`);
+          if (businessesResponse.ok) {
+            const businessesData = await businessesResponse.json();
+
+
+            if (businessesData.data && businessesData.data.length > 0) {
+
+              for (const business of businessesData.data) {
+                try {
+                  const wabaResponse = await fetch(
+                    `https://graph.facebook.com/v24.0/${business.id}/owned_whatsapp_business_accounts?access_token=${accessToken}`
+                  );
+                  if (wabaResponse.ok) {
+                    const wabaData = await wabaResponse.json();
+                    if (wabaData.data && wabaData.data.length > 0) {
+                      wabaId = wabaData.data[0].id;
+                      businessAccountName = business.name || 'WhatsApp Business Account';
+                      break;
+                    }
+                  }
+                } catch (e) {
+                  console.warn(`⚠️ [OLD EMBEDDED SIGNUP] Error getting WABA for business ${business.id}:`, e);
+                }
+              }
+            }
+          } else {
+            const errorData = await businessesResponse.json();
+            console.error('❌ [OLD EMBEDDED SIGNUP] Failed to get businesses:', errorData);
+          }
+        } catch (e) {
+          console.error('❌ [OLD EMBEDDED SIGNUP] Error getting businesses:', e);
+        }
+      }
+
+
+      if (!wabaId && config.partnerApiKey && config.partnerSecret) {
+        try {
+
+          const appAccessToken = `${config.partnerApiKey}|${config.partnerSecret}`;
+
+
+          const appWabaResponse = await fetch(
+            `https://graph.facebook.com/v24.0/${config.partnerApiKey}/whatsapp_business_accounts?access_token=${appAccessToken}`
+          );
+
+          if (appWabaResponse.ok) {
+            const appWabaData = await appWabaResponse.json();
+
+
+            if (appWabaData.data && appWabaData.data.length > 0) {
+
+              const businessAccount = appWabaData.data[0];
+              wabaId = businessAccount.id;
+              businessAccountName = businessAccount.name || 'WhatsApp Business Account';
+
+
+              try {
+                const phoneNumbersResponse = await fetch(
+                  `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}`
+                );
+                if (phoneNumbersResponse.ok) {
+                  const phoneNumbersData = await phoneNumbersResponse.json();
+                  if (phoneNumbersData.data && phoneNumbersData.data.length > 0) {
+                    phoneNumbers = phoneNumbersData.data;
+                  }
+                }
+              } catch (e) {
+                console.warn('⚠️ [OLD EMBEDDED SIGNUP] Could not get phone numbers with user token:', e);
+
+                try {
+                  const phoneNumbersResponse = await fetch(
+                    `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${appAccessToken}`
+                  );
+                  if (phoneNumbersResponse.ok) {
+                    const phoneNumbersData = await phoneNumbersResponse.json();
+                    if (phoneNumbersData.data && phoneNumbersData.data.length > 0) {
+                      phoneNumbers = phoneNumbersData.data;
+                    }
+                  }
+                } catch (e2) {
+                  console.warn('⚠️ [OLD EMBEDDED SIGNUP] Could not get phone numbers with app token either:', e2);
+                }
+              }
+            }
+          } else {
+            const errorData = await appWabaResponse.json();
+            console.warn('⚠️ [OLD EMBEDDED SIGNUP] Could not get WABAs from app:', errorData);
+          }
+        } catch (e) {
+          console.warn('⚠️ [OLD EMBEDDED SIGNUP] Error getting WABAs from app:', e);
+        }
+      }
+
+      if (!wabaId) {
+        console.error('❌ [OLD EMBEDDED SIGNUP] Could not find WhatsApp Business Account after all attempts');
+
+
+
+
+
+
         return res.status(400).json({
-          message: 'Failed to retrieve business account information',
-          error: errorData
+          message: 'Could not find WhatsApp Business Account. The embedded signup may not have completed successfully, or the access token does not have required permissions.',
+          error: 'No WhatsApp Business Account found for this access token',
+          suggestion: 'Please ensure the embedded signup completes and check if the message listener receives the signup data. The signup data should include business_account_id and phone_numbers.'
         });
       }
 
-      const wabaData = await wabaResponse.json();
 
-      if (!wabaData.data || wabaData.data.length === 0) {
-        return res.status(400).json({ message: 'No WhatsApp Business accounts found' });
+
+
+      if (phoneNumbers.length === 0) {
+        try {
+          const phoneNumbersResponse = await fetch(
+            `https://graph.facebook.com/v24.0/${wabaId}/phone_numbers?access_token=${accessToken}`
+          );
+
+          if (phoneNumbersResponse.ok) {
+            const phoneNumbersData = await phoneNumbersResponse.json();
+            if (phoneNumbersData.data && phoneNumbersData.data.length > 0) {
+              phoneNumbers = phoneNumbersData.data;
+            }
+          } else {
+            const errorData = await phoneNumbersResponse.json();
+            console.warn('⚠️ [OLD EMBEDDED SIGNUP] Could not get phone numbers:', errorData);
+          }
+        } catch (e) {
+          console.warn('⚠️ [OLD EMBEDDED SIGNUP] Error getting phone numbers:', e);
+        }
       }
 
-      const businessAccount = wabaData.data[0];
-      const wabaId = businessAccount.id;
-
-      const phoneNumbersResponse = await fetch(
-        `https://graph.facebook.com/v22.0/${wabaId}/phone_numbers?access_token=${accessToken}`
-      );
-
-      if (!phoneNumbersResponse.ok) {
-        const errorData = await phoneNumbersResponse.json();
-        console.error('Failed to get phone numbers:', errorData);
-        return res.status(400).json({
-          message: 'Failed to retrieve phone numbers',
-          error: errorData
-        });
-      }
-
-      const phoneNumbersData = await phoneNumbersResponse.json();
-
-      if (!phoneNumbersData.data || phoneNumbersData.data.length === 0) {
+      if (phoneNumbers.length === 0) {
+        console.error('❌ [OLD EMBEDDED SIGNUP] No phone numbers found');
         return res.status(400).json({ message: 'No phone numbers found for this WhatsApp Business account' });
       }
 
-      const phoneNumber = phoneNumbersData.data[0];
+      const phoneNumber = phoneNumbers[0];
       const phoneNumberId = phoneNumber.id;
 
 
+
+
       if (!user.companyId) {
+        console.error('❌ [OLD EMBEDDED SIGNUP] Company ID is missing');
         return res.status(400).json({ message: 'Company ID is required for multi-tenant security' });
       }
 
-      const connection = await storage.createChannelConnection({
-        userId: user.id,
-        companyId: user.companyId,
-        channelType: 'whatsapp_official',
-        accountId: wabaId,
-        accountName: `WhatsApp Business - ${phoneNumber.display_phone_number}`,
-        status: 'connected',
-        connectionData: {
-          phoneNumberId: phoneNumberId,
-          wabaId: wabaId,
-          accessToken: accessToken,
-          phoneNumber: phoneNumber.display_phone_number,
-          verifiedName: phoneNumber.verified_name || businessAccount.name,
-          businessAccountId: businessAccount.id,
-          businessAccountName: businessAccount.name
-        }
-      });
+
+
+
+
+      const signupData = {
+        business_account_id: wabaId,
+        business_account_name: businessAccountName,
+        phone_numbers: phoneNumbers.map((pn: any) => ({
+          phone_number_id: pn.id,
+          phone_number: pn.display_phone_number || pn.phone_number || '',
+          display_name: pn.verified_name || pn.display_phone_number || pn.phone_number,
+          access_token: accessToken
+        }))
+      };
+
+
+
+
+      const result = await whatsAppMetaPartnerService.processEmbeddedSignupCallback(
+        user.companyId,
+        signupData,
+        connectionName
+      );
+
+
+
+
+      const connection = result.connections?.[0] || null;
+
+      if (!connection) {
+        console.warn('⚠️ [OLD EMBEDDED SIGNUP] No connection in result, but service completed:', {
+          hasConnections: !!result.connections,
+          connectionsCount: result.connections?.length || 0,
+          hasPhoneNumbers: !!result.phoneNumbers,
+          phoneNumbersCount: result.phoneNumbers?.length || 0
+        });
+
+        return res.status(201).json({
+          client: result.client,
+          phoneNumbers: result.phoneNumbers,
+          connections: result.connections || [],
+          message: 'WhatsApp Business account connected successfully. Please refresh to see the connection.'
+        });
+      }
+
+
 
 
 
@@ -3489,12 +5555,19 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         console.error('Failed to initialize WhatsApp Official service:', initError);
       }
 
+
       broadcastToCompany({
         type: 'channelConnectionCreated',
         data: connection
       }, user.companyId);
 
-      res.status(201).json(connection);
+
+      res.status(201).json({
+        ...connection,
+        client: result.client,
+        phoneNumbers: result.phoneNumbers,
+        message: 'WhatsApp Business account connected successfully'
+      });
     } catch (error) {
       console.error('Error processing WhatsApp Business API signup:', error);
       res.status(500).json({
@@ -3505,30 +5578,680 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   });
 
   app.post('/api/channel-connections/meta-whatsapp-embedded-signup', ensureAuthenticated, async (req: Request, res: Response) => {
+    let createdClientId: number | null = null;
+    let createdPhoneNumberIds: number[] = [];
+
+
+
+
     try {
-      const { connectionName, signupData } = req.body;
+      const { connectionName, signupData, signupMode, enableHistorySync } = req.body;
       const user = req.user as any;
 
+
+
       if (!connectionName || !signupData) {
+
         return res.status(400).json({ message: 'Connection name and signup data are required' });
+      }
+
+      if (!user?.companyId) {
+
+        return res.status(401).json({ message: 'User not authenticated or missing company' });
+      }
+
+
+      const { business_account_id } = signupData;
+      if (business_account_id) {
+
+        const existingClient = await storage.getMetaWhatsappClientByBusinessAccountId(business_account_id);
+        if (existingClient) {
+
+
+          if (existingClient.companyId === user.companyId) {
+            const terminalStates = ['webhook_configured', 'completed', 'active'];
+
+            if (existingClient.onboardingState && terminalStates.includes(existingClient.onboardingState)) {
+
+              const existingPhoneNumbers = await storage.getMetaWhatsappPhoneNumbersByClientId(existingClient.id);
+
+
+
+
+
+              const allConnections = await storage.getChannelConnections(null, user.companyId);
+
+
+              const existingConnections = allConnections.filter(conn => {
+                if (conn.channelType !== 'whatsapp_official') {
+
+                  return false;
+                }
+                const connData = conn.connectionData as any;
+                const phoneNumberId = connData?.phoneNumberId;
+                const matches = existingPhoneNumbers.some(pn => pn.phoneNumberId === phoneNumberId);
+
+                return matches;
+              });
+
+
+              if (existingConnections.length === 0 && existingPhoneNumbers.length > 0) {
+
+                const createdConnections = [];
+
+                const businessIdForConnection = signupData.businessId || signupData.data?.business_id;
+
+                for (const phoneNumber of existingPhoneNumbers) {
+                  try {
+
+
+                    const connection = await whatsAppMetaPartnerService.createChannelConnection(
+                      user.companyId,
+                      phoneNumber,
+                      connectionName,
+                      businessIdForConnection // Add missing 4th parameter
+                    );
+                    createdConnections.push(connection);
+
+                  } catch (error) {
+
+                  }
+                }
+
+
+                for (const connection of createdConnections) {
+                  broadcastToCompany({
+                    type: 'channelConnectionCreated',
+                    data: connection
+                  }, user.companyId);
+
+                }
+
+                return res.status(200).json({
+                  client: existingClient,
+                  phoneNumbers: existingPhoneNumbers,
+                  connections: createdConnections,
+                  message: 'Meta WhatsApp Business account already onboarded. Connections created.',
+                  idempotent: true
+                });
+              }
+
+              return res.status(200).json({
+                client: existingClient,
+                phoneNumbers: existingPhoneNumbers,
+                connections: existingConnections,
+                message: 'Meta WhatsApp Business account already onboarded',
+                idempotent: true
+              });
+            }
+
+            if (existingClient.onboardingState === 'failed') {
+
+            }
+          } else {
+
+
+            return res.status(403).json({
+              message: 'This WhatsApp Business Account is already associated with another company'
+            });
+          }
+        } else {
+
+        }
+      }
+
+
+
+      const partnerConfigCheck = await storage.getPartnerConfiguration('meta');
+
+
+
+
+      const result = await whatsAppMetaPartnerService.processEmbeddedSignupCallback(
+        user.companyId,
+        signupData,
+        connectionName,
+        signupMode,
+        enableHistorySync
+      );
+
+
+      if (result.connections && result.connections.length > 0) {
+        const connectionsWithBusinessId = result.connections.filter((c: any) => (c.connectionData as any)?.businessId);
+
+      }
+
+
+      createdClientId = result.client?.id || null;
+      createdPhoneNumberIds = result.phoneNumbers?.map((p: any) => p.id) || [];
+
+
+      if (result.client && result.phoneNumbers && result.phoneNumbers.length > 0) {
+        try {
+          const partnerConfig = await storage.getPartnerConfiguration('meta');
+          if (partnerConfig && partnerConfig.partnerWebhookUrl && partnerConfig.webhookVerifyToken) {
+            const wabaId = result.client.businessAccountId;
+            const appId = partnerConfig.partnerApiKey;
+
+            const appAccessToken = `${partnerConfig.partnerApiKey}|${partnerConfig.partnerSecret}`;
+
+
+            const systemUserToken = partnerConfig.accessToken || undefined; // System User token if configured
+            const webhookUrl = partnerConfig.partnerWebhookUrl;
+            const verifyToken = partnerConfig.webhookVerifyToken;
+
+
+
+
+
+            const webhookResult = await retryWebhookConfiguration(
+              wabaId,
+              appId,
+              webhookUrl,
+              verifyToken,
+              appAccessToken, // App access token for /subscriptions endpoint
+              3,
+              systemUserToken // System User token for /subscribed_apps endpoint (optional)
+            );
+
+            if (webhookResult.success) {
+
+              await storage.updateMetaWhatsappClient(result.client.id, {
+                webhookConfiguredAt: new Date(),
+                onboardingState: 'webhook_configured'
+              });
+
+
+
+            } else {
+
+              const errorCode = webhookResult.error?.error?.code;
+              const errorMessage = webhookResult.error?.error?.message || webhookResult.message || 'Webhook configuration failed';
+
+              let userFriendlyMessage = errorMessage;
+              if (errorCode === 2200) {
+                userFriendlyMessage = 'Webhook callback verification timed out. Meta cannot reach your webhook URL. Please configure webhook manually in Meta App Dashboard or ensure your webhook URL is publicly accessible.';
+              }
+
+
+
+              await storage.updateMetaWhatsappClient(result.client.id, {
+                onboardingState: 'webhook_failed',
+                configurationErrors: {
+                  webhook: userFriendlyMessage,
+                  errorCode: errorCode || 'unknown'
+                }
+              });
+            }
+          }
+        } catch (webhookError) {
+          console.error('Error auto-configuring webhook during embedded signup:', webhookError);
+
+          if (result.client?.id) {
+            await storage.updateMetaWhatsappClient(result.client.id, {
+              onboardingState: 'webhook_failed',
+              configurationErrors: { webhook: (webhookError as Error).message }
+            });
+          }
+        }
+      }
+      if (result.connections && result.connections.length > 0) {
+
+
+        for (const connection of result.connections) {
+
+
+          let connectionToBroadcast = connection;
+          if (enableHistorySync && signupMode === 'coexistence') {
+            const updatedConnection = await storage.updateChannelConnection(connection.id, {
+              connectionData: {
+                ...(connection.connectionData as any),
+                historySyncEnabled: true,
+                historySyncStatus: 'pending'
+              }
+            });
+            connectionToBroadcast = updatedConnection;
+          }
+
+          broadcastToCompany({
+            type: 'channelConnectionCreated',
+            data: connectionToBroadcast
+          }, user.companyId);
+
+
+        }
+      }
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Error processing Meta WhatsApp embedded signup:', error);
+
+
+      if (createdClientId) {
+        try {
+          const errorDetails = {
+            signup: error instanceof Error ? error.message : 'Unknown error during signup',
+            timestamp: new Date().toISOString(),
+            phoneNumbersCreated: createdPhoneNumberIds.length,
+            stack: error instanceof Error ? error.stack : undefined
+          };
+
+          await storage.updateMetaWhatsappClient(createdClientId, {
+            onboardingState: 'failed',
+            status: 'suspended',
+            configurationErrors: errorDetails
+          });
+
+
+          for (const phoneNumberId of createdPhoneNumberIds) {
+            try {
+              await storage.updateMetaWhatsappPhoneNumber(phoneNumberId, {
+                status: 'failed',
+                lastWebhookError: `Onboarding failed: ${errorDetails.signup}`
+              });
+            } catch (phoneError) {
+              console.error(`Error updating phone number ${phoneNumberId} during rollback:`, phoneError);
+            }
+          }
+        } catch (rollbackError) {
+          console.error('Error during rollback:', rollbackError);
+
+        }
+      }
+
+      res.status(500).json({
+        message: 'Failed to process Meta WhatsApp embedded signup',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        rollbackApplied: createdClientId ? true : false
+      });
+    }
+  });
+
+
+  app.post('/api/channel-connections/meta-messenger-embedded-signup', ensureAuthenticated, ensureActiveSubscription, async (req: Request, res: Response) => {
+    try {
+      const { accessToken, action, connectionName, pageId, pageName, pageAccessToken } = req.body;
+      const user = req.user as any;
+
+      if (!user?.companyId) {
+        return res.status(401).json({ message: 'User not authenticated or missing company' });
+      }
+
+      const config = await storage.getPartnerConfiguration('meta');
+      if (!config || !config.isActive) {
+        return res.status(500).json({
+          message: 'Meta partner configuration missing or inactive',
+          error: 'Contact your administrator to configure Meta partner credentials in the admin panel'
+        });
+      }
+
+      if (!config.partnerApiKey || !config.partnerSecret) {
+        return res.status(400).json({
+          message: 'Meta partner configuration incomplete',
+          error: 'App ID and App Secret are required'
+        });
+      }
+
+      if (action === 'fetch_pages') {
+
+        if (!accessToken) {
+          return res.status(400).json({ message: 'Access token is required' });
+        }
+
+        try {
+          const pages = await metaGraphAPI.getUserPages(accessToken);
+          return res.json({ pages });
+        } catch (error: any) {
+          console.error('Error fetching Pages:', error);
+          return res.status(500).json({
+            message: 'Failed to fetch Facebook Pages',
+            error: error.message || 'Unknown error'
+          });
+        }
+      } else if (action === 'create_connection') {
+
+        if (!pageId || !pageAccessToken || !connectionName) {
+          return res.status(400).json({ message: 'Page ID, access token, and connection name are required' });
+        }
+
+        try {
+
+          const longLivedToken = await metaGraphAPI.getPageAccessToken(
+            pageId,
+            pageAccessToken,
+            config.partnerApiKey,
+            config.partnerSecret
+          );
+
+
+          const pageInfo = await metaGraphAPI.getPageInfo(pageId, longLivedToken);
+
+
+          const connection = await storage.createChannelConnection({
+            userId: user.id,
+            companyId: user.companyId,
+            channelType: 'messenger',
+            accountId: pageId,
+            accountName: connectionName,
+            accessToken: longLivedToken,
+            connectionData: {
+              pageId: pageId,
+              appId: config.partnerApiKey,
+              appSecret: config.partnerSecret,
+              webhookUrl: config.partnerWebhookUrl || `${req.protocol}://${req.get('host')}/api/webhooks/messenger`,
+              verifyToken: config.webhookVerifyToken || 'default_verify_token',
+              pageInfo: pageInfo
+            },
+            status: 'active'
+          });
+
+
+          await messengerService.connect(connection.id, user.id, user.companyId);
+
+          broadcastToCompany({
+            type: 'channelConnectionCreated',
+            data: connection
+          }, user.companyId);
+
+          return res.status(201).json({
+            connection,
+            message: 'Messenger connection created successfully'
+          });
+        } catch (error: any) {
+          console.error('Error creating Messenger connection:', error);
+          return res.status(500).json({
+            message: 'Failed to create Messenger connection',
+            error: error.message || 'Unknown error'
+          });
+        }
+      } else {
+        return res.status(400).json({ message: 'Invalid action' });
+      }
+    } catch (error: any) {
+      console.error('Error in Messenger embedded signup:', error);
+      return res.status(500).json({
+        message: 'Failed to process Messenger embedded signup',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+
+  app.post('/api/channel-connections/meta-instagram-embedded-signup', ensureAuthenticated, ensureActiveSubscription, async (req: Request, res: Response) => {
+    try {
+      const { accessToken, action, connectionName, instagramAccountId, username } = req.body;
+      const user = req.user as any;
+
+      if (!user?.companyId) {
+        return res.status(401).json({ message: 'User not authenticated or missing company' });
+      }
+
+      const config = await storage.getPartnerConfiguration('meta');
+      if (!config || !config.isActive) {
+        return res.status(500).json({
+          message: 'Meta partner configuration missing or inactive',
+          error: 'Contact your administrator to configure Meta partner credentials in the admin panel'
+        });
+      }
+
+      if (!config.partnerApiKey || !config.partnerSecret) {
+        return res.status(400).json({
+          message: 'Meta partner configuration incomplete',
+          error: 'App ID and App Secret are required'
+        });
+      }
+
+      if (action === 'fetch_accounts') {
+
+        if (!accessToken) {
+          return res.status(400).json({ message: 'Access token is required' });
+        }
+
+        try {
+          const accounts = await metaGraphAPI.getInstagramAccounts(accessToken);
+          return res.json({ accounts });
+        } catch (error: any) {
+          console.error('Error fetching Instagram accounts:', error);
+          return res.status(500).json({
+            message: 'Failed to fetch Instagram accounts',
+            error: error.message || 'Unknown error'
+          });
+        }
+      } else if (action === 'create_connection') {
+
+        if (!instagramAccountId || !connectionName || !accessToken) {
+          return res.status(400).json({ message: 'Instagram account ID, connection name, and access token are required' });
+        }
+
+        try {
+
+          const pages = await metaGraphAPI.getUserPages(accessToken);
+          let instagramAccessToken = '';
+          let linkedPageId = '';
+
+
+          for (const page of pages) {
+            try {
+              const pageInfo = await metaGraphAPI.getPageInfo(page.id, page.access_token);
+              if (pageInfo.instagram_business_account && pageInfo.instagram_business_account.id === instagramAccountId) {
+                linkedPageId = page.id;
+                instagramAccessToken = page.access_token;
+                break;
+              }
+            } catch (err) {
+
+            }
+          }
+
+          if (!instagramAccessToken) {
+
+            try {
+              const longLivedUserToken = await metaGraphAPI.getPageAccessToken(
+                pages[0]?.id || '',
+                accessToken,
+                config.partnerApiKey,
+                config.partnerSecret
+              );
+              instagramAccessToken = longLivedUserToken;
+            } catch (err) {
+              return res.status(400).json({
+                message: 'Could not find access token for Instagram account',
+                error: 'Please ensure your Instagram account is linked to a Facebook Page'
+              });
+            }
+          }
+
+
+          const accountInfo = await metaGraphAPI.getInstagramAccountInfo(instagramAccountId, instagramAccessToken);
+
+
+          const connection = await storage.createChannelConnection({
+            userId: user.id,
+            companyId: user.companyId,
+            channelType: 'instagram',
+            accountId: instagramAccountId,
+            accountName: connectionName,
+            accessToken: instagramAccessToken,
+            connectionData: {
+              instagramAccountId: instagramAccountId,
+              appId: config.partnerApiKey,
+              appSecret: config.partnerSecret,
+              webhookUrl: config.partnerWebhookUrl || `${req.protocol}://${req.get('host')}/api/webhooks/instagram`,
+              verifyToken: config.webhookVerifyToken || 'default_verify_token',
+              accountInfo: accountInfo,
+              linkedPageId: linkedPageId
+            },
+            status: 'active'
+          });
+
+
+          await instagramService.connect(connection.id, user.id, user.companyId);
+
+          broadcastToCompany({
+            type: 'channelConnectionCreated',
+            data: connection
+          }, user.companyId);
+
+          return res.status(201).json({
+            connection,
+            message: 'Instagram connection created successfully'
+          });
+        } catch (error: any) {
+          console.error('Error creating Instagram connection:', error);
+          return res.status(500).json({
+            message: 'Failed to create Instagram connection',
+            error: error.message || 'Unknown error'
+          });
+        }
+      } else {
+        return res.status(400).json({ message: 'Invalid action' });
+      }
+    } catch (error: any) {
+      console.error('Error in Instagram embedded signup:', error);
+      return res.status(500).json({
+        message: 'Failed to process Instagram embedded signup',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post('/api/channel-connections/:connectionId/disconnect-embedded-signup', ensureAuthenticated, async (req: Request, res: Response) => {
+
+
+    try {
+      const connectionId = parseInt(req.params.connectionId, 10);
+      const user = req.user as any;
+      const companyId = user.companyId;
+
+      if (isNaN(connectionId)) {
+        return res.status(400).json({ message: 'Invalid connection ID' });
+      }
+
+
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection) {
+        console.error('❌ [META DISCONNECT] Connection not found:', connectionId);
+        return res.status(404).json({ message: 'Connection not found' });
+      }
+
+      if (connection.companyId !== companyId) {
+        console.error('❌ [META DISCONNECT] Access denied:', {
+          connectionId,
+          connectionCompanyId: connection.companyId,
+          userCompanyId: companyId
+        });
+        return res.status(403).json({ message: 'Access denied: Connection does not belong to your company' });
+      }
+
+
+      const connectionData = connection.connectionData as any;
+      if (!connectionData?.partnerManaged) {
+        console.error('❌ [META DISCONNECT] Not an embedded signup connection:', connectionId);
+        return res.status(400).json({ message: 'This connection is not an embedded signup connection' });
+      }
+
+
+
+
+      const result = await whatsAppMetaPartnerService.disconnectEmbeddedSignupConnection(connectionId, companyId);
+
+
+
+
+      if (result.connection) {
+        broadcastToCompany({ type: 'channelConnectionUpdated', data: result.connection }, companyId);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: result.message || 'WhatsApp number disconnected successfully',
+        connection: result.connection
+      });
+
+    } catch (error: any) {
+      console.error('❌ [META DISCONNECT] Error:', {
+        connectionId: req.params.connectionId,
+        error: error.message,
+        stack: error.stack
+      });
+
+      const statusCode = error.message?.includes('not found') ? 404
+        : error.message?.includes('Access denied') ? 403
+          : error.message?.includes('not an embedded signup') ? 400
+            : 500;
+
+      return res.status(statusCode).json({
+        success: false,
+        message: error.message || 'Failed to disconnect WhatsApp number',
+        error: error.message
+      });
+    }
+  });
+
+
+  app.post('/api/channel-connections/meta-whatsapp-configure-webhook', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { wabaId, phoneNumberIds } = req.body;
+      const user = req.user as any;
+
+      if (!wabaId) {
+        return res.status(400).json({ message: 'WABA ID is required' });
       }
 
       if (!user?.companyId) {
         return res.status(401).json({ message: 'User not authenticated or missing company' });
       }
 
+      const partnerConfig = await storage.getPartnerConfiguration('meta');
+      if (!partnerConfig || !partnerConfig.isActive) {
+        return res.status(404).json({ message: 'Meta partner configuration not found or inactive' });
+      }
+
+      if (!partnerConfig.partnerWebhookUrl || !partnerConfig.webhookVerifyToken) {
+        return res.status(400).json({ message: 'Webhook URL and verify token must be configured' });
+      }
+
+      const appId = partnerConfig.partnerApiKey;
+      const accessToken = partnerConfig.accessToken || `${partnerConfig.partnerApiKey}|${partnerConfig.partnerSecret}`;
+      const webhookUrl = partnerConfig.partnerWebhookUrl;
+      const verifyToken = partnerConfig.webhookVerifyToken;
 
 
-      const result = await whatsAppMetaPartnerService.processEmbeddedSignupCallback(
-        user.companyId,
-        signupData
+      const result = await retryWebhookConfiguration(
+        wabaId,
+        appId,
+        webhookUrl,
+        verifyToken,
+        accessToken,
+        3
       );
 
-      res.status(201).json(result);
+      if (result.success) {
+
+        const client = await storage.getMetaWhatsappClientByBusinessAccountId(wabaId);
+        if (client) {
+          await storage.updateMetaWhatsappClient(client.id, {
+            webhookConfiguredAt: new Date(),
+            onboardingState: 'webhook_configured'
+          });
+        }
+
+        res.json({
+          success: true,
+          message: 'Webhook configured successfully',
+          subscriptionId: result.subscriptionId
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: result.message,
+          error: result.error
+        });
+      }
     } catch (error) {
-      console.error('Error processing Meta WhatsApp embedded signup:', error);
+      console.error('Error configuring webhook:', error);
       res.status(500).json({
-        message: 'Failed to process Meta WhatsApp embedded signup',
+        message: 'Failed to configure webhook',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -3538,41 +6261,96 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.get('/api/partner-configurations/meta/availability', ensureAuthenticated, async (req: Request, res: Response) => {
     try {
       const config = await storage.getPartnerConfiguration('meta');
-      
+
       if (!config || !config.isActive) {
-        return res.json({ 
-          isAvailable: false, 
-          message: 'Meta WhatsApp Business API Partner integration is not configured' 
+        return res.json({
+          isAvailable: false,
+          message: 'Meta WhatsApp Business API Partner integration is not configured'
         });
       }
 
-      res.json({ 
-        isAvailable: true, 
+      const healthStatus = config.healthCheckStatus as any;
+
+      res.json({
+        isAvailable: true,
         message: 'Meta WhatsApp Business API Partner integration is available',
         config: {
           partnerApiKey: config.partnerApiKey,
-          configId: config.configId
+          configId: config.configId,
+          webhookUrl: config.partnerWebhookUrl,
+          status: healthStatus?.status || 'unknown',
+          lastValidatedAt: config.lastValidatedAt,
+          apiVersion: config.apiVersion || 'v24.0'
         }
       });
     } catch (error) {
       console.error('Error checking Meta partner availability:', error);
-      res.status(500).json({ 
-        isAvailable: false, 
-        message: 'Failed to check Meta partner configuration' 
+      res.status(500).json({
+        isAvailable: false,
+        message: 'Failed to check Meta partner configuration'
+      });
+    }
+  });
+
+
+  app.get('/api/partner-configurations/meta/refresh', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getPartnerConfiguration('meta');
+
+      if (!config || !config.isActive) {
+        return res.status(404).json({
+          error: 'Meta WhatsApp Business API Partner integration is not configured'
+        });
+      }
+
+
+      await storage.updatePartnerConfiguration(config.id, {
+        healthCheckStatus: config.healthCheckStatus // Update with existing data to trigger refresh
+      });
+
+      const refreshedConfig = await storage.getPartnerConfiguration('meta');
+      const healthStatus = refreshedConfig?.healthCheckStatus as any;
+
+      res.json({
+        success: true,
+        config: {
+          partnerApiKey: refreshedConfig?.partnerApiKey,
+          configId: refreshedConfig?.configId,
+          webhookUrl: refreshedConfig?.partnerWebhookUrl,
+          status: healthStatus?.status || 'unknown',
+          lastValidatedAt: refreshedConfig?.lastValidatedAt,
+          apiVersion: refreshedConfig?.apiVersion || 'v24.0'
+        }
+      });
+    } catch (error) {
+      console.error('Error refreshing Meta partner configuration:', error);
+      res.status(500).json({
+        error: 'Failed to refresh Meta partner configuration'
       });
     }
   });
 
   app.get('/api/whatsapp/behavior-config', ensureAuthenticated, async (req: Request, res: Response) => {
     try {
+
       const typingConfig = whatsAppService.getTypingConfiguration();
       const messageSplittingConfig = whatsAppService.getMessageSplittingConfiguration();
       const messageDebouncingConfig = whatsAppService.getMessageDebouncingConfiguration();
 
+
+      const whatsAppOfficialService = await import('./services/channels/whatsapp-official');
+      const officialTypingConfig = whatsAppOfficialService.getTypingConfiguration();
+      const officialMessageSplittingConfig = whatsAppOfficialService.getMessageSplittingConfiguration();
+
       res.json({
         typing: typingConfig,
         messageSplitting: messageSplittingConfig,
-        messageDebouncing: messageDebouncingConfig
+        messageDebouncing: messageDebouncingConfig,
+
+        official: {
+          typing: officialTypingConfig,
+          messageSplitting: officialMessageSplittingConfig
+        }
       });
     } catch (error) {
       console.error('Error getting WhatsApp behavior configuration:', error);
@@ -3587,6 +6365,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     try {
       const { typing, messageSplitting, messageDebouncing } = req.body;
 
+
       if (typing) {
         whatsAppService.configureTypingBehavior(typing);
       }
@@ -3599,11 +6378,26 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         whatsAppService.configureMessageDebouncing(messageDebouncing);
       }
 
+
+      const whatsAppOfficialService = await import('./services/channels/whatsapp-official');
+      
+      if (typing) {
+        whatsAppOfficialService.configureTypingBehavior(typing);
+      }
+
+      if (messageSplitting) {
+        whatsAppOfficialService.configureMessageSplitting(messageSplitting);
+      }
+
       res.json({
-        message: 'WhatsApp behavior configuration updated successfully',
+        message: 'WhatsApp behavior configuration updated successfully for both official and non-official services',
         typing: whatsAppService.getTypingConfiguration(),
         messageSplitting: whatsAppService.getMessageSplittingConfiguration(),
-        messageDebouncing: whatsAppService.getMessageDebouncingConfiguration()
+        messageDebouncing: whatsAppService.getMessageDebouncingConfiguration(),
+        official: {
+          typing: whatsAppOfficialService.getTypingConfiguration(),
+          messageSplitting: whatsAppOfficialService.getMessageSplittingConfiguration()
+        }
       });
     } catch (error) {
       console.error('Error updating WhatsApp behavior configuration:', error);
@@ -3652,15 +6446,73 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     }
   });
 
+
+  const connectionCompanyCache = new Map<number, { companyId: number; timestamp: number }>();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes TTL
+
+  /**
+   * Update the connection company cache
+   * @param connectionId - The channel connection ID
+   * @param companyId - The company ID to cache
+   */
+  function updateConnectionCompanyCache(connectionId: number, companyId: number): void {
+    connectionCompanyCache.set(connectionId, {
+      companyId,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Verify if a channel connection belongs to a specific company
+   * Uses in-memory cache to avoid repeated DB lookups
+   * @param connectionId - The channel connection ID
+   * @param companyId - The company ID to verify against
+   * @returns Promise<boolean> - True if connection belongs to company, false otherwise
+   */
+  async function isConnectionOwnedByCompany(
+    connectionId: number,
+    companyId: number | undefined
+  ): Promise<boolean> {
+
+    if (companyId === null || companyId === undefined) return false;
+
+
+    const cached = connectionCompanyCache.get(connectionId);
+    if (cached) {
+      const age = Date.now() - cached.timestamp;
+      if (age < CACHE_TTL) {
+        return cached.companyId === companyId;
+      } else {
+
+        connectionCompanyCache.delete(connectionId);
+      }
+    }
+
+
+    try {
+      const connection = await storage.getChannelConnection(connectionId);
+      if (connection && connection.companyId !== null) {
+
+        updateConnectionCompanyCache(connectionId, connection.companyId);
+        return connection.companyId === companyId;
+      }
+      return false;
+    } catch (error) {
+      console.error(`Error checking connection ownership: ${error}`);
+      return false;
+    }
+  }
+
   const httpServer = createServer(app);
 
   const wsPort = process.env.WS_PORT ? parseInt(process.env.WS_PORT) : undefined;
   const wss = wsPort
     ? new WebSocketServer({ port: wsPort, path: '/ws' })
-    : new WebSocketServer({ server: httpServer, path: '/ws' });
+    : new WebSocketServer({ noServer: true, path: '/ws' });
 
   if (wsPort) {
   }
+
 
   const clients = new Map<string, {
     socket: WebSocket,
@@ -3796,7 +6648,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         }
 
 
-        const conversations = await storage.getConversations();
+        const conversations = await storage.getConversations({ companyId: user.companyId === null ? undefined : user.companyId });
         ws.send(JSON.stringify({
           type: 'authenticated',
           message: 'Successfully authenticated'
@@ -3811,30 +6663,78 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         const qrCache = new Map<number, { qrCode: string; timestamp: number }>();
         const QR_CACHE_TTL = 12000; // 12 seconds TTL
 
-        const unsubscribeQrCode = whatsAppService.subscribeToEvents('qrCode', (data) => {
+        const unsubscribeQrCode = whatsAppService.subscribeToEvents('qrCode', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            if (data.companyId !== undefined) {
+              if (data.companyId !== client.companyId) return;
+            } else {
+
+              const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+              if (!isOwned) return;
+            }
 
             const cached = qrCache.get(data.connectionId);
             const now = Date.now();
-            const shouldSend = !cached || 
-                             cached.qrCode !== data.qrCode || 
-                             (now - cached.timestamp) > QR_CACHE_TTL;
-            
+            const shouldSend = !cached ||
+              cached.qrCode !== data.qrCode ||
+              (now - cached.timestamp) > QR_CACHE_TTL;
+
             if (shouldSend) {
               const message = {
                 type: 'whatsappQrCode',
                 connectionId: data.connectionId,
                 qrCode: data.qrCode
               };
-              
+
               ws.send(JSON.stringify(message));
               qrCache.set(data.connectionId, { qrCode: data.qrCode, timestamp: now });
             }
           }
         });
 
-        const unsubscribeConnectionStatus = whatsAppService.subscribeToEvents('connectionStatusUpdate', (data) => {
+        const unsubscribeQrCodeRequired = whatsAppService.subscribeToEvents('qrCodeRequired', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            if (data.companyId !== undefined) {
+              if (data.companyId !== client.companyId) return;
+            } else {
+
+              const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+              if (!isOwned) return;
+            }
+
+            ws.send(JSON.stringify({
+              type: 'whatsappQrCodeRequired',
+              connectionId: data.connectionId,
+              message: data.message
+            }));
+          }
+        });
+
+        const unsubscribeConnectionStatus = whatsAppService.subscribeToEvents('connectionStatusUpdate', async (data) => {
+          if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            if (data.companyId !== undefined) {
+              if (data.companyId !== client.companyId) return;
+            } else {
+
+              const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+              if (!isOwned) return;
+            }
+
             ws.send(JSON.stringify({
               type: 'whatsappConnectionStatus',
               connectionId: data.connectionId,
@@ -3843,8 +6743,21 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeConnectionError = whatsAppService.subscribeToEvents('connectionError', (data) => {
+        const unsubscribeConnectionError = whatsAppService.subscribeToEvents('connectionError', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            if (data.companyId !== undefined) {
+              if (data.companyId !== client.companyId) return;
+            } else {
+
+              const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+              if (!isOwned) return;
+            }
+
             ws.send(JSON.stringify({
               type: 'whatsappConnectionError',
               connectionId: data.connectionId,
@@ -3864,8 +6777,16 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeWhatsAppOfficialConnectionStatus = whatsAppOfficialService.subscribeToEvents('connectionStatusUpdate', (data) => {
+        const unsubscribeWhatsAppOfficialConnectionStatus = whatsAppOfficialService.subscribeToEvents('connectionStatusUpdate', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+            if (!isOwned) return;
+
             ws.send(JSON.stringify({
               type: 'whatsappOfficialConnectionStatus',
               connectionId: data.connectionId,
@@ -3874,8 +6795,16 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeWhatsAppOfficialConnectionError = whatsAppOfficialService.subscribeToEvents('connectionError', (data) => {
+        const unsubscribeWhatsAppOfficialConnectionError = whatsAppOfficialService.subscribeToEvents('connectionError', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+            if (!isOwned) return;
+
             ws.send(JSON.stringify({
               type: 'whatsappOfficialConnectionError',
               connectionId: data.connectionId,
@@ -3895,8 +6824,16 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeInstagramConnectionStatus = instagramService.subscribeToEvents('connectionStatusUpdate', (data) => {
+        const unsubscribeInstagramConnectionStatus = instagramService.subscribeToEvents('connectionStatusUpdate', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+            if (!isOwned) return;
+
             ws.send(JSON.stringify({
               type: 'instagramConnectionStatus',
               connectionId: data.connectionId,
@@ -3905,8 +6842,16 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeInstagramConnectionError = instagramService.subscribeToEvents('connectionError', (data) => {
+        const unsubscribeInstagramConnectionError = instagramService.subscribeToEvents('connectionError', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+            if (!isOwned) return;
+
             ws.send(JSON.stringify({
               type: 'instagramConnectionError',
               connectionId: data.connectionId,
@@ -3917,20 +6862,34 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
         const unsubscribeInstagramMessageReceived = instagramService.subscribeToEvents('messageReceived', (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            if (!data.conversation || data.conversation.companyId !== client.companyId) {
+              return;
+            }
+
+            broadcastToAll({
               type: 'newMessage',
               data: data.message
-            }));
+            }, data.conversation.companyId);
 
-            ws.send(JSON.stringify({
-              type: 'conversationUpdated',
-              data: data.conversation
-            }));
+            broadcastConversationUpdate(data.conversation, 'conversationUpdated');
           }
         });
 
-        const unsubscribeMessengerConnectionStatus = messengerService.subscribeToEvents('connectionStatusUpdate', (data) => {
+        const unsubscribeMessengerConnectionStatus = messengerService.subscribeToEvents('connectionStatusUpdate', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+            if (!isOwned) return;
+
             ws.send(JSON.stringify({
               type: 'messengerConnectionStatus',
               connectionId: data.connectionId,
@@ -3939,8 +6898,16 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           }
         });
 
-        const unsubscribeMessengerConnectionError = messengerService.subscribeToEvents('connectionError', (data) => {
+        const unsubscribeMessengerConnectionError = messengerService.subscribeToEvents('connectionError', async (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            const isOwned = await isConnectionOwnedByCompany(data.connectionId, client.companyId);
+            if (!isOwned) return;
+
             ws.send(JSON.stringify({
               type: 'messengerConnectionError',
               connectionId: data.connectionId,
@@ -3951,15 +6918,21 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
         const unsubscribeMessengerMessageReceived = messengerService.subscribeToEvents('messageReceived', (data) => {
           if (data && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
+            const client = clients.get(clientId);
+
+            if (!client || client.companyId === null || client.companyId === undefined) return;
+
+
+            if (!data.conversation || data.conversation.companyId !== client.companyId) {
+              return;
+            }
+
+            broadcastToAll({
               type: 'newMessage',
               data: data.message
-            }));
+            }, data.conversation.companyId);
 
-            ws.send(JSON.stringify({
-              type: 'conversationUpdated',
-              data: data.conversation
-            }));
+            broadcastConversationUpdate(data.conversation, 'conversationUpdated');
           }
         });
 
@@ -3981,6 +6954,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         if (clientForCleanup) {
           clientForCleanup.unsubscribeFunctions = [
             unsubscribeQrCode,
+            unsubscribeQrCodeRequired,
             unsubscribeConnectionStatus,
             unsubscribeConnectionError,
             unsubscribeMessageReceived,
@@ -4089,7 +7063,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                     const nameCandidates = [
                       (user as any).fullName,
                       (user as any).name,
-                      [ (user as any).firstName, (user as any).lastName ].filter(Boolean).join(' ').trim(),
+                      [(user as any).firstName, (user as any).lastName].filter(Boolean).join(' ').trim(),
                       (user as any).displayName,
                       typeof (user as any).email === 'string' ? (user as any).email.split('@')[0] : undefined
                     ].filter((v: any) => typeof v === 'string' && v.trim().length > 0);
@@ -4185,7 +7159,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                 userId,
                 user.companyId,
                 phoneNumber,
-                messageContent
+                messageContent,
+                true // isFromBot - bot-initiated message from flow
               );
 
               if (!savedMessage) {
@@ -4546,6 +7521,139 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   flowExecutor.setWebSocketClients(clients);
 
+
+  const callAgentWss = new WebSocketServer({ noServer: true });
+
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    try {
+      const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+
+
+      if (pathname.startsWith('/call-agent/stream/')) {
+        const callSidMatch = pathname.match(/\/call-agent\/stream\/(.+)/);
+        if (callSidMatch) {
+          const callSid = callSidMatch[1];
+
+          callAgentWss.handleUpgrade(request, socket, head, async (ws) => {
+            try {
+              const callAgentService = await import('./services/call-agent-service');
+              let callData = callAgentService.getActiveCall(callSid);
+              let actualCallSid = callSid;
+
+
+              if (callData && (callData as any)?.actualCallSid) {
+                actualCallSid = (callData as any).actualCallSid;
+                const realCallData = callAgentService.getActiveCall(actualCallSid);
+
+
+                if (realCallData) {
+
+                  if (callData.conversationData && callData.conversationData.length > 0) {
+                    realCallData.conversationData = [
+                      ...(realCallData.conversationData || []),
+                      ...callData.conversationData
+                    ];
+                    callAgentService.setActiveCall(actualCallSid, realCallData);
+                  }
+                  callData = realCallData;
+                } else {
+
+                  const migratedData = {
+                    ...callData,
+                    conversationData: callData.conversationData || []
+                  };
+                  delete (migratedData as any).actualCallSid;
+                  callAgentService.setActiveCall(actualCallSid, migratedData);
+                  callData = migratedData;
+                }
+
+
+                callAgentService.removeActiveCall(callSid);
+              }
+
+              if (!callData) {
+                console.error(`[CallAgent] No active call data found for ${callSid}`);
+                ws.close();
+                return;
+              }
+
+
+              const circuitState = callAgentService.getCircuitBreakerState();
+              if (circuitState.state === 'open') {
+                console.warn(`[CallAgent] Circuit breaker open for call ${callSid}, rejecting WebSocket upgrade`);
+                ws.close(1011, 'Service temporarily unavailable (circuit breaker open)');
+                return;
+              }
+
+
+              const agentConfig = await callAgentService.configureElevenLabsAgent(callData.config);
+
+
+
+              let elevenLabsWsUrl: string;
+              
+              if ((callData.config as any).elevenLabsSignedUrl) {
+
+                elevenLabsWsUrl = (callData.config as any).elevenLabsSignedUrl;
+
+              } else if (callData.config.elevenLabsAgentId) {
+
+                elevenLabsWsUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${callData.config.elevenLabsAgentId}`;
+
+              } else {
+
+                elevenLabsWsUrl = `wss://api.elevenlabs.io/v1/convai/conversation`;
+
+              }
+
+
+
+
+              const stateToPersist = {
+                ...callData,
+                twilioWs: ws,
+                streamSid: callData.streamSid,
+                conversationData: callData.conversationData || [],
+                audioChunksSent: (callData as any).audioChunksSent,
+                audioChunksReceived: (callData as any).audioChunksReceived,
+                lastActivityTime: Date.now()
+              };
+              callAgentService.setActiveCall(actualCallSid, stateToPersist as any);
+
+              const elevenLabsOptions = {
+                url: elevenLabsWsUrl,
+                headers: { 'xi-api-key': callData.config.elevenLabsApiKey },
+                agentConfig
+              };
+
+
+              await callAgentService.handleAudioStream(ws, actualCallSid, elevenLabsOptions);
+
+
+            } catch (error) {
+              console.error(`[CallAgent] Error setting up WebSocket for call ${callSid}:`, error);
+              ws.close();
+            }
+          });
+          return; // Explicitly return after handling CallAgent upgrade
+        } else {
+
+          socket.destroy();
+          return;
+        }
+      }
+
+
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } catch (error) {
+      console.error('[WebSocket] Error handling upgrade:', error);
+      socket.destroy();
+    }
+  });
+
   const cleanupAllConnections = () => {
     logger.info('websocket', `Cleaning up ${clients.size} WebSocket connections...`);
 
@@ -4574,6 +7682,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.get('/api/channel-connections', ensureAuthenticated, ensureActiveSubscription, requireAnyPermission([PERMISSIONS.VIEW_CHANNELS, PERMISSIONS.MANAGE_CHANNELS]), async (req: any, res) => {
     try {
+
+
       if (!req.user || !req.user.companyId) {
         return res.status(400).json({ error: 'Company ID is required for multi-tenant security' });
       }
@@ -4582,33 +7692,37 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const userPermissions = await getUserPermissions(user);
 
 
+
       const normalizeStatuses = (conns: any[]) => conns.map(c => ({
         ...c,
-        status: c.status === 'connected' ? 'active' : (c.status === 'disconnected' ? 'inactive' : c.status)
+        status: (c.status === 'connected' || c.status === 'pending' || c.status === null) 
+          ? 'active' 
+          : (c.status === 'disconnected' ? 'inactive' : c.status)
       }));
 
+      let connections: any[] = [];
+
       if (user.isSuperAdmin) {
-        const connections = await storage.getChannelConnections(null, undefined);
+        connections = await storage.getChannelConnections(null, undefined);
         return res.json(normalizeStatuses(connections));
       }
-
 
       if (userPermissions[PERMISSIONS.MANAGE_CHANNELS]) {
-        const connections = await storage.getChannelConnections(null, user.companyId);
+
+        connections = await storage.getChannelConnections(null, user.companyId);
         return res.json(normalizeStatuses(connections));
       }
-
 
       if (userPermissions[PERMISSIONS.VIEW_CHANNELS]) {
-        const connections = await storage.getChannelConnections(null, user.companyId);
+
+        connections = await storage.getChannelConnections(null, user.companyId);
         return res.json(normalizeStatuses(connections));
       }
 
 
-      const connections = await storage.getChannelConnections(user.id, user.companyId);
+      connections = await storage.getChannelConnections(user.id, user.companyId);
       res.json(normalizeStatuses(connections));
     } catch (error) {
-      console.error('Error fetching channel connections:', error);
       res.status(500).json({ error: 'Failed to fetch channel connections' });
     }
   });
@@ -4627,7 +7741,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       const normalizeStatuses = (conns: any[]) => conns.map(c => ({
         ...c,
-        status: c.status === 'connected' ? 'active' : (c.status === 'disconnected' ? 'inactive' : c.status)
+        status: (c.status === 'connected' || c.status === 'pending' || c.status === null) 
+          ? 'active' 
+          : (c.status === 'disconnected' ? 'inactive' : c.status)
       }));
 
       if (user.isSuperAdmin) {
@@ -4665,7 +7781,20 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(404).json({ error: 'Channel connection not found' });
       }
 
-      if (connection.userId !== req.user.id) {
+      if (!req.user || !req.user.companyId) {
+        return res.status(400).json({ error: 'Company ID is required for multi-tenant security' });
+      }
+
+      if (connection.companyId !== req.user.companyId) {
+        return res.status(403).json({ error: 'Access denied: Connection does not belong to your company' });
+      }
+
+
+      const permissions = await getUserPermissions(req.user);
+      const hasManagePermission = req.user.isSuperAdmin || permissions[PERMISSIONS.MANAGE_CHANNELS] === true;
+      const isOwner = connection.userId === req.user.id;
+
+      if (!hasManagePermission && !isOwner) {
         return res.status(403).json({ error: 'Not authorized to update this connection' });
       }
 
@@ -4707,7 +7836,12 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(403).json({ error: 'Access denied: Connection does not belong to your company' });
       }
 
-      if (connection.userId !== req.user.id) {
+
+      const permissions = await getUserPermissions(req.user);
+      const hasManagePermission = req.user.isSuperAdmin || permissions[PERMISSIONS.MANAGE_CHANNELS] === true;
+      const isOwner = connection.userId === req.user.id;
+
+      if (!hasManagePermission && !isOwner) {
         return res.status(403).json({ error: 'Not authorized to update this connection' });
       }
 
@@ -4882,7 +8016,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(404).json({ error: 'Channel connection not found' });
       }
 
-      if (connection.userId !== req.user.id) {
+
+      if (connection.companyId !== req.user.companyId) {
         return res.status(403).json({ error: 'Not authorized to access this connection' });
       }
 
@@ -4903,6 +8038,364 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     } catch (error) {
       console.error('Error retrieving channel connection:', error);
       res.status(500).json({ error: 'Failed to retrieve channel connection' });
+    }
+  });
+
+  app.get('/api/channel-connections/:id/export', ensureAuthenticated, async (req: any, res) => {
+    try {
+      const connectionId = parseInt(req.params.id);
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection) return res.status(404).json({ error: 'Connection not found' });
+      if (connection.companyId !== req.user.companyId) return res.status(403).json({ error: 'Not authorized' });
+      if (connection.channelType !== 'twilio_voice') return res.status(400).json({ error: 'Only Twilio Voice connections can be exported' });
+      const data = connection.connectionData as any;
+      const mask = (s: string, show = 4) => (s && s.length > show * 2 ? s.slice(0, show) + '*'.repeat(s.length - show * 2) + s.slice(-show) : s || '');
+      const exportPayload = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        connectionType: 'twilio_voice',
+        configuration: {
+          accountName: connection.accountName,
+          accountSid: mask(data?.accountSid),
+          authToken: mask(data?.authToken ?? '', 0) || '****',
+          fromNumber: data?.fromNumber,
+          apiKey: mask(data?.apiKey),
+          apiSecret: mask(data?.apiSecret ?? '', 0) || '****',
+          twimlAppSid: mask(data?.twimlAppSid),
+          callMode: data?.callMode ?? 'basic',
+          elevenLabsApiKey: data?.elevenLabsApiKey ? '****' : '',
+          elevenLabsAgentId: data?.elevenLabsAgentId,
+          voiceId: data?.voiceId,
+          audioFormat: data?.audioFormat ?? 'ulaw_8000',
+          statusCallbackUrl: data?.statusCallbackUrl
+        },
+        metadata: {
+          companyId: connection.companyId,
+          createdAt: connection.createdAt,
+          lastValidated: new Date().toISOString()
+        }
+      };
+      res.setHeader('Content-Disposition', `attachment; filename="twilio-voice-${connectionId}-${new Date().toISOString().slice(0, 10)}.json"`);
+      res.json(exportPayload);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Export failed' });
+    }
+  });
+
+  app.post('/api/channel-connections/import', ensureAuthenticated, async (req: any, res) => {
+    try {
+      if (!req.user?.companyId) return res.status(400).json({ message: 'Company ID required' });
+      const body = req.body?.configuration ? req.body : { configuration: req.body, version: '1.0', connectionType: 'twilio_voice' };
+      const config = body.configuration || {};
+      if (body.connectionType !== 'twilio_voice') return res.status(400).json({ error: 'Invalid connection type' });
+      const accountSid = config.accountSid ?? '';
+      const authToken = config.authToken ?? '';
+      const fromNumber = config.fromNumber ?? '';
+      if (!accountSid || !authToken || !fromNumber) {
+        return res.status(400).json({ error: 'Missing required fields: accountSid, authToken, fromNumber. Fill in masked credentials.' });
+      }
+      const connectionData = validateBody(insertChannelConnectionSchema, {
+        channelType: 'twilio_voice',
+        accountId: fromNumber,
+        accountName: config.accountName || 'Imported Twilio Voice',
+        connectionData: {
+          accountSid,
+          authToken,
+          fromNumber,
+          apiKey: config.apiKey ?? '',
+          apiSecret: config.apiSecret ?? '',
+          twimlAppSid: config.twimlAppSid ?? '',
+          statusCallbackUrl: config.statusCallbackUrl ?? '',
+          callMode: config.callMode ?? 'basic',
+          ...(config.callMode === 'ai-powered' && {
+            elevenLabsApiKey: config.elevenLabsApiKey ?? '',
+            elevenLabsAgentId: config.elevenLabsAgentId,
+            voiceId: config.voiceId,
+            audioFormat: config.audioFormat ?? 'ulaw_8000'
+          })
+        },
+        userId: req.user.id,
+        companyId: req.user.companyId,
+        status: 'active'
+      });
+      const connection = await storage.createChannelConnection(connectionData);
+      broadcastToCompany({ type: 'channelConnectionCreated', data: connection }, req.user.companyId);
+      res.status(201).json(connection);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message || 'Import failed' });
+    }
+  });
+
+  app.post('/api/channel-connections/:id/rotate-credentials', ensureAuthenticated, async (req: any, res) => {
+    const connectionId = parseInt(req.params.id);
+    let connection = await storage.getChannelConnection(connectionId);
+    if (!connection) return res.status(404).json({ error: 'Connection not found' });
+    if (connection.companyId !== req.user.companyId) return res.status(403).json({ error: 'Not authorized' });
+    if (connection.channelType !== 'twilio_voice') return res.status(400).json({ error: 'Only Twilio Voice connections support rotation' });
+
+    const newCreds = req.body?.connectionData ?? req.body;
+    const newAccountSid = newCreds.accountSid ? sanitizeCredential(newCreds.accountSid) : '';
+    const newAuthToken = newCreds.authToken ? sanitizeCredential(newCreds.authToken) : '';
+    const newApiKey = newCreds.apiKey ?? '';
+    const newApiSecret = newCreds.apiSecret ?? '';
+    const newTwimlAppSid = newCreds.twimlAppSid ?? '';
+    if (!newAccountSid || !newAuthToken) return res.status(400).json({ error: 'New Account SID and Auth Token required' });
+
+    const currentData = (connection.connectionData as any) || {};
+    const twimlAppSidToValidate = newTwimlAppSid || currentData.twimlAppSid || '';
+    const apiKeyToValidate = newApiKey || currentData.apiKey || '';
+    const apiSecretToValidate = newApiSecret || currentData.apiSecret || '';
+    let updateApplied = false;
+
+    try {
+
+      const restValidation = await validateTwilioCredentialsWithAPI(newAccountSid, newAuthToken);
+      if (!restValidation.valid) {
+        return res.status(400).json({ error: 'New credentials failed validation', details: restValidation });
+      }
+
+
+      if (twimlAppSidToValidate && newAccountSid && newAuthToken) {
+        try {
+          await axios.get(
+            `https://api.twilio.com/2010-04-01/Accounts/${newAccountSid}/Applications/${twimlAppSidToValidate}.json`,
+            { headers: { Authorization: getTwilioAuthHeader(newAccountSid, newAuthToken) }, timeout: 5000 }
+          );
+        } catch (err: any) {
+          return res.status(400).json({
+            error: 'TwiML App not accessible with new credentials',
+            details: { twimlApp: err.response?.data?.message || err.message }
+          });
+        }
+      }
+
+
+      if (apiKeyToValidate && apiSecretToValidate && twimlAppSidToValidate) {
+        try {
+          const twilio = await import('twilio');
+          const AccessToken = twilio.jwt.AccessToken;
+          const VoiceGrant = AccessToken.VoiceGrant;
+          const voiceGrant = new VoiceGrant({ outgoingApplicationSid: twimlAppSidToValidate, incomingAllow: true });
+          const token = new AccessToken(newAccountSid, apiKeyToValidate, apiSecretToValidate, { identity: 'rotation-validation', ttl: 60 });
+          token.addGrant(voiceGrant);
+          const jwt = token.toJwt();
+          if (!jwt?.length) {
+            return res.status(400).json({ error: 'Voice SDK token generation failed with new API Key/Secret' });
+          }
+        } catch (err: any) {
+          return res.status(400).json({
+            error: 'Voice SDK credentials invalid (token generation failed)',
+            details: { voiceSdk: err.message }
+          });
+        }
+      }
+
+
+      const stagedData = {
+        ...currentData,
+        accountSid: newAccountSid,
+        authToken: newAuthToken,
+        ...(newApiKey && { apiKey: newApiKey }),
+        ...(newApiSecret && { apiSecret: newApiSecret }),
+        ...(newTwimlAppSid && { twimlAppSid: newTwimlAppSid })
+      };
+
+
+      await storage.updateChannelConnection(connectionId, { connectionData: stagedData });
+      updateApplied = true;
+
+      const updated = await storage.getChannelConnection(connectionId);
+      broadcastToCompany({ type: 'channelConnectionUpdated', data: updated }, req.user.companyId);
+      broadcastToCompany({
+        type: 'credentialsRotated',
+        data: { connectionId, connection: updated, reconnectGraceful: true }
+      }, req.user.companyId);
+      return res.json({ success: true, message: 'Credentials rotated. Active calls can reconnect with new credentials.', connection: updated });
+    } catch (err: any) {
+
+      if (updateApplied) {
+        await storage.updateChannelConnection(connectionId, { connectionData: currentData }).catch(() => {});
+      }
+      if (err.response) return res.status(err.response.status || 400).json(err.response.data || { error: err.message });
+      return res.status(400).json({ error: err.message || 'Rotation failed' });
+    }
+  });
+
+
+  const twilioVoiceValidationRateLimit = new Map<number, { count: number; resetAt: number }>();
+  const TWILIO_VOICE_VALIDATION_MAX_PER_MINUTE = 5;
+
+  app.post('/api/channel-connections/validate-twilio-voice', ensureAuthenticated, async (req: any, res) => {
+    try {
+      if (!req.user?.id) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+      }
+      const userId = req.user.id;
+      const now = Date.now();
+      const windowMs = 60 * 1000;
+      let bucket = twilioVoiceValidationRateLimit.get(userId);
+      if (!bucket) {
+        bucket = { count: 0, resetAt: now + windowMs };
+        twilioVoiceValidationRateLimit.set(userId, bucket);
+      }
+      if (now >= bucket.resetAt) {
+        bucket.count = 0;
+        bucket.resetAt = now + windowMs;
+      }
+      if (bucket.count >= TWILIO_VOICE_VALIDATION_MAX_PER_MINUTE) {
+        return res.status(429).json({
+          success: false,
+          error: 'Too many validation attempts. Please try again in a minute.',
+          retryAfter: Math.ceil((bucket.resetAt - now) / 1000)
+        });
+      }
+      bucket.count++;
+
+      const body = req.body?.connectionData ?? req.body;
+      const accountSid = sanitizeCredential(body?.accountSid ?? '');
+      const authToken = sanitizeCredential(body?.authToken ?? '');
+      const fromNumber = body?.fromNumber ?? '';
+      const apiKey = body?.apiKey ?? '';
+      const apiSecret = body?.apiSecret ?? '';
+      const twimlAppSid = body?.twimlAppSid ?? '';
+      const callMode = body?.callMode ?? 'basic';
+      const elevenLabsApiKey = body?.elevenLabsApiKey ?? '';
+      const elevenLabsAgentId = body?.elevenLabsAgentId ?? '';
+      const voiceId = body?.voiceId ?? '';
+      const audioFormat = body?.audioFormat ?? 'ulaw_8000';
+      const statusCallbackUrl = body?.statusCallbackUrl ?? '';
+
+      const report: {
+        success: boolean;
+        twilioRestApi: { valid: boolean; accountInfo?: any; error?: string; suggestions?: string[]; responseTime?: number };
+        twimlApp: { valid: boolean; error?: string; appName?: string; responseTime?: number };
+        voiceSdk?: { valid: boolean; error?: string; responseTime?: number };
+        elevenLabs?: { valid: boolean; error?: string; responseTime?: number };
+        webhooks?: { statusCallbackAccessible?: boolean; error?: string };
+        recommendations: string[];
+      } = {
+        success: true,
+        twilioRestApi: { valid: false },
+        twimlApp: { valid: false },
+        recommendations: []
+      };
+
+
+      if (!accountSid || !authToken) {
+        report.twilioRestApi = { valid: false, error: 'Account SID and Auth Token are required' };
+        report.recommendations.push('Provide Twilio Account SID (34 chars, starts with AC) and Auth Token.');
+      } else {
+        const twilioStart = Date.now();
+        const twilioResult = await validateTwilioCredentialsWithAPI(accountSid, authToken);
+        report.twilioRestApi = {
+          valid: twilioResult.valid,
+          responseTime: Date.now() - twilioStart,
+          ...(twilioResult.accountInfo && { accountInfo: twilioResult.accountInfo }),
+          ...(twilioResult.error && { error: twilioResult.error }),
+          ...(twilioResult.suggestions && { suggestions: twilioResult.suggestions })
+        };
+        if (!twilioResult.valid) {
+          report.success = false;
+          report.recommendations.push(twilioResult.error || 'Fix Twilio credentials.');
+          if (twilioResult.suggestions?.length) report.recommendations.push(...twilioResult.suggestions);
+        }
+      }
+
+
+      if (report.twilioRestApi.valid && twimlAppSid && accountSid && authToken) {
+        try {
+          const appStart = Date.now();
+          const appRes = await axios.get(
+            `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Applications/${twimlAppSid}.json`,
+            { headers: { Authorization: getTwilioAuthHeader(accountSid, authToken) }, timeout: 5000 }
+          );
+          report.twimlApp = {
+            valid: true,
+            appName: appRes.data?.friendly_name,
+            responseTime: Date.now() - appStart
+          };
+        } catch (err: any) {
+          report.twimlApp = {
+            valid: false,
+            error: err.response?.data?.message || err.message || 'TwiML App not found or inaccessible',
+            responseTime: 0
+          };
+          report.success = false;
+          report.recommendations.push('Verify TwiML App SID in Twilio Console → Voice → TwiML Apps.');
+        }
+      } else if (twimlAppSid) {
+        report.twimlApp = { valid: false, error: 'Validate Twilio account first.' };
+      }
+
+
+      if (report.twilioRestApi.valid && apiKey && apiSecret && twimlAppSid) {
+        try {
+          const voiceStart = Date.now();
+          const twilio = await import('twilio');
+          const AccessToken = twilio.jwt.AccessToken;
+          const VoiceGrant = AccessToken.VoiceGrant;
+          const voiceGrant = new VoiceGrant({ outgoingApplicationSid: twimlAppSid, incomingAllow: true });
+          const token = new AccessToken(accountSid, apiKey, apiSecret, { identity: 'validation', ttl: 60 });
+          token.addGrant(voiceGrant);
+          const jwt = token.toJwt();
+          report.voiceSdk = { valid: !!jwt?.length, responseTime: Date.now() - voiceStart };
+          if (!report.voiceSdk.valid) {
+            report.success = false;
+            report.recommendations.push('Voice SDK credentials could not generate a token. Check API Key and Secret.');
+          }
+        } catch (err: any) {
+          report.voiceSdk = { valid: false, error: err.message || 'Voice SDK test failed', responseTime: 0 };
+          report.success = false;
+          report.recommendations.push('Verify API Key and API Secret in Twilio Console → Account → API Keys.');
+        }
+      }
+
+
+      if (callMode === 'ai-powered' && elevenLabsApiKey) {
+        const config: CallAgentConfig = {
+          twilioAccountSid: accountSid,
+          twilioAuthToken: authToken,
+          twilioFromNumber: fromNumber || '+0000000000',
+          elevenLabsApiKey,
+          elevenLabsAgentId: elevenLabsAgentId || undefined,
+          elevenLabsVoiceId: voiceId || undefined,
+          audioFormat: audioFormat as 'ulaw_8000' | 'pcm_8000' | 'pcm_16000',
+          toNumber: '+0000000000',
+          executionMode: 'blocking'
+        };
+        try {
+          const elStart = Date.now();
+          await configureElevenLabsAgent(config);
+          report.elevenLabs = { valid: true, responseTime: Date.now() - elStart };
+        } catch (err: any) {
+          report.elevenLabs = { valid: false, error: err.message || 'ElevenLabs validation failed', responseTime: 0 };
+          report.success = false;
+          report.recommendations.push(err.message || 'Verify ElevenLabs API key and Agent ID.');
+        }
+      }
+
+
+      if (statusCallbackUrl && (statusCallbackUrl.startsWith('http://') || statusCallbackUrl.startsWith('https://'))) {
+        try {
+          const headRes = await axios.head(statusCallbackUrl, { timeout: 5000, validateStatus: () => true });
+          report.webhooks = { statusCallbackAccessible: headRes.status < 500 };
+          if (headRes.status >= 400) {
+            report.recommendations.push('Ensure Status Callback URL is publicly accessible via HTTPS.');
+          }
+        } catch {
+          report.webhooks = { statusCallbackAccessible: false, error: 'URL not reachable' };
+          report.recommendations.push('Verify webhook URL is publicly accessible (HTTPS recommended).');
+        }
+      }
+
+      return res.json(report);
+    } catch (err: any) {
+      console.error('[channel-connections] validate-twilio-voice error:', err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || 'Validation failed',
+        recommendations: ['Check your credentials and try again.']
+      });
     }
   });
 
@@ -4927,13 +8420,19 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }, req.user.companyId);
 
       if (connection.channelType === 'whatsapp_unofficial') {
-        try {
-          whatsAppService.connect(connection.id, req.user.id)
-            .catch(err => console.error('Error connecting to WhatsApp:', err));
 
-          res.status(201).json(connection);
-        } catch (err: any) {
-          console.error('Error initiating WhatsApp connection:', err);
+        const autoConnect = req.body.autoConnect !== undefined ? req.body.autoConnect : true;
+        if (autoConnect) {
+          try {
+            whatsAppService.connect(connection.id, req.user.id)
+              .catch(err => console.error('Error connecting to WhatsApp:', err));
+
+            res.status(201).json(connection);
+          } catch (err: any) {
+            console.error('Error initiating WhatsApp connection:', err);
+            res.status(201).json(connection);
+          }
+        } else {
           res.status(201).json(connection);
         }
       } else if (connection.channelType === 'whatsapp_official') {
@@ -4950,55 +8449,6 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         } catch (err: any) {
           console.error('Error initiating WhatsApp Business API connection:', err);
           res.status(201).json(connection);
-        }
-      } else if (connection.channelType === 'whatsapp_twilio') {
-        try {
-          const connectionData = connection.connectionData as any;
-          await whatsAppTwilioService.initializeConnection(connection.id, {
-            accountSid: connectionData.accountSid,
-            authToken: connectionData.authToken,
-            conversationServiceSid: connectionData.conversationServiceSid,
-            whatsappNumber: connectionData.whatsappNumber
-          });
-
-          res.status(201).json(connection);
-        } catch (err: any) {
-          console.error('Error initiating Twilio WhatsApp connection:', err);
-          res.status(201).json(connection);
-        }
-      } else if (connection.channelType === 'whatsapp_360dialog') {
-        try {
-          const connectionData = connection.connectionData as any;
-
-          if (connectionData.clientId && connectionData.channels && connection.companyId) {
-            await whatsApp360DialogPartnerService.processOnboardingCallback(connection.companyId, {
-              clientId: connectionData.clientId,
-              channels: connectionData.channels
-            });
-          }
-
-          await whatsApp360DialogPartnerService.connect(connection.id);
-
-          res.status(201).json(connection);
-        } catch (err: any) {
-          const dialog360Error = parseDialog360Error(err);
-          console.error('Error initiating 360Dialog Partner WhatsApp connection:', dialog360Error);
-
-          await storage.updateChannelConnection(connection.id, {
-            status: 'error',
-            connectionData: {
-              ...(connection.connectionData || {}),
-              lastError: dialog360Error.message,
-              errorCode: dialog360Error.code,
-              retryable: dialog360Error.retryable
-            }
-          });
-
-          res.status(201).json({
-            ...connection,
-            status: 'error',
-            error: createErrorResponse(dialog360Error)
-          });
         }
       } else if (connection.channelType === 'instagram') {
         try {
@@ -5058,7 +8508,12 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(403).json({ message: 'Access denied: Connection does not belong to your company' });
       }
 
-      if (connection.userId !== req.user.id) {
+
+      const permissions = await getUserPermissions(req.user);
+      const hasManagePermission = req.user.isSuperAdmin || permissions[PERMISSIONS.MANAGE_CHANNELS] === true;
+      const isOwner = connection.userId === req.user.id;
+
+      if (!hasManagePermission && !isOwner) {
         return res.status(403).json({ message: 'You do not have permission to delete this connection' });
       }
 
@@ -5071,10 +8526,6 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         }
 
         await whatsAppOfficialService.disconnect(connectionId, req.user.id, req.user.companyId);
-      } else if (connection.channelType === 'whatsapp_twilio') {
-        await whatsAppTwilioService.disconnect(connectionId);
-      } else if (connection.channelType === 'whatsapp_360dialog') {
-        await whatsApp360DialogPartnerService.disconnect(connectionId);
       } else if (connection.channelType === 'instagram') {
         await instagramService.disconnect(connectionId, req.user.id);
       } else if (connection.channelType === 'messenger') {
@@ -5118,21 +8569,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ error: 'Only WhatsApp connections can be reconnected' });
       }
 
-      try {
-        await whatsAppService.disconnect(connectionId, req.user.id);
-
-      } catch (disconnectErr) {
-        console.error('Error during disconnect phase:', disconnectErr);
-      }
-
-      setTimeout(async () => {
-        try {
-          await whatsAppService.connect(connectionId, req.user.id);
-
-        } catch (connectErr) {
-          console.error('Error during reconnection:', connectErr);
-        }
-      }, 1000);
+      await whatsAppService.connect(connectionId, req.user.id);
 
       res.status(200).json({ message: 'Reconnection initiated' });
     } catch (err: any) {
@@ -5777,7 +9214,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           const nameCandidates = [
             (user as any).fullName,
             (user as any).name,
-            [ (user as any).firstName, (user as any).lastName ].filter(Boolean).join(' ').trim(),
+            [(user as any).firstName, (user as any).lastName].filter(Boolean).join(' ').trim(),
             (user as any).displayName,
             typeof (user as any).email === 'string' ? (user as any).email.split('@')[0] : undefined
           ].filter((v: any) => typeof v === 'string' && v.trim().length > 0);
@@ -5802,17 +9239,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             return res.status(400).json({ message: 'Company ID is required for multi-tenant security' });
           }
 
-          sentMessage = await whatsAppOfficialService.sendMessage(connectionId, req.user.id, req.user.companyId, to, messageContent);
+          sentMessage = await whatsAppOfficialService.sendMessage(connectionId, req.user.id, req.user.companyId, to, messageContent, false);
         } catch (error: any) {
           console.error(`Failed to send WhatsApp Business API message:`, error);
           return res.status(500).json({ message: error.message || 'Failed to send message' });
         }
-      }
-      else if (connection.channelType === 'whatsapp_twilio') {
-        sentMessage = await whatsAppTwilioService.sendMessage(connectionId, req.user.id, to, messageContent);
-      }
-      else if (connection.channelType === 'whatsapp_360dialog') {
-        sentMessage = await whatsApp360DialogPartnerService.sendMessage(connectionId, req.user.id, to, messageContent);
       }
       else {
         return res.status(400).json({ message: 'Unsupported channel type for sending messages' });
@@ -5827,21 +9258,212 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
     } catch (err: any) {
       console.error('Error sending WhatsApp message:', err);
-
-      if (connection?.channelType === 'whatsapp_360dialog') {
-        const dialog360Error = parseDialog360Error(err);
-        const errorResponse = createErrorResponse(dialog360Error);
-
-        res.status(400).json({
-          message: 'Failed to send WhatsApp message',
-          ...errorResponse
-        });
-      } else {
-        res.status(400).json({ message: err.message });
-      }
+      res.status(400).json({ message: err.message });
     }
   });
 
+
+  app.post('/api/link-preview', ensureAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const rateLimitKey = `${userId}-link-preview`;
+      const now = Date.now();
+      const rateLimitRecord = linkPreviewRateLimitStore.get(rateLimitKey);
+      const windowMs = 60 * 1000; // 60 seconds
+      const maxRequests = 10;
+
+
+      if (rateLimitRecord && now < rateLimitRecord.resetTime) {
+        if (rateLimitRecord.count >= maxRequests) {
+          const retryAfter = Math.ceil((rateLimitRecord.resetTime - now) / 1000);
+          return res.status(429).json({
+            success: false,
+            error: 'Rate limit exceeded',
+            retryAfter
+          });
+        }
+        rateLimitRecord.count++;
+      } else {
+        linkPreviewRateLimitStore.set(rateLimitKey, {
+          count: 1,
+          resetTime: now + windowMs
+        });
+      }
+
+
+      let url = req.body.url?.trim() || '';
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+
+
+      let validatedData;
+      try {
+        validatedData = validateBody(linkPreviewSchema, { url });
+      } catch (validationError: any) {
+        return res.status(400).json({
+          success: false,
+          error: validationError.message || 'Invalid request data'
+        });
+      }
+
+      url = validatedData.url.trim();
+
+
+      try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.toLowerCase();
+
+
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname.startsWith('10.') ||
+          hostname.startsWith('192.168.') ||
+          hostname.startsWith('172.16.') ||
+          hostname.startsWith('172.17.') ||
+          hostname.startsWith('172.18.') ||
+          hostname.startsWith('172.19.') ||
+          hostname.startsWith('172.20.') ||
+          hostname.startsWith('172.21.') ||
+          hostname.startsWith('172.22.') ||
+          hostname.startsWith('172.23.') ||
+          hostname.startsWith('172.24.') ||
+          hostname.startsWith('172.25.') ||
+          hostname.startsWith('172.26.') ||
+          hostname.startsWith('172.27.') ||
+          hostname.startsWith('172.28.') ||
+          hostname.startsWith('172.29.') ||
+          hostname.startsWith('172.30.') ||
+          hostname.startsWith('172.31.') ||
+          hostname === '0.0.0.0' ||
+          hostname.endsWith('.local')
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid URL: Internal addresses are not allowed'
+          });
+        }
+
+
+        try {
+          const addresses = await dns.promises.lookup(hostname, { all: true });
+
+          for (const addr of addresses) {
+            const ip = addr.address;
+
+
+            if (isPrivateOrReservedIP(ip)) {
+              return res.status(400).json({
+                success: false,
+                error: 'Invalid URL: Internal addresses are not allowed'
+              });
+            }
+          }
+        } catch (dnsError: any) {
+
+
+
+
+        }
+      } catch (urlError) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid URL format'
+        });
+      }
+
+
+      let previewData;
+      try {
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout')), 10000); // 10 seconds
+        });
+
+        const previewPromise = getLinkPreview(url, {
+          timeout: 10000,
+          followRedirects: 'follow' as const,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+
+        previewData = await Promise.race([previewPromise, timeoutPromise]);
+      } catch (previewError: any) {
+
+        if (previewError.message === 'Request timeout' || previewError.code === 'ETIMEDOUT') {
+          return res.status(504).json({
+            success: false,
+            error: 'Request timeout: The URL took too long to respond'
+          });
+        }
+
+        if (previewError.code === 'ENOTFOUND' || previewError.code === 'ECONNREFUSED') {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid or unreachable URL'
+          });
+        }
+
+        if (previewError.message && (previewError.message.includes('parse') || previewError.message.includes('Invalid'))) {
+          return res.status(422).json({
+            success: false,
+            error: 'Unable to parse preview data from URL'
+          });
+        }
+
+
+        console.error('Link preview error:', previewError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch link preview'
+        });
+      }
+
+
+      const response: any = {
+        success: true,
+        url: url,
+        preview: {}
+      };
+
+      if (previewData) {
+        if ((previewData as any).title) {
+          response.preview.title = (previewData as any).title;
+        }
+        if ((previewData as any).description) {
+          response.preview.description = (previewData as any).description;
+        }
+        if ((previewData as any).images && Array.isArray((previewData as any).images)) {
+          response.preview.images = (previewData as any).images;
+        } else if ((previewData as any).images) {
+          response.preview.images = [(previewData as any).images];
+        }
+        if ((previewData as any).siteName) {
+          response.preview.siteName = (previewData as any).siteName;
+        }
+        if ((previewData as any).mediaType) {
+          response.preview.mediaType = (previewData as any).mediaType;
+        }
+        if ((previewData as any).contentType) {
+          response.preview.contentType = (previewData as any).contentType;
+        }
+        if ((previewData as any).favicons && Array.isArray((previewData as any).favicons)) {
+          response.preview.favicons = (previewData as any).favicons;
+        } else if ((previewData as any).favicons) {
+          response.preview.favicons = [(previewData as any).favicons];
+        }
+      }
+
+      return res.json(response);
+    } catch (error: any) {
+      console.error('Link preview endpoint error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  });
 
   app.post('/api/whatsapp/test-template/:connectionId', ensureAuthenticated, async (req: any, res) => {
     try {
@@ -5928,7 +9550,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ error: 'Conversation has no channel ID' });
       }
 
-      if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial' && conversation.channelType !== 'whatsapp_official' && conversation.channelType !== 'whatsapp_twilio' && conversation.channelType !== 'whatsapp_360dialog') {
+      if (conversation.channelType !== 'whatsapp' && conversation.channelType !== 'whatsapp_unofficial' && conversation.channelType !== 'whatsapp_official') {
         await fsExtra.unlink(req.file.path);
         return res.status(400).json({ error: 'Media upload only supported for WhatsApp channels' });
       }
@@ -5990,36 +9612,6 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           undefined,
           false
         );
-      } else if (conversation.channelType === 'whatsapp_twilio') {
-        const publicUrl = `${req.protocol}://${req.get('host')}/uploads/${path.basename(req.file.path)}`;
-
-        const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
-        await fsExtra.copy(req.file.path, publicPath);
-
-        message = await whatsAppTwilioService.sendMedia(
-          conversation.channelId,
-          req.user.id,
-          contact.identifier || contact.phone || '',
-          determinedMediaType,
-          publicUrl,
-          caption,
-          req.file.originalname
-        );
-      } else if (conversation.channelType === 'whatsapp_360dialog') {
-        const publicUrl = `${req.protocol}://${req.get('host')}/uploads/${path.basename(req.file.path)}`;
-
-        const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
-        await fsExtra.copy(req.file.path, publicPath);
-
-        message = await whatsApp360DialogPartnerService.sendMedia(
-          conversation.channelId,
-          req.user.id,
-          contact.identifier || contact.phone || '',
-          determinedMediaType,
-          publicUrl,
-          caption,
-          req.file.originalname
-        );
       } else {
         message = await whatsAppService.sendMedia(
           conversation.channelId,
@@ -6064,6 +9656,39 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     try {
       const user = req.user as any;
 
+
+      const permissions = await getUserPermissions(user);
+      const hasViewOwnContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_OWN_CONTACTS] === true;
+      const hasViewAssignedContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_ASSIGNED_CONTACTS] === true;
+      const hasViewCompanyContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_COMPANY_CONTACTS] === true;
+
+
+      const hasLegacyViewContacts = permissions[PERMISSIONS.VIEW_CONTACTS] === true || permissions[PERMISSIONS.MANAGE_CONTACTS] === true;
+      const hasLegacyAccess = hasLegacyViewContacts && hasViewCompanyContacts;
+
+
+      if (!hasViewOwnContacts && !hasViewAssignedContacts && !hasViewCompanyContacts && !hasLegacyAccess) {
+        return res.status(403).json({ message: 'You do not have permission to view contacts' });
+      }
+
+
+
+      let contactScope: 'own' | 'assigned' | 'company' | undefined = undefined;
+      if (user.isSuperAdmin) {
+        contactScope = 'company';
+      } else if (hasViewCompanyContacts || hasLegacyAccess) {
+        contactScope = 'company';
+      } else if (hasViewAssignedContacts) {
+        contactScope = 'assigned';
+      } else if (hasViewOwnContacts) {
+        contactScope = 'own';
+      }
+
+
+      if (!user.isSuperAdmin && !contactScope) {
+        return res.status(403).json({ message: 'You do not have permission to view contacts' });
+      }
+
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       const search = req.query.search as string || undefined;
@@ -6075,8 +9700,6 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       const companyId = user.isSuperAdmin ? undefined : user.companyId;
 
-      
-
       const result = await storage.getContacts({
         page,
         limit,
@@ -6086,10 +9709,14 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         companyId,
         includeArchived,
         archivedOnly,
-        dateRange
+        dateRange,
+        userId: user.id,
+        contactScope
       });
 
-     
+      if (!user.isSuperAdmin && permissions[PERMISSIONS.VIEW_CONTACT_PHONE] !== true) {
+        result.contacts = result.contacts.map(c => ({ ...c, phone: null, identifier: null }));
+      }
 
       res.json(result);
     } catch (error) {
@@ -6230,12 +9857,153 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     }
   });
 
+  app.post('/api/contacts/scrape-google-maps', ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { searchTerm, maxResults, connectionId, location } = req.body;
+
+      if (!searchTerm || !connectionId) {
+        return res.status(400).json({
+          error: 'Search term and connection ID are required'
+        });
+      }
+
+      const maxResultsNum = maxResults ? parseInt(maxResults) : 20;
+      if (isNaN(maxResultsNum) || maxResultsNum < 1 || maxResultsNum > GOOGLE_MAPS_SCRAPE_MAX_RESULTS) {
+        return res.status(400).json({
+          error: `Max results must be between 1 and ${GOOGLE_MAPS_SCRAPE_MAX_RESULTS}`
+        });
+      }
+
+      if (searchTerm.length > 200) {
+        return res.status(400).json({
+          error: 'Search term cannot exceed 200 characters'
+        });
+      }
+
+      if (location && (typeof location !== 'string' || location.length > 100)) {
+        return res.status(400).json({
+          error: 'Location must be a string under 100 characters'
+        });
+      }
+
+      const whatsAppService = await import('./services/channels/whatsapp');
+      const googleMapsScraper = await import('./services/google-maps-scraper');
+
+      const connection = await storage.getChannelConnection(connectionId);
+      if (!connection) {
+        return res.status(404).json({ error: 'WhatsApp connection not found' });
+      }
+
+      if (!connection.companyId) {
+        return res.status(400).json({ error: 'Connection must be associated with a company' });
+      }
+
+      if (!user.isSuperAdmin && connection.companyId !== user.companyId) {
+        return res.status(403).json({ error: 'Access denied to this connection' });
+      }
+
+      if (connection.channelType !== 'whatsapp_unofficial' && connection.channelType !== 'whatsapp') {
+        return res.status(400).json({
+          error: 'This feature only works with unofficial WhatsApp connections'
+        });
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      res.write(`data: ${JSON.stringify({
+        type: 'started',
+        message: 'Scraping started',
+        totalToCheck: maxResultsNum
+      })}\n\n`);
+
+      const progressCallback = (update: any) => {
+        res.write(`data: ${JSON.stringify(update)}\n\n`);
+      };
+
+      try {
+        const results = await googleMapsScraper.scrapeGoogleMapsContactsWithProgress(
+          connectionId,
+          searchTerm.trim(),
+          maxResultsNum,
+          progressCallback,
+          location || undefined
+        );
+
+        res.write(`data: ${JSON.stringify({
+          type: 'completed',
+          results: results.validNumbers,
+          totalChecked: results.totalChecked,
+          validCount: results.validNumbers.length,
+          errors: results.errors
+        })}\n\n`);
+
+        res.end();
+
+      } catch (error) {
+        console.error('Error during scraping:', error);
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          error: 'Failed to scrape Google Maps contacts',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        })}\n\n`);
+        res.end();
+      }
+
+    } catch (error) {
+      console.error('Error setting up Google Maps scraping:', error);
+      res.status(500).json({
+        error: 'Failed to start scraping process',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   app.post('/api/contacts/export', ensureAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
 
       if (!user.companyId) {
         return res.status(400).json({ message: 'User must be associated with a company' });
+      }
+
+
+      const permissions = await getUserPermissions(user);
+      const hasViewOwnContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_OWN_CONTACTS] === true;
+      const hasViewAssignedContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_ASSIGNED_CONTACTS] === true;
+      const hasViewCompanyContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_COMPANY_CONTACTS] === true;
+
+
+      const hasLegacyViewContacts = permissions[PERMISSIONS.VIEW_CONTACTS] === true || permissions[PERMISSIONS.MANAGE_CONTACTS] === true;
+      const hasLegacyAccess = hasLegacyViewContacts && hasViewCompanyContacts;
+
+
+      if (!hasViewOwnContacts && !hasViewAssignedContacts && !hasViewCompanyContacts && !hasLegacyAccess) {
+        return res.status(403).json({ message: 'You do not have permission to export contacts' });
+      }
+
+
+
+      let contactScope: 'own' | 'assigned' | 'company' | undefined = undefined;
+      if (user.isSuperAdmin) {
+        contactScope = 'company';
+      } else if (hasViewCompanyContacts || hasLegacyAccess) {
+        contactScope = 'company';
+      } else if (hasViewAssignedContacts) {
+        contactScope = 'assigned';
+      } else if (hasViewOwnContacts) {
+        contactScope = 'own';
+      }
+
+
+      if (!user.isSuperAdmin && !contactScope) {
+        return res.status(403).json({ message: 'You do not have permission to export contacts' });
       }
 
       const { exportScope, tags, createdAfter, createdBefore, search, channel } = req.body;
@@ -6247,12 +10015,16 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         createdAfter: createdAfter || undefined,
         createdBefore: createdBefore || undefined,
         search: search || undefined,
-        channel: channel || undefined
+        channel: channel || undefined,
+        userId: user.id,
+        contactScope
       };
 
 
       const contacts = await storage.getContactsForExport(exportOptions);
 
+
+      const canViewPhone = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
 
       const escapeCsvField = (value: any): string => {
         if (value === null || value === undefined) {
@@ -6299,11 +10071,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           escapeCsvField(contact.id),
           escapeCsvField(contact.name),
           escapeCsvField(contact.email),
-          escapeCsvField(contact.phone),
+          escapeCsvField(canViewPhone ? contact.phone : ''),
           escapeCsvField(contact.company),
           escapeCsvField((contact.tags || []).join(', ')),
           escapeCsvField(contact.identifierType),
-          escapeCsvField(contact.identifier),
+          escapeCsvField(canViewPhone ? contact.identifier : ''),
           escapeCsvField(contact.source),
           escapeCsvField(contact.notes),
           escapeCsvField(formatDate(contact.createdAt)),
@@ -6339,6 +10111,38 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
 
+      const permissions = await getUserPermissions(user);
+      const hasViewOwnContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_OWN_CONTACTS] === true;
+      const hasViewAssignedContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_ASSIGNED_CONTACTS] === true;
+      const hasViewCompanyContacts = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_COMPANY_CONTACTS] === true;
+
+
+      const hasLegacyViewContacts = permissions[PERMISSIONS.VIEW_CONTACTS] === true || permissions[PERMISSIONS.MANAGE_CONTACTS] === true;
+      const hasLegacyAccess = hasLegacyViewContacts && hasViewCompanyContacts;
+
+
+      if (!hasViewOwnContacts && !hasViewAssignedContacts && !hasViewCompanyContacts && !hasLegacyAccess) {
+        return res.status(403).json({ message: 'You do not have permission to view contacts' });
+      }
+
+
+
+      let contactScope: 'own' | 'assigned' | 'company' | undefined = undefined;
+      if (user.isSuperAdmin) {
+        contactScope = 'company';
+      } else if (hasViewCompanyContacts || hasLegacyAccess) {
+        contactScope = 'company';
+      } else if (hasViewAssignedContacts) {
+        contactScope = 'assigned';
+      } else if (hasViewOwnContacts) {
+        contactScope = 'own';
+      }
+
+
+      if (!user.isSuperAdmin && !contactScope) {
+        return res.status(403).json({ message: 'You do not have permission to view contacts' });
+      }
+
       let parsedLimit: number | undefined;
       let parsedOffset: number | undefined;
 
@@ -6370,8 +10174,14 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const result = await storage.getContactsWithoutConversations(user.companyId, {
         search: searchTerm,
         limit: parsedLimit,
-        offset: parsedOffset
+        offset: parsedOffset,
+        userId: user.id,
+        contactScope: contactScope
       });
+
+      if (!user.isSuperAdmin && permissions[PERMISSIONS.VIEW_CONTACT_PHONE] !== true) {
+        result.contacts = result.contacts.map(c => ({ ...c, phone: null, identifier: null }));
+      }
 
       res.json(result);
 
@@ -6410,19 +10220,30 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   });
 
   app.get('/api/contacts/:id', ensureAuthenticated, async (req, res) => {
-    const id = parseInt(req.params.id);
-    const contact = await storage.getContact(id);
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const contact = await storage.getContact(id);
 
-    if (!contact) {
-      return res.status(404).json({ message: 'Contact not found' });
+      if (!contact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      if (isWhatsAppGroupChatId(contact.phone) || isWhatsAppGroupChatId(contact.identifier)) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      if (!user.isSuperAdmin) {
+        const permissions = await getUserPermissions(user);
+        if (permissions[PERMISSIONS.VIEW_CONTACT_PHONE] !== true) {
+          return res.json({ ...contact, phone: null, identifier: null });
+        }
+      }
+
+      res.json(contact);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch contact' });
     }
-
-
-    if (isWhatsAppGroupChatId(contact.phone) || isWhatsAppGroupChatId(contact.identifier)) {
-      return res.status(404).json({ message: 'Contact not found' });
-    }
-
-    res.json(contact);
   });
 
   app.patch('/api/contacts/:id', ensureAuthenticated, async (req, res) => {
@@ -6479,13 +10300,20 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         });
       }
 
+      const user = req.user as any;
+      const permissions = await getUserPermissions(user);
+      const canViewPhone = user.isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+      const contactForBroadcast = canViewPhone ? updatedContact : { ...updatedContact, phone: null, identifier: null };
       if ((global as any).broadcastToAllClients) {
         (global as any).broadcastToAllClients({
           type: 'contactUpdated',
-          data: updatedContact
+          data: contactForBroadcast
         });
       }
 
+      if (!user.isSuperAdmin && !canViewPhone) {
+        return res.json({ ...updatedContact, phone: null, identifier: null });
+      }
       res.json(updatedContact);
     } catch (error) {
       console.error('Error updating contact:', error);
@@ -6529,13 +10357,19 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         userAgent: req.get('User-Agent')
       });
 
+      const permissions = await getUserPermissions(req.user);
+      const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+      const contactForBroadcast = canViewPhone ? contact : { ...contact, phone: null, identifier: null };
       if ((global as any).broadcastToAllClients) {
         (global as any).broadcastToAllClients({
           type: 'contactArchived',
-          data: contact
+          data: contactForBroadcast
         });
       }
 
+      if (!(req.user as any).isSuperAdmin && !canViewPhone) {
+        return res.json({ ...contact, phone: null, identifier: null });
+      }
       res.json(contact);
     } catch (error) {
       console.error('Error archiving contact:', error);
@@ -6579,13 +10413,19 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         userAgent: req.get('User-Agent')
       });
 
+      const permissions = await getUserPermissions(req.user);
+      const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+      const contactForBroadcast = canViewPhone ? contact : { ...contact, phone: null, identifier: null };
       if ((global as any).broadcastToAllClients) {
         (global as any).broadcastToAllClients({
           type: 'contactUnarchived',
-          data: contact
+          data: contactForBroadcast
         });
       }
 
+      if (!(req.user as any).isSuperAdmin && !canViewPhone) {
+        return res.json({ ...contact, phone: null, identifier: null });
+      }
       res.json(contact);
     } catch (error) {
       console.error('Error unarchiving contact:', error);
@@ -6781,7 +10621,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     try {
       const contactData = validateBody(insertContactSchema, {
         ...req.body,
-        companyId: req.user.companyId
+        companyId: req.user.companyId,
+        createdBy: req.user.id
       });
 
 
@@ -6817,6 +10658,44 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         userAgent: req.get('User-Agent')
       });
 
+
+      try {
+        const autoAddEnabled = await getCachedCompanySetting(req.user.companyId, 'autoAddContactToPipeline');
+        if (autoAddEnabled) {
+
+          const initialStage = await getCachedInitialPipelineStage(req.user.companyId);
+          if (initialStage) {
+
+            const existingDeal = await storage.getActiveDealByContact(contact.id, req.user.companyId, initialStage.pipelineId);
+            if (!existingDeal) {
+              const deal = await storage.createDeal({
+                companyId: req.user.companyId,
+                contactId: contact.id,
+                title: `New Lead - ${contact.name}`,
+                pipelineId: initialStage.pipelineId,
+                stageId: initialStage.id,
+                stage: 'lead'
+              });
+              await storage.createDealActivity({
+                dealId: deal.id,
+                userId: req.user.id,
+                type: 'create',
+                content: 'Deal automatically created when contact was added'
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-adding contact to pipeline:', error);
+
+      }
+
+      if (!(req.user as any).isSuperAdmin) {
+        const permissions = await getUserPermissions(req.user);
+        if (permissions[PERMISSIONS.VIEW_CONTACT_PHONE] !== true) {
+          return res.status(201).json({ ...contact, phone: null, identifier: null });
+        }
+      }
       res.status(201).json(contact);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -6859,6 +10738,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ error: 'No CSV file provided' });
       }
 
+      const permissions = await getUserPermissions(req.user);
+      const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+
       const { duplicateHandling = 'skip', columnMapping } = req.body;
       const companyId = req.user.companyId;
       let mapping: Record<string, string> = {};
@@ -6894,7 +10776,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       for (let i = 1; i < lines.length; i++) {
         try {
           const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-          const contactData: any = { companyId };
+          const contactData: any = { companyId, createdBy: req.user.id };
 
           headers.forEach((header, index) => {
             const mappedField = mapping[header];
@@ -6982,6 +10864,38 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             contact = await storage.getOrCreateContact(contactData);
           }
 
+
+          try {
+            const autoAddEnabled = await getCachedCompanySetting(companyId, 'autoAddContactToPipeline');
+            if (autoAddEnabled) {
+
+              const initialStage = await getCachedInitialPipelineStage(companyId);
+              if (initialStage) {
+
+                const existingDeal = await storage.getActiveDealByContact(contact.id, companyId, initialStage.pipelineId);
+                if (!existingDeal) {
+                  const deal = await storage.createDeal({
+                    companyId: companyId,
+                    contactId: contact.id,
+                    title: `New Lead - ${contact.name}`,
+                    pipelineId: initialStage.pipelineId,
+                    stageId: initialStage.id,
+                    stage: 'lead'
+                  });
+                  await storage.createDealActivity({
+                    dealId: deal.id,
+                    userId: req.user.id,
+                    type: 'create',
+                    content: 'Deal automatically created when contact was added'
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error auto-adding contact to pipeline:', error);
+
+          }
+
           importedContacts.push(contact);
           successful++;
 
@@ -6998,11 +10912,15 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         console.error('Error cleaning up CSV file:', cleanupError);
       }
 
+      const sanitizedImported = canViewPhone
+        ? importedContacts.slice(0, 50)
+        : importedContacts.slice(0, 50).map(c => ({ ...c, phone: null, identifier: null }));
+
       res.json({
         successful,
         failed,
         errors: errors.slice(0, 10),
-        importedContacts: importedContacts.slice(0, 50)
+        importedContacts: sanitizedImported
       });
 
     } catch (error) {
@@ -7041,7 +10959,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-      
+
       const requiredHeaders = ['name'];
 
       const headersLowercase = headers.map(h => h.toLowerCase());
@@ -7060,7 +10978,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       for (let i = 1; i < lines.length; i++) {
         try {
           const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-          const contactData: any = { companyId };
+          const contactData: any = { companyId, createdBy: req.user.id };
 
           headers.forEach((header, index) => {
             const value = values[index] || '';
@@ -7120,8 +11038,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             continue;
           }
 
+          let contact: any;
           if (duplicateHandling === 'create') {
-            await storage.createContact(contactData);
+            contact = await storage.createContact(contactData);
           } else if (duplicateHandling === 'skip') {
             const existingByPhone = contactData.phone ? await storage.getContactByPhone(contactData.phone, companyId) : null;
             const existingByEmail = contactData.email ? await storage.getContactByEmail(contactData.email, companyId) : null;
@@ -7130,9 +11049,41 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
               continue;
             }
 
-            await storage.createContact(contactData);
+            contact = await storage.createContact(contactData);
           } else {
-            await storage.getOrCreateContact(contactData);
+            contact = await storage.getOrCreateContact(contactData);
+          }
+
+
+          try {
+            const autoAddEnabled = await getCachedCompanySetting(companyId, 'autoAddContactToPipeline');
+            if (autoAddEnabled) {
+
+              const initialStage = await getCachedInitialPipelineStage(companyId);
+              if (initialStage) {
+
+                const existingDeal = await storage.getActiveDealByContact(contact.id, companyId, initialStage.pipelineId);
+                if (!existingDeal) {
+                  const deal = await storage.createDeal({
+                    companyId: companyId,
+                    contactId: contact.id,
+                    title: `New Lead - ${contact.name}`,
+                    pipelineId: initialStage.pipelineId,
+                    stageId: initialStage.id,
+                    stage: 'lead'
+                  });
+                  await storage.createDealActivity({
+                    dealId: deal.id,
+                    userId: req.user.id,
+                    type: 'create',
+                    content: 'Deal automatically created when contact was added'
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error auto-adding contact to pipeline:', error);
+
           }
 
           successful++;
@@ -7195,20 +11146,53 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       const avatarUrl = `/uploads/${req.file.filename}`;
 
+
+      let previousAvatarSize = 0;
+      if (contact.avatarUrl && contact.avatarUrl.startsWith('/uploads/')) {
+        try {
+          const previousAvatarPath = path.join(process.cwd(), contact.avatarUrl.substring(1));
+          if (await fsExtra.pathExists(previousAvatarPath)) {
+            const stats = await fsExtra.stat(previousAvatarPath);
+            previousAvatarSize = stats.size;
+          }
+        } catch (error) {
+
+        }
+      }
+
       const updatedContact = await storage.updateContact(contactId, {
         avatarUrl
       });
 
+
+      if (contact.companyId && req.file) {
+
+        dataUsageTracker.trackFileUpload(contact.companyId, req.file.size).catch(err => {
+          console.error('Failed to track contact avatar upload:', err);
+        });
+
+
+        if (previousAvatarSize > 0) {
+          dataUsageTracker.trackFileDelete(contact.companyId, previousAvatarSize).catch(err => {
+            console.error('Failed to track contact avatar deletion:', err);
+          });
+        }
+      }
+
+      const permissions = await getUserPermissions(req.user);
+      const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+      const contactForBroadcast = canViewPhone ? updatedContact : { ...updatedContact, phone: null, identifier: null };
       if ((global as any).broadcastToAllClients) {
         (global as any).broadcastToAllClients({
           type: 'contactUpdated',
-          data: updatedContact
+          data: contactForBroadcast
         });
       }
 
+      const contactToReturn = canViewPhone ? updatedContact : { ...updatedContact, phone: null, identifier: null };
       res.json({
         success: true,
-        contact: updatedContact,
+        contact: contactToReturn,
         avatarUrl
       });
     } catch (err: any) {
@@ -7399,6 +11383,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         userAgent: req.get('User-Agent')
       });
 
+
+      if (companyId && req.file) {
+        dataUsageTracker.trackFileUpload(companyId, req.file.size).catch(err => {
+          console.error('Failed to track contact document upload:', err);
+        });
+      }
+
       res.status(201).json(document);
     } catch (error) {
       console.error('Error uploading contact document:', error);
@@ -7463,6 +11454,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         ipAddress: req.ip,
         userAgent: req.get('User-Agent')
       });
+
+
+      if (companyId && document.fileSize) {
+        dataUsageTracker.trackFileDelete(companyId, document.fileSize).catch(err => {
+          console.error('Failed to track contact document deletion:', err);
+        });
+      }
 
       res.json({ success: true });
     } catch (error) {
@@ -7623,6 +11621,265 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       res.status(500).json({ error: 'Failed to delete appointment' });
     }
   });
+
+
+
+  app.post('/api/contacts/:contactId/initiate-call',
+    ensureAuthenticated,
+    requirePermission(PERMISSIONS.MANAGE_CALL_LOGS),
+    async (req, res) => {
+      try {
+
+        const contactId = parseInt(req.params.contactId);
+        if (isNaN(contactId)) {
+          return res.status(400).json({ error: 'Invalid contact ID' });
+        }
+
+
+        const { callType } = req.body;
+
+
+        const contact = await storage.getContact(contactId);
+        if (!contact) {
+          return res.status(404).json({ error: 'Contact not found' });
+        }
+
+
+        if (!req.user || contact.companyId !== req.user.companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const permissions = await getUserPermissions(req.user);
+        if (!(req.user as any).isSuperAdmin && permissions[PERMISSIONS.VIEW_CONTACT_PHONE] !== true) {
+          return res.status(403).json({ error: 'You do not have permission to view or use contact phone numbers' });
+        }
+
+
+        if (contact.isArchived) {
+          return res.status(400).json({ error: 'Cannot call archived contacts' });
+        }
+
+
+        const phoneNumber = contact.phone;
+        if (!phoneNumber || phoneNumber.trim() === '') {
+          return res.status(400).json({ error: 'Contact does not have a phone number' });
+        }
+
+
+        const { validatePhoneNumber } = await import('./utils/phone-validation');
+        const phoneValidation = validatePhoneNumber(phoneNumber);
+        if (!phoneValidation.isValid) {
+          return res.status(400).json({ 
+            error: 'Invalid phone number', 
+            details: phoneValidation.error || 'Phone number format is not valid' 
+          });
+        }
+
+
+        if (!req.user?.companyId) {
+          return res.status(400).json({ error: 'Company ID is required' });
+        }
+        const allConnections = await storage.getChannelConnectionsByCompany(req.user.companyId);
+        const twilioVoiceConnections = allConnections.filter(
+          conn => conn.channelType === 'twilio_voice' && conn.status === 'active'
+        );
+
+        if (twilioVoiceConnections.length === 0) {
+          return res.status(400).json({ error: 'No active Twilio Voice connection found' });
+        }
+
+
+        const channelConnection = twilioVoiceConnections[0];
+
+
+        let conversation = await storage.getConversationByContactAndChannel(
+          contactId,
+          channelConnection.id
+        );
+
+
+        if (!conversation) {
+          conversation = await storage.createConversation({
+            contactId: contactId,
+            channelId: channelConnection.id,
+            companyId: req.user.companyId,
+            channelType: 'twilio_voice',
+            status: 'active',
+            lastMessageAt: new Date(),
+            isGroup: false
+          });
+        }
+
+
+        const { initiateOutboundCall } = await import('./services/call-agent-service');
+        const { callLogsService } = await import('./services/call-logs-service');
+        const { CallLogsEventEmitter } = await import('./utils/websocket');
+
+
+        const connectionData = channelConnection.connectionData as any;
+        const {
+          accountSid,
+          authToken,
+          fromNumber,
+          elevenLabsApiKey,
+          elevenLabsAgentId,
+          elevenLabsPrompt,
+          voiceId
+        } = connectionData;
+
+
+        if (!accountSid || !authToken || !fromNumber) {
+          return res.status(400).json({
+            error: 'Twilio Voice channel is missing required credentials (Account SID, Auth Token, or From Number)'
+          });
+        }
+
+
+        const hasElevenLabs = !!(elevenLabsApiKey && elevenLabsApiKey.trim() !== '');
+
+
+        let useElevenLabs = hasElevenLabs;
+        let actualCallType = hasElevenLabs ? 'ai-powered' : 'direct';
+
+        if (callType) {
+          if (callType === 'direct') {
+            useElevenLabs = false;
+            actualCallType = 'direct';
+          } else if (callType === 'ai-powered') {
+            if (!hasElevenLabs) {
+              return res.status(400).json({
+                error: 'ElevenLabs credentials not configured for AI-powered calls'
+              });
+            }
+
+            if (!elevenLabsAgentId && !elevenLabsPrompt) {
+              return res.status(400).json({
+                error: 'Either ElevenLabs Agent ID or custom prompt must be configured for AI-powered calls. Please configure an agent in your ElevenLabs dashboard or provide a custom prompt.',
+                suggestion: 'Go to Settings > AI Credentials > ElevenLabs to configure your agent ID'
+              });
+            }
+            if (!elevenLabsAgentId && elevenLabsPrompt) {
+              console.warn('[Initiate Call] Using custom prompt with AI-powered call - signed URL authentication not available for custom prompts');
+            }
+            useElevenLabs = true;
+            actualCallType = 'ai-powered';
+          } else {
+            return res.status(400).json({
+              error: 'Invalid callType. Must be "direct" or "ai-powered"'
+            });
+          }
+        }
+
+
+
+
+        const config: CallAgentConfig = {
+          twilioAccountSid: accountSid,
+          twilioAuthToken: authToken,
+          twilioFromNumber: fromNumber,
+          toNumber: phoneNumber,
+          elevenLabsApiKey: useElevenLabs ? (elevenLabsApiKey || '') : '',
+          elevenLabsAgentId: useElevenLabs ? elevenLabsAgentId : undefined,
+          elevenLabsPrompt: useElevenLabs ? elevenLabsPrompt : undefined,
+          elevenLabsVoiceId: useElevenLabs ? voiceId : undefined,
+          timeout: 30,
+          maxDuration: 300,
+          recordCall: true,
+          executionMode: 'async'
+        };
+
+
+        const webhookBaseUrl = process.env.WEBHOOK_BASE_URL ||
+          process.env.PUBLIC_URL?.replace(/^https?:\/\//, '') ||
+          'localhost:3000';
+
+
+        const result = await initiateOutboundCall(config, webhookBaseUrl);
+        const { callSid, from, to, startTime, metadata } = result;
+
+
+        if (metadata?.callType) {
+          actualCallType = metadata.callType;
+        }
+        
+
+        if (metadata?.elevenLabsFallback) {
+          actualCallType = 'direct';
+        }
+
+
+        const savedCall = await callLogsService.upsertCallLog({
+          companyId: req.user?.companyId || 0,
+          channelId: channelConnection.id,
+          contactId: contact.id,
+          conversationId: conversation.id,
+          flowId: null,
+          nodeId: null,
+          direction: 'outbound',
+          status: 'initiated',
+          from: from,
+          to: to,
+          twilioCallSid: callSid,
+          startedAt: startTime,
+          agentConfig: elevenLabsAgentId ? {
+            elevenLabsAgentId,
+            elevenLabsPrompt,
+            voiceId
+          } : undefined,
+          metadata: {
+            ...metadata,
+            hasElevenLabs: hasElevenLabs,
+            callType: actualCallType,
+            userSelectedCallType: !!callType,
+            elevenLabsConversationId: result.metadata?.elevenLabsConversationId
+          }
+        });
+
+
+        CallLogsEventEmitter.emitCallStatusUpdate(
+          savedCall.id,
+          req.user?.companyId || 0,
+          'initiated',
+          { callSid, from, to }
+        );
+
+        const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+
+        res.json({
+          success: true,
+          callSid: callSid,
+          callId: savedCall.id,
+          status: 'initiated',
+          from: from,
+          to: to,
+          contactName: contact.name,
+          contactPhone: canViewPhone ? contact.phone : null,
+          contactAvatar: contact.avatarUrl,
+          message: 'Call initiated successfully',
+          conferenceName: result.metadata?.conferenceName,
+          channelId: channelConnection.id,
+          callType: actualCallType
+        });
+
+      } catch (error) {
+        console.error('[Initiate Contact Call]', error);
+
+
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        if (errorMessage?.includes('Invalid credentials') ||
+          errorMessage?.includes('authentication')) {
+          return res.status(400).json({ error: 'Invalid Twilio credentials' });
+        }
+
+        if (errorMessage?.includes('Twilio API')) {
+          return res.status(500).json({ error: 'Twilio API error: ' + errorMessage });
+        }
+
+        res.status(500).json({ error: 'Failed to initiate call' });
+      }
+    }
+  );
 
 
   app.get('/api/contacts/:contactId/tasks', ensureAuthenticated, async (req: any, res) => {
@@ -8274,6 +12531,20 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         actionType: actionType as string
       });
 
+      const permissions = await getUserPermissions(req.user);
+      const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+      if (!canViewPhone && auditLogs.logs) {
+        auditLogs.logs = auditLogs.logs.map((log: any) => ({
+          ...log,
+          oldValues: log.oldValues && typeof log.oldValues === 'object'
+            ? { ...log.oldValues, phone: null, identifier: null }
+            : log.oldValues,
+          newValues: log.newValues && typeof log.newValues === 'object'
+            ? { ...log.newValues, phone: null, identifier: null }
+            : log.newValues
+        }));
+      }
+
       res.json(auditLogs);
     } catch (error) {
       console.error('Error fetching contact audit logs:', error);
@@ -8334,7 +12605,18 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const avatarUrl = `/uploads/${req.file.filename}`;
       const updatedContact = await storage.updateContact(contactId, { avatarUrl });
 
-      res.json({ avatarUrl, contact: updatedContact });
+      const permissions = await getUserPermissions(req.user);
+      const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+      const contactForBroadcast = canViewPhone ? updatedContact : { ...updatedContact, phone: null, identifier: null };
+      if ((global as any).broadcastToAllClients) {
+        (global as any).broadcastToAllClients({
+          type: 'contactUpdated',
+          data: contactForBroadcast
+        });
+      }
+
+      const contactToReturn = canViewPhone ? updatedContact : { ...updatedContact, phone: null, identifier: null };
+      res.json({ avatarUrl, contact: contactToReturn });
     } catch (error) {
       console.error('Error uploading contact avatar:', error);
       res.status(500).json({ error: 'Failed to upload avatar' });
@@ -8366,14 +12648,18 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(404).json({ message: 'Connection not found' });
       }
 
+      const permissions = await getUserPermissions(req.user);
+      const canViewPhone = (req.user as any).isSuperAdmin || permissions[PERMISSIONS.VIEW_CONTACT_PHONE] === true;
+
       if (!forceRefresh && contact.avatarUrl) {
         const avatarAge = Date.now() - new Date(contact.updatedAt || contact.createdAt || Date.now()).getTime();
         const maxAge = 24 * 60 * 60 * 1000;
 
         if (avatarAge < maxAge) {
+          const contactToReturn = canViewPhone ? contact : { ...contact, phone: null, identifier: null };
           return res.json({
             success: true,
-            contact: contact,
+            contact: contactToReturn,
             profilePictureUrl: contact.avatarUrl,
             cached: true
           });
@@ -8399,16 +12685,18 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         avatarUrl: profilePictureUrl
       });
 
+      const contactForBroadcast = canViewPhone ? updatedContact : { ...updatedContact, phone: null, identifier: null };
       if ((global as any).broadcastToAllClients) {
         (global as any).broadcastToAllClients({
           type: 'contactUpdated',
-          data: updatedContact
+          data: contactForBroadcast
         });
       }
 
+      const contactToReturn = canViewPhone ? updatedContact : { ...updatedContact, phone: null, identifier: null };
       res.json({
         success: true,
-        contact: updatedContact,
+        contact: contactToReturn,
         profilePictureUrl,
         cached: false
       });
@@ -8738,7 +13026,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           company: null,
           tags: null,
           isActive: true,
-          notes: null
+          notes: null,
+          createdBy: req.user.id
         };
 
         contact = await storage.getOrCreateContact(contactData);
@@ -8775,7 +13064,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
               req.user.id,
               req.user.companyId,
               cleanPhoneNumber,
-              initialMessage.trim()
+              initialMessage.trim(),
+              false // isFromBot - user-initiated message
             );
           } else {
 
@@ -9020,9 +13310,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         for (let index = 0; index < metadata.participants.length; index++) {
           const participant = metadata.participants[index];
 
-          
+
           const participantAny = participant as any;
- 
+
 
           const rawId = participant.id.split('@')[0];
 
@@ -9036,7 +13326,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           let isValidPhoneNumber = false;
 
 
-          
+
           if (officialJid && officialJid.includes('@s.whatsapp.net')) {
             const phoneDigits = officialJid.split('@')[0];
             displayPhoneNumber = phoneDigits;
@@ -9116,14 +13406,14 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
               const groupParticipants = await storage.getGroupParticipants(conversationId);
               const existingParticipant = groupParticipants.find(p => p.participantJid === participant.id);
               if (existingParticipant && existingParticipant.participantName &&
-                  existingParticipant.participantName !== participant.id &&
-                  existingParticipant.participantName !== rawId &&
-                  !existingParticipant.participantName.startsWith('LID-')) {
+                existingParticipant.participantName !== participant.id &&
+                existingParticipant.participantName !== rawId &&
+                !existingParticipant.participantName.startsWith('LID-')) {
                 participantInfo.displayName = existingParticipant.participantName;
 
                 if (existingParticipant.contact && existingParticipant.contact.phone &&
-                    !existingParticipant.contact.phone.startsWith('LID-') &&
-                    existingParticipant.contact.phone !== rawId) {
+                  !existingParticipant.contact.phone.startsWith('LID-') &&
+                  existingParticipant.contact.phone !== rawId) {
                   participantInfo.phoneNumber = existingParticipant.contact.phone;
                   participantInfo.resolvedFromLid = isLidFormat;
                   displayPhoneNumber = existingParticipant.contact.phone;
@@ -9246,7 +13536,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             } catch (previewError) {
             }
           }
-        
+
           try {
             const statusInfo = await sock.fetchStatus(participant.id);
 
@@ -9264,7 +13554,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           } catch (statusError) {
           }
 
-          
+
           enhancedParticipants.push(participantInfo);
 
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -9337,14 +13627,14 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const csvHeaders = ['Name', 'Phone Number', 'Role', 'Joined Date', 'WhatsApp JID'];
       const csvRows = participants.map(participant => {
         const role = participant.isSuperAdmin ? 'Super Admin' :
-                    participant.isAdmin ? 'Admin' : 'Member';
+          participant.isAdmin ? 'Admin' : 'Member';
         const joinedDate = participant.joinedAt ?
-                          new Date(participant.joinedAt).toLocaleDateString() : 'Unknown';
+          new Date(participant.joinedAt).toLocaleDateString() : 'Unknown';
         const phoneNumber = participant.contact?.phone ||
-                           participant.participantJid.split('@')[0] || 'Unknown';
+          participant.participantJid.split('@')[0] || 'Unknown';
         const name = participant.participantName ||
-                    participant.contact?.name ||
-                    phoneNumber;
+          participant.contact?.name ||
+          phoneNumber;
 
         return [
           `"${name}"`,
@@ -9607,7 +13897,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
       else if (!conversation.isGroup) {
         if (conversation.assignedToUserId === user.id ||
-            (user.companyId && conversation.companyId === user.companyId)) {
+          (user.companyId && conversation.companyId === user.companyId)) {
           canClear = true;
         }
       }
@@ -9962,8 +14252,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     }
   });
 
-  app.post('/api/conversations/:id/send-template', 
-    ensureAuthenticated, 
+  app.post('/api/conversations/:id/send-template',
+    ensureAuthenticated,
     requireAnyPermission([PERMISSIONS.MANAGE_CONVERSATIONS]),
     async (req: any, res) => {
       try {
@@ -10049,7 +14339,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
         const components: Array<{
           type: 'header' | 'body' | 'button';
-          parameters?: Array<{ type: 'text' | 'currency' | 'date_time' | 'image' | 'document' | 'video'; text?: string; image?: any; video?: any; document?: any; [key: string]: any }>;
+          parameters?: Array<{ type: 'text' | 'currency' | 'date_time' | 'image' | 'document' | 'video'; text?: string; image?: any; video?: any; document?: any;[key: string]: any }>;
         }> = [];
 
 
@@ -10057,11 +14347,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         if (templateRecord) {
           let templateMediaUrls = ((templateRecord.mediaUrls as string[]) || []);
           const mediaHandle = (templateRecord as any).mediaHandle;
-          
+
           const hasMediaHandle = !!mediaHandle;
           const hasMediaUrls = templateMediaUrls.length > 0;
           const hasAnyMedia = hasMediaHandle || hasMediaUrls;
-          
+
           if (hasAnyMedia) {
 
             let headerFormat = 'IMAGE'; // Default to IMAGE
@@ -10075,10 +14365,10 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                 headerFormat = 'IMAGE';
               }
             }
-            
+
 
             const isMediaHandleUrl = mediaHandle && (mediaHandle.startsWith('http://') || mediaHandle.startsWith('https://'));
-            
+
             if (mediaHandle && !isMediaHandleUrl) {
 
               const headerParam: any = {
@@ -10087,7 +14377,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                   id: mediaHandle
                 }
               };
-              
+
               components.push({
                 type: 'header',
                 parameters: [headerParam]
@@ -10095,7 +14385,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             } else if (hasMediaUrls) {
 
               let mediaUrl = templateMediaUrls[0];
-              
+
 
               if (!mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
                 const baseUrl = process.env.APP_URL || process.env.BASE_URL || process.env.PUBLIC_URL;
@@ -10114,33 +14404,33 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                   }
                 }
               }
-              
+
               try {
 
                 const connection = await storage.getChannelConnection(channelId);
                 if (!connection) {
                   throw new Error('Channel connection not found');
                 }
-                
+
                 const connectionData = connection.connectionData as any;
                 const accessToken = connectionData?.accessToken || connection.accessToken;
                 const phoneNumberId = connectionData?.phoneNumberId;
-                
+
                 if (!accessToken || !phoneNumberId) {
                   throw new Error('Missing WhatsApp connection credentials');
                 }
-                
+
 
                 const mediaResponse = await axios.get(mediaUrl, {
                   responseType: 'arraybuffer',
                   timeout: 30000
                 });
-                
+
 
                 const FormData = (await import('form-data')).default;
                 const formData = new FormData();
                 formData.append('messaging_product', 'whatsapp');
-                
+
                 const getFileExtension = (url: string): string => {
                   const urlLower = url.toLowerCase();
                   if (urlLower.match(/\.(jpg|jpeg)$/)) return 'jpg';
@@ -10152,7 +14442,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                   if (urlLower.match(/\.pdf$/)) return 'pdf';
                   return 'jpg';
                 };
-                
+
                 const getContentType = (ext: string): string => {
                   const types: Record<string, string> = {
                     'jpg': 'image/jpeg',
@@ -10166,15 +14456,15 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                   };
                   return types[ext] || 'application/octet-stream';
                 };
-                
+
                 const fileExtension = getFileExtension(mediaUrl);
                 const contentType = mediaResponse.headers['content-type'] || getContentType(fileExtension);
-                
+
                 formData.append('file', Buffer.from(mediaResponse.data), {
                   filename: `template_media.${fileExtension}`,
                   contentType: contentType
                 });
-                
+
                 const uploadResponse = await axios.post(
                   `https://graph.facebook.com/v23.0/${phoneNumberId}/media`,
                   formData,
@@ -10187,13 +14477,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                     timeout: 60000
                   }
                 );
-                
+
                 if (!uploadResponse.data?.id) {
                   throw new Error('Failed to get media ID from WhatsApp');
                 }
-                
+
                 const mediaId = uploadResponse.data.id;
-                
+
 
                 const headerParam: any = {
                   type: headerFormat.toLowerCase(),
@@ -10201,14 +14491,14 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                     id: mediaId
                   }
                 };
-                
+
                 components.push({
                   type: 'header',
                   parameters: [headerParam]
                 });
               } catch (uploadError: any) {
                 console.error('[Send Template] Failed to upload media, trying with link as fallback:', uploadError.message);
-                
+
 
                 const headerParam: any = {
                   type: headerFormat.toLowerCase(),
@@ -10216,7 +14506,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                     link: mediaUrl
                   }
                 };
-                
+
                 components.push({
                   type: 'header',
                   parameters: [headerParam]
@@ -10224,8 +14514,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
               }
             } else {
 
-              return res.status(400).json({ 
-                error: `Template "${templateName}" requires media header but no media URL or media handle is configured. Please ensure the template was properly synced from Meta with media handle stored, or add media URLs to the template.` 
+              return res.status(400).json({
+                error: `Template "${templateName}" requires media header but no media URL or media handle is configured. Please ensure the template was properly synced from Meta with media handle stored, or add media URLs to the template.`
               });
             }
           }
@@ -10247,7 +14537,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
 
-          
+
 
 
           const bodyParams = expectedVariables
@@ -10297,8 +14587,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.json({ success: true, messageId: result.messageId || result.id });
       } catch (error: any) {
         console.error('Error sending template message:', error);
-        return res.status(500).json({ 
-          error: error.message || 'Failed to send template message' 
+        return res.status(500).json({
+          error: error.message || 'Failed to send template message'
         });
       }
     }
@@ -10466,25 +14756,25 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       let message = null;
 
-	      let messageCaption: string = caption;
-	      try {
-	        const dbUser = await storage.getUser(req.user.id);
-	        if (dbUser) {
-	          const nameCandidates = [
-	            (dbUser as any).fullName,
-	            (dbUser as any).name,
-	            [ (dbUser as any).firstName, (dbUser as any).lastName ].filter(Boolean).join(' ').trim(),
-	            (dbUser as any).displayName,
-	            typeof (dbUser as any).email === 'string' ? (dbUser as any).email.split('@')[0] : undefined
-	          ].filter((v: any) => typeof v === 'string' && v.trim().length > 0);
-	          const signatureName = nameCandidates[0];
-	          if (signatureName) {
-	            messageCaption = `> *${signatureName}*\n\n${caption || ''}`.trim();
-	          }
-	        }
-	      } catch (sigErr) {
-	        console.error('Error generating signature for media caption:', sigErr);
-	      }
+      let messageCaption: string = caption;
+      try {
+        const dbUser = await storage.getUser(req.user.id);
+        if (dbUser) {
+          const nameCandidates = [
+            (dbUser as any).fullName,
+            (dbUser as any).name,
+            [(dbUser as any).firstName, (dbUser as any).lastName].filter(Boolean).join(' ').trim(),
+            (dbUser as any).displayName,
+            typeof (dbUser as any).email === 'string' ? (dbUser as any).email.split('@')[0] : undefined
+          ].filter((v: any) => typeof v === 'string' && v.trim().length > 0);
+          const signatureName = nameCandidates[0];
+          if (signatureName) {
+            messageCaption = `> *${signatureName}*\n\n${caption || ''}`.trim();
+          }
+        }
+      } catch (sigErr) {
+        console.error('Error generating signature for media caption:', sigErr);
+      }
 
       let convertedFilePath: string | null = null;
 
@@ -10553,47 +14843,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             finalMimeType,
             false
           );
-        } else if (conversation.channelType === 'whatsapp_twilio') {
-          const host = req.get('host') || 'localhost:9000';
-          const protocol = host.includes('localhost') ? 'http' : req.protocol;
-          const publicUrl = `${protocol}://${host}/uploads/${path.basename(req.file.path)}`;
-          const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
-
-          if (path.resolve(req.file.path) !== path.resolve(publicPath)) {
-            await fsExtra.copy(req.file.path, publicPath);
-          }
-
-          message = await whatsAppTwilioService.sendMedia(
-            conversation.channelId,
-            req.user.id,
-            contact.identifier || contact.phone || '',
-            determinedMediaType,
-            publicUrl,
-            messageCaption,
-            req.file.originalname
-          );
-        } else if (conversation.channelType === 'whatsapp_360dialog') {
-          const host = req.get('host') || 'localhost:9000';
-          const protocol = host.includes('localhost') ? 'http' : req.protocol;
-          const publicUrl = `${protocol}://${host}/uploads/${path.basename(req.file.path)}`;
-          const publicPath = path.join(process.cwd(), 'uploads', path.basename(req.file.path));
-
-          if (path.resolve(req.file.path) !== path.resolve(publicPath)) {
-            await fsExtra.copy(req.file.path, publicPath);
-          }
-
-          message = await whatsApp360DialogPartnerService.sendMedia(
-            conversation.channelId,
-            req.user.id,
-            contact.identifier || contact.phone || '',
-            determinedMediaType,
-            publicUrl,
-            messageCaption,
-            req.file.originalname
-          );
         } else if (conversation.channelType === 'messenger') {
 
-          
+
 
 
           const messengerSupportedTypes = {
@@ -10630,7 +14882,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
           if (path.resolve(req.file.path) !== path.resolve(publicPath)) {
             await fsExtra.copy(req.file.path, publicPath);
-            
+
           }
 
 
@@ -10639,7 +14891,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
           const messengerMediaType = determinedMediaType === 'document' ? 'file' : determinedMediaType;
 
-          
+
 
 
           const messengerResult = await sendMessengerMediaMessage(
@@ -10654,7 +14906,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             throw new Error(messengerResult.error || 'Failed to send Messenger media message');
           }
 
-          
+
 
 
           const messageData = {
@@ -10856,10 +15108,10 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
             const newPublicUrl = `${protocol}://${host}/uploads/${convertedBasename}`;
-            
+
             await fsExtra.unlink(conversionResult.outputPath);
             await fsExtra.unlink(req.file.path); // Clean up original file
-            
+
             return res.json({
               success: true,
               mediaUrl: newPublicUrl,
@@ -10910,7 +15162,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     const multer = (await import('multer')).default;
     const path = (await import('path')).default;
     const crypto = (await import('crypto')).default;
-    
+
     const scheduledUpload = multer({
       storage: multer.diskStorage({
         destination: async function (req: any, file: any, cb: any) {
@@ -10957,17 +15209,26 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
       const mediaFilePath = req.file.path;
-      
 
 
-      return res.json({
+
+      const responseData = {
         success: true,
         mediaFilePath: mediaFilePath,
         mediaType: determinedMediaType,
         fileName: req.file.originalname,
         fileSize: req.file.size,
         mimeType: req.file.mimetype
-      });
+      };
+
+
+      if (req.user?.companyId && req.file) {
+        dataUsageTracker.trackFileUpload(req.user.companyId, req.file.size).catch(err => {
+          console.error('Failed to track scheduled message media upload:', err);
+        });
+      }
+
+      return res.json(responseData);
 
     } catch (error: any) {
       console.error('Error uploading scheduled media file:', error);
@@ -11032,12 +15293,21 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         const filename = path.basename(req.file.path);
         const fileUrl = `/media/flow-media/${filename}`;
 
-        return res.status(200).json({
+        const responseData = {
           url: fileUrl,
           originalName: req.file.originalname,
           mimetype: req.file.mimetype,
           size: req.file.size
-        });
+        };
+
+
+        if (req.user?.companyId && req.file) {
+          dataUsageTracker.trackFileUpload(req.user.companyId, req.file.size).catch(err => {
+            console.error('Failed to track flow-media upload:', err);
+          });
+        }
+
+        return res.status(200).json(responseData);
       } catch (error: any) {
         console.error('Error processing uploaded file:', error);
 
@@ -11337,13 +15607,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       const nodes = flow.nodes as any[] || [];
-      const dataCaptureNodes = nodes.filter(node => 
-        node.type === 'data_capture' && 
+      const dataCaptureNodes = nodes.filter(node =>
+        node.type === 'data_capture' &&
         node.data?.captureRules?.length > 0
       );
 
-      const codeExecutionNodes = nodes.filter(node => 
-        node.type === 'code_execution' && 
+      const codeExecutionNodes = nodes.filter(node =>
+        node.type === 'code_execution' &&
         node.data?.code
       );
 
@@ -11378,7 +15648,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       codeExecutionNodes.forEach(node => {
         const nodeName = node.data.label || `Code Execution ${node.id}`;
-        
+
         capturedVariables.push({
           variableKey: 'code_execution_output',
           label: 'Code Execution Output',
@@ -11684,7 +15954,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       const updatedAssignment = await storage.updateFlowAssignmentStatus(id, isActive);
 
-      
+
 
       res.json(updatedAssignment);
 
@@ -12114,8 +16384,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.post('/api/google/calendar/events', ensureAuthenticated, async (req: any, res) => {
     try {
-      
-      const { summary, description, location, startDateTime, endDateTime, attendees } = req.body;
+
+      const { summary, description, location, startDateTime, endDateTime, attendees, colorId } = req.body;
 
       if (!summary || !startDateTime || !endDateTime) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -12133,7 +16403,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           dateTime: endDateTime,
           timeZone: 'UTC'
         },
-        attendees: attendees || []
+        attendees: attendees || [],
+        colorId: colorId || undefined
       };
 
       const result = await googleCalendarService.createCalendarEvent(
@@ -12186,7 +16457,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.patch('/api/google/calendar/events/:eventId', ensureAuthenticated, async (req: any, res) => {
     try {
       const eventId = req.params.eventId;
-      const { summary, description, location, startDateTime, endDateTime, attendees } = req.body;
+      const { summary, description, location, startDateTime, endDateTime, attendees, colorId } = req.body;
 
       if (!eventId || !summary || !startDateTime || !endDateTime) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -12204,7 +16475,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           dateTime: endDateTime,
           timeZone: 'UTC'
         },
-        attendees: Array.isArray(attendees) ? attendees : []
+        attendees: Array.isArray(attendees) ? attendees : [],
+        colorId: colorId || undefined
       };
 
       const result = await googleCalendarService.updateCalendarEvent(
@@ -12252,7 +16524,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.get('/api/google/calendar/availability', ensureAuthenticated, async (req: any, res) => {
     try {
-      
+
       const date = req.query.date as string;
       const durationMinutes = parseInt(req.query.duration as string) || 30;
 
@@ -12336,8 +16608,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.post('/api/zoho/calendar/events', ensureAuthenticated, async (req: any, res) => {
     try {
-      
-      const { summary, description, location, startDateTime, endDateTime, attendees } = req.body;
+
+      const { summary, description, location, startDateTime, endDateTime, attendees, colorId } = req.body;
 
       if (!summary || !startDateTime || !endDateTime) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -12355,7 +16627,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           dateTime: endDateTime,
           timeZone: 'UTC'
         },
-        attendees: attendees || []
+        attendees: attendees || [],
+        colorId: colorId || undefined
       };
 
       const result = await zohoCalendarService.createCalendarEvent(
@@ -12408,7 +16681,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.patch('/api/zoho/calendar/events/:eventId', ensureAuthenticated, async (req: any, res) => {
     try {
       const eventId = req.params.eventId;
-      const { summary, description, location, startDateTime, endDateTime, attendees } = req.body;
+      const { summary, description, location, startDateTime, endDateTime, attendees, colorId } = req.body;
 
       if (!eventId || !summary || !startDateTime || !endDateTime) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -12426,7 +16699,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           dateTime: endDateTime,
           timeZone: 'UTC'
         },
-        attendees: Array.isArray(attendees) ? attendees : []
+        attendees: Array.isArray(attendees) ? attendees : [],
+        colorId: colorId || undefined
       };
 
       const result = await zohoCalendarService.updateCalendarEvent(
@@ -12474,7 +16748,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.get('/api/zoho/calendar/availability', ensureAuthenticated, async (req: any, res) => {
     try {
-      
+
       const date = req.query.date as string;
       const durationMinutes = parseInt(req.query.duration as string) || 30;
 
@@ -14642,7 +18916,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       } = req.body;
 
       if (!connectionId || !imapHost || !imapPort || !imapUsername ||
-          !smtpHost || !smtpPort || !smtpUsername || !emailAddress) {
+        !smtpHost || !smtpPort || !smtpUsername || !emailAddress) {
         return res.status(400).json({
           success: false,
           error: 'MISSING_REQUIRED_FIELDS',
@@ -15220,22 +19494,22 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           filteredMessages = allMessages.filter(msg => {
             const metadata = msg.metadata ? (typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata) : {};
             return msg.direction === 'inbound' &&
-                   msg.status !== 'deleted' &&
-                   !metadata.deleted &&
-                   !metadata.archived &&
-                   metadata.folder !== 'trash';
+              msg.status !== 'deleted' &&
+              !metadata.deleted &&
+              !metadata.archived &&
+              metadata.folder !== 'trash';
           });
           break;
         case 'sent':
           filteredMessages = allMessages.filter(msg => {
             const metadata = msg.metadata ? (typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata) : {};
             return msg.direction === 'outbound' &&
-                   msg.status !== 'deleted' &&
-                   msg.status !== 'draft' &&
-                   !metadata.deleted &&
-                   !metadata.archived &&
-                   !metadata.isDraft &&
-                   metadata.folder !== 'trash';
+              msg.status !== 'deleted' &&
+              msg.status !== 'draft' &&
+              !metadata.deleted &&
+              !metadata.archived &&
+              !metadata.isDraft &&
+              metadata.folder !== 'trash';
           });
           break;
         case 'drafts':
@@ -15254,9 +19528,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           filteredMessages = allMessages.filter(msg => {
             const metadata = msg.metadata ? (typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata) : {};
             return metadata.starred === true &&
-                   msg.status !== 'deleted' &&
-                   !metadata.deleted &&
-                   metadata.folder !== 'trash';
+              msg.status !== 'deleted' &&
+              !metadata.deleted &&
+              metadata.folder !== 'trash';
           });
           break;
         case 'archive':
@@ -15274,10 +19548,10 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           filteredMessages = allMessages.filter(msg => {
             const metadata = msg.metadata ? (typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata) : {};
             return msg.direction === 'inbound' &&
-                   msg.status !== 'deleted' &&
-                   !metadata.deleted &&
-                   !metadata.archived &&
-                   metadata.folder !== 'trash';
+              msg.status !== 'deleted' &&
+              !metadata.deleted &&
+              !metadata.archived &&
+              metadata.folder !== 'trash';
           });
       }
 
@@ -15487,12 +19761,12 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
       const channelConnection = await storage.getChannelConnection(parseInt(channelId));
-      
+
       if (!channelConnection) {
 
         const allEmailConnections = await storage.getChannelConnectionsByType('email');
         const companyEmailConnections = allEmailConnections.filter(conn => conn.companyId === user.companyId);
-     
+
 
         return res.status(400).json({
           success: false,
@@ -16512,6 +20786,22 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     try {
       const user = req.user as any;
       const generalSearch = req.query.generalSearch as string | undefined;
+      const pipelineId = req.query.pipelineId ? parseInt(req.query.pipelineId as string) : undefined;
+      const includeReverts = req.query.includeReverts === 'true';
+
+
+      const stageIds = req.query.stageIds ? (req.query.stageIds as string).split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : undefined;
+      const priorities = req.query.priorities ? (req.query.priorities as string).split(',') as ('low' | 'medium' | 'high')[] : undefined;
+      const minValue = req.query.minValue ? parseFloat(req.query.minValue as string) : undefined;
+      const maxValue = req.query.maxValue ? parseFloat(req.query.maxValue as string) : undefined;
+      const dueDateFrom = req.query.dueDateFrom as string | undefined;
+      const dueDateTo = req.query.dueDateTo as string | undefined;
+      const assignedUserIds = req.query.assignedUserIds ? (req.query.assignedUserIds as string).split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : undefined;
+      const includeUnassigned = req.query.includeUnassigned === 'true';
+      const tags = req.query.tags ? (req.query.tags as string).split(',') : undefined;
+      const status = req.query.status as string | undefined;
+      const createdFrom = req.query.createdFrom as string | undefined;
+      const createdTo = req.query.createdTo as string | undefined;
 
       if (!user.companyId) {
         return res.status(400).json({ message: 'User must be associated with a company' });
@@ -16520,6 +20810,20 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const filter: {
         companyId?: number;
         generalSearch?: string;
+        pipelineId?: number;
+        stageIds?: number[];
+        priorities?: ('low' | 'medium' | 'high')[];
+        minValue?: number;
+        maxValue?: number;
+        dueDateFrom?: string;
+        dueDateTo?: string;
+        assignedUserIds?: number[];
+        includeUnassigned?: boolean;
+        tags?: string[];
+        status?: string;
+        createdFrom?: string;
+        createdTo?: string;
+        customFields?: Record<string, {operator: 'equals' | 'contains' | 'gt' | 'lt' | 'inArray'; value: string | number | string[]}>;
       } = {
         companyId: user.companyId
       };
@@ -16528,10 +20832,121 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         filter.generalSearch = generalSearch;
       }
 
+      if (pipelineId && !isNaN(pipelineId)) {
+        filter.pipelineId = pipelineId;
+      }
+
+      if (stageIds && stageIds.length > 0) {
+        filter.stageIds = stageIds;
+      }
+
+      if (priorities && priorities.length > 0) {
+        filter.priorities = priorities;
+      }
+
+      if (minValue !== undefined && !isNaN(minValue)) {
+        filter.minValue = minValue;
+      }
+
+      if (maxValue !== undefined && !isNaN(maxValue)) {
+        filter.maxValue = maxValue;
+      }
+
+      if (dueDateFrom) {
+        filter.dueDateFrom = dueDateFrom;
+      }
+
+      if (dueDateTo) {
+        filter.dueDateTo = dueDateTo;
+      }
+
+      if (assignedUserIds && assignedUserIds.length > 0) {
+        filter.assignedUserIds = assignedUserIds;
+      }
+
+      if (includeUnassigned) {
+        filter.includeUnassigned = includeUnassigned;
+      }
+
+      if (tags && tags.length > 0) {
+        filter.tags = tags;
+      }
+
+      if (status) {
+        filter.status = status;
+      }
+
+      if (createdFrom) {
+        filter.createdFrom = createdFrom;
+      }
+
+      if (createdTo) {
+        filter.createdTo = createdTo;
+      }
+
+
+      if (req.query.customFields) {
+        try {
+          const customFieldsStr = req.query.customFields as string;
+          filter.customFields = JSON.parse(customFieldsStr);
+        } catch (error) {
+          console.error('Error parsing customFields:', error);
+
+        }
+      }
+
       const deals = await storage.getDeals(filter);
+
+
+      if (includeReverts && deals && Array.isArray(deals)) {
+        const dealsWithReverts = await Promise.all(
+          deals.map(async (deal: any) => {
+            try {
+              const reverts = await storage.getPipelineStageRevertsByDeal(deal.id, user.companyId);
+              const activeReverts = reverts.filter((r: any) => r.status === 'scheduled');
+              return {
+                ...deal,
+                scheduledReverts: reverts,
+                hasScheduledReverts: activeReverts.length > 0
+              };
+            } catch (error) {
+              console.error(`Error fetching reverts for deal ${deal.id}:`, error);
+              return {
+                ...deal,
+                scheduledReverts: [],
+                hasScheduledReverts: false
+              };
+            }
+          })
+        );
+        return res.status(200).json(dealsWithReverts);
+      }
+
       return res.status(200).json(deals);
     } catch (error) {
       console.error("Error fetching deals:", error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+
+  app.get('/api/company/custom-fields', ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const entity = req.query.entity as 'deal' | 'contact' | 'company' | undefined;
+
+      if (!user.companyId) {
+        return res.status(400).json({ message: 'User must be associated with a company' });
+      }
+
+      if (!entity) {
+        return res.status(400).json({ message: 'Entity parameter is required' });
+      }
+
+      const customFields = await storage.getCompanyCustomFields(user.companyId, entity);
+      return res.status(200).json(customFields);
+    } catch (error) {
+      console.error('Error fetching custom fields:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });
@@ -16618,14 +21033,19 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       const stages = await storage.getPipelineStages();
       const teamMembers = await storage.getAllTeamMembers();
-      
+
+
+      const pipelines = user.companyId 
+        ? await storage.getPipelinesByCompany(user.companyId)
+        : await storage.getPipelines();
+      const pipelinesMap = new Map(pipelines.map(p => [p.id, p]));
 
       const contactIdsSet = new Set<number>();
       deals.forEach(deal => contactIdsSet.add(deal.contactId));
       const contactIds = Array.from(contactIdsSet);
-      
 
-      
+
+
       const contacts = await Promise.all(
         contactIds.map(async (contactId) => {
           try {
@@ -16637,13 +21057,13 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         })
       );
       const contactsMap = new Map(contacts.filter(Boolean).map(c => [c!.id, c]));
-      
+
 
       const enrichedDeals = deals.map(deal => {
         const stage = stages.find(s => s.id === deal.stageId);
         const assignee = teamMembers.find((m: any) => m.id === deal.assignedToUserId);
         const contact = contactsMap.get(deal.contactId);
-        
+
         return {
           id: deal.id,
           title: deal.title,
@@ -16658,6 +21078,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           assignedToEmail: assignee?.email || '',
           assignedToName: assignee?.fullName || assignee?.username || '',
           tags: Array.isArray(deal.tags) ? deal.tags : [],
+          pipelineId: deal.pipelineId,
+          pipelineName: pipelinesMap.get(deal.pipelineId)?.name || '',
           stage: stage?.name || '',
           stageId: deal.stageId,
           createdAt: deal.createdAt,
@@ -16673,7 +21095,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.json(enrichedDeals);
       } else if (format === 'csv') {
 
-        const csvHeader = 'id,title,description,value,priority,contactId,contactName,contactEmail,contactPhone,assignedToUserId,assignedToEmail,assignedToName,tags,stage,stageId,createdAt,updatedAt\n';
+        const csvHeader = 'id,title,description,value,priority,contactId,contactName,contactEmail,contactPhone,assignedToUserId,assignedToEmail,assignedToName,tags,pipelineId,pipelineName,stage,stageId,createdAt,updatedAt\n';
         const csvData = enrichedDeals.map(deal => {
           return [
             deal.id,
@@ -16689,6 +21111,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             `"${deal.assignedToEmail || ''}"`,
             `"${deal.assignedToName || ''}"`,
             `"${Array.isArray(deal.tags) ? deal.tags.join(',') : ''}"`,
+            deal.pipelineId || '',
+            `"${deal.pipelineName || ''}"`,
             `"${deal.stage || ''}"`,
             deal.stageId || '',
             deal.createdAt || '',
@@ -16702,7 +21126,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       } else if (format === 'excel') {
 
 
-        const csvHeader = 'id,title,description,value,priority,contactId,contactName,contactEmail,contactPhone,assignedToUserId,assignedToEmail,assignedToName,tags,stage,stageId,createdAt,updatedAt\n';
+        const csvHeader = 'id,title,description,value,priority,contactId,contactName,contactEmail,contactPhone,assignedToUserId,assignedToEmail,assignedToName,tags,pipelineId,pipelineName,stage,stageId,createdAt,updatedAt\n';
         const csvData = enrichedDeals.map(deal => {
           return [
             deal.id,
@@ -16718,6 +21142,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             `"${deal.assignedToEmail || ''}"`,
             `"${deal.assignedToName || ''}"`,
             `"${Array.isArray(deal.tags) ? deal.tags.join(',') : ''}"`,
+            deal.pipelineId || '',
+            `"${deal.pipelineName || ''}"`,
             `"${deal.stage || ''}"`,
             deal.stageId || '',
             deal.createdAt || '',
@@ -16733,9 +21159,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
     } catch (error) {
       console.error('Error exporting deals:', error);
-      res.status(500).json({ 
-        message: 'Internal server error', 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      res.status(500).json({
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
@@ -16930,6 +21356,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     try {
       const dealId = parseInt(req.params.id);
       const { stageId } = req.body;
+      const user = req.user as any;
 
       if (!stageId || isNaN(parseInt(stageId))) {
         return res.status(400).json({ message: 'Invalid stage ID' });
@@ -16938,6 +21365,23 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const stage = await storage.getPipelineStage(parseInt(stageId));
       if (!stage) {
         return res.status(404).json({ message: 'Pipeline stage not found' });
+      }
+
+
+      const deal = await storage.getDeal(dealId);
+      if (!deal) {
+        return res.status(404).json({ message: 'Deal not found' });
+      }
+
+      if (deal.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'Access denied: Deal does not belong to your company' });
+      }
+
+
+      if (stage.pipelineId !== deal.pipelineId) {
+        return res.status(400).json({ 
+          message: 'Stage does not belong to deal\'s current pipeline. Use /api/deals/:id/move-pipeline to move between pipelines.' 
+        });
       }
 
       const updatedDeal = await storage.updateDealStageId(dealId, parseInt(stageId));
@@ -16949,10 +21393,84 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     }
   });
 
+
+  app.get('/api/deals/:dealId/scheduled-reverts', ensureAuthenticated, async (req: any, res) => {
+    try {
+      const dealId = parseInt(req.params.dealId);
+      const companyId = req.user.companyId;
+
+      if (isNaN(dealId)) {
+        return res.status(400).json({ error: 'Invalid deal ID' });
+      }
+
+
+      const deal = await storage.getDeal(dealId);
+      if (!deal || deal.companyId !== companyId) {
+        return res.status(404).json({ error: 'Deal not found' });
+      }
+
+
+      const dealReverts = await storage.getPipelineStageRevertsByDeal(dealId, companyId);
+
+
+      const revertsWithLogs = await Promise.all(
+        dealReverts.map(async (revert: any) => {
+          const logs = await storage.getPipelineStageRevertLogs(revert.scheduleId);
+          return { ...revert, logs };
+        })
+      );
+
+      res.json(revertsWithLogs);
+    } catch (error) {
+      console.error('Error fetching scheduled reverts:', error);
+      res.status(500).json({ error: 'Failed to fetch scheduled reverts' });
+    }
+  });
+
+  app.delete('/api/pipeline-reverts/:scheduleId', ensureAuthenticated, async (req: any, res) => {
+    try {
+      const scheduleId = req.params.scheduleId;
+      const companyId = req.user.companyId;
+
+
+      const revert = await storage.getPipelineStageRevert(scheduleId);
+      if (!revert) {
+        return res.status(404).json({ error: 'Scheduled revert not found' });
+      }
+
+
+      if (revert.companyId !== companyId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+
+      await storage.cancelPipelineStageRevert(scheduleId);
+
+      res.json({ success: true, message: 'Scheduled revert cancelled' });
+    } catch (error) {
+      console.error('Error cancelling scheduled revert:', error);
+      res.status(500).json({ error: 'Failed to cancel scheduled revert' });
+    }
+  });
+
+  app.get('/api/pipeline-reverts/stats', ensureAuthenticated, async (req: any, res) => {
+    try {
+      const companyId = req.user.companyId;
+
+
+      const stats = await storage.getPipelineStageRevertsStats(companyId);
+
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching revert stats:', error);
+      res.status(500).json({ error: 'Failed to fetch revert statistics' });
+    }
+  });
+
   app.delete('/api/deals/bulk-delete', ensureAuthenticated, async (req: any, res) => {
     try {
       const { dealIds } = req.body;
-      
+
       if (!Array.isArray(dealIds) || dealIds.length === 0) {
         return res.status(400).json({ message: 'dealIds must be a non-empty array' });
       }
@@ -16965,10 +21483,10 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         try {
           const parsedDealId = parseInt(dealId);
           if (isNaN(parsedDealId) || parsedDealId <= 0) {
-            results.push({ 
-              dealId, 
-              status: 'error', 
-              message: 'Invalid deal ID format' 
+            results.push({
+              dealId,
+              status: 'error',
+              message: 'Invalid deal ID format'
             });
             failureCount++;
             continue;
@@ -16976,17 +21494,17 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
           const deleteResult = await storage.deleteDeal(parsedDealId, req.user.companyId);
           if (deleteResult.success) {
-            results.push({ 
-              dealId: parsedDealId, 
+            results.push({
+              dealId: parsedDealId,
               status: 'success',
               message: deleteResult.reason || 'Deleted successfully'
             });
             successCount++;
           } else {
-            results.push({ 
-              dealId: parsedDealId, 
-              status: 'not_found', 
-              message: deleteResult.reason || 'Deal not found or already deleted' 
+            results.push({
+              dealId: parsedDealId,
+              status: 'not_found',
+              message: deleteResult.reason || 'Deal not found or already deleted'
             });
             failureCount++;
           }
@@ -16995,8 +21513,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           failureCount++;
         }
       }
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         message: `${successCount} deals deleted successfully${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
         deletedCount: successCount,
         failedCount: failureCount,
@@ -17054,15 +21572,302 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     }
   });
 
+  app.post('/api/deals/:id/move-pipeline', ensureAuthenticated, async (req, res) => {
+    try {
+      const dealId = parseInt(req.params.id);
+
+      const { pipelineId, stageId, targetPipelineId, targetStageId } = req.body;
+      const user = req.user as any;
+
+
+      const resolvedPipelineId = targetPipelineId || pipelineId;
+      const resolvedStageId = targetStageId || stageId;
+
+      if (!resolvedPipelineId) {
+        return res.status(400).json({ message: 'pipelineId or targetPipelineId is required' });
+      }
+
+      if (isNaN(dealId) || isNaN(parseInt(resolvedPipelineId))) {
+        return res.status(400).json({ message: 'Invalid deal ID or pipeline ID' });
+      }
+
+
+      const deal = await storage.getDeal(dealId);
+      if (!deal) {
+        return res.status(404).json({ message: 'Deal not found' });
+      }
+
+
+      if (deal.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'Access denied: Deal does not belong to your company' });
+      }
+
+      const parsedTargetPipelineId = parseInt(resolvedPipelineId);
+
+
+      const targetPipeline = await storage.getPipeline(parsedTargetPipelineId);
+      if (!targetPipeline) {
+        return res.status(404).json({ message: 'Target pipeline not found' });
+      }
+
+
+      if (targetPipeline.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'Access denied: Target pipeline does not belong to your company' });
+      }
+
+
+      let parsedTargetStageId: number;
+      if (resolvedStageId) {
+        const parsedStageId = parseInt(resolvedStageId);
+        if (isNaN(parsedStageId)) {
+          return res.status(400).json({ message: 'Invalid stage ID' });
+        }
+
+
+        const targetStage = await storage.getPipelineStage(parsedStageId);
+        if (!targetStage) {
+          return res.status(404).json({ message: 'Target stage not found' });
+        }
+
+
+        if (targetStage.pipelineId !== parsedTargetPipelineId) {
+          return res.status(400).json({ message: 'Target stage does not belong to target pipeline' });
+        }
+
+        parsedTargetStageId = parsedStageId;
+      } else {
+
+        const stages = await storage.getPipelineStagesByPipeline(parsedTargetPipelineId);
+        if (stages.length === 0) {
+          return res.status(400).json({ message: 'Target pipeline has no stages' });
+        }
+        parsedTargetStageId = stages[0].id;
+      }
+
+
+      if (deal.contactId && deal.companyId) {
+        const existingActiveDeal = await storage.getActiveDealByContact(
+          deal.contactId,
+          deal.companyId,
+          parsedTargetPipelineId
+        );
+        if (existingActiveDeal && existingActiveDeal.id !== dealId) {
+          return res.status(409).json({ 
+            message: `Contact already has an active deal in this pipeline`,
+            conflictingDealId: existingActiveDeal.id
+          });
+        }
+      }
+
+
+      const previousPipelineId = deal.pipelineId;
+      const previousStageId = deal.stageId;
+
+
+      const previousPipeline = previousPipelineId ? await storage.getPipeline(previousPipelineId) : null;
+
+
+      const updatedDeal = await storage.updateDealPipelineAndStage(dealId, parsedTargetPipelineId, parsedTargetStageId);
+
+
+      await storage.createDealActivity({
+        dealId: dealId,
+        userId: user.id,
+        type: 'pipeline_change',
+        content: `Deal moved from pipeline "${previousPipeline?.name || 'Unknown'}" to pipeline "${targetPipeline.name}"`,
+        metadata: {
+          previousPipelineId,
+          newPipelineId: parsedTargetPipelineId,
+          previousStageId,
+          newStageId: parsedTargetStageId,
+          changedBy: user.id
+        }
+      });
+
+      return res.status(200).json(updatedDeal);
+    } catch (error) {
+      console.error(`Error moving deal ${req.params.id} to different pipeline:`, error);
+      if (error instanceof Error && error.message.includes('not found')) {
+        return res.status(404).json({ message: error.message });
+      }
+
+      if (error instanceof Error && (
+        error.message.includes('idx_unique_active_contact_deal_pipeline') ||
+        error.message.includes('unique constraint') ||
+        error.message.includes('DUPLICATE_DEAL_CONFLICT')
+      )) {
+        return res.status(409).json({ 
+          message: 'Contact already has an active deal in this pipeline',
+          error: error.message
+        });
+      }
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/deals/bulk-move-pipeline', ensureAuthenticated, async (req, res) => {
+    try {
+
+      const { dealIds, pipelineId, stageId, targetPipelineId, targetStageId } = req.body;
+      const user = req.user as any;
+
+      if (!Array.isArray(dealIds) || dealIds.length === 0) {
+        return res.status(400).json({ message: 'dealIds must be a non-empty array' });
+      }
+
+
+      const resolvedPipelineId = targetPipelineId || pipelineId;
+      const resolvedStageId = targetStageId || stageId;
+
+      if (!resolvedPipelineId) {
+        return res.status(400).json({ message: 'pipelineId or targetPipelineId is required' });
+      }
+
+      const parsedTargetPipelineId = parseInt(resolvedPipelineId);
+
+      if (isNaN(parsedTargetPipelineId)) {
+        return res.status(400).json({ message: 'Invalid pipeline ID' });
+      }
+
+
+      const targetPipeline = await storage.getPipeline(parsedTargetPipelineId);
+      if (!targetPipeline) {
+        return res.status(404).json({ message: 'Target pipeline not found' });
+      }
+
+      if (targetPipeline.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'Access denied: Target pipeline does not belong to your company' });
+      }
+
+
+      let parsedTargetStageId: number;
+      if (resolvedStageId) {
+        parsedTargetStageId = parseInt(resolvedStageId);
+        if (isNaN(parsedTargetStageId)) {
+          return res.status(400).json({ message: 'Invalid stage ID' });
+        }
+
+
+        const targetStage = await storage.getPipelineStage(parsedTargetStageId);
+        if (!targetStage) {
+          return res.status(404).json({ message: 'Target stage not found' });
+        }
+
+        if (targetStage.pipelineId !== parsedTargetPipelineId) {
+          return res.status(400).json({ message: 'Target stage does not belong to target pipeline' });
+        }
+      } else {
+
+        const stages = await storage.getPipelineStagesByPipeline(parsedTargetPipelineId);
+        if (stages.length === 0) {
+          return res.status(400).json({ message: 'Target pipeline has no stages' });
+        }
+        parsedTargetStageId = stages[0].id;
+      }
+
+      let movedCount = 0;
+      const failures: Array<{ dealId: number; error: string }> = [];
+
+
+      for (const dealId of dealIds) {
+        const parsedDealId = parseInt(dealId);
+        if (isNaN(parsedDealId)) {
+          failures.push({ dealId: typeof dealId === 'number' ? dealId : 0, error: 'Invalid deal ID' });
+          continue;
+        }
+
+        try {
+
+          const deal = await storage.getDeal(parsedDealId);
+          if (!deal) {
+            failures.push({ dealId: parsedDealId, error: 'Deal not found' });
+            continue;
+          }
+
+          if (deal.companyId !== user.companyId) {
+            failures.push({ dealId: parsedDealId, error: 'Access denied: Deal does not belong to your company' });
+            continue;
+          }
+
+
+          if (deal.contactId && deal.companyId) {
+            const existingActiveDeal = await storage.getActiveDealByContact(
+              deal.contactId,
+              deal.companyId,
+              parsedTargetPipelineId
+            );
+            if (existingActiveDeal && existingActiveDeal.id !== parsedDealId) {
+              failures.push({ 
+                dealId: parsedDealId, 
+                error: `Contact already has an active deal in this pipeline (deal ID: ${existingActiveDeal.id})`
+              });
+              continue;
+            }
+          }
+
+
+          const previousPipelineId = deal.pipelineId;
+          const previousPipeline = previousPipelineId ? await storage.getPipeline(previousPipelineId) : null;
+
+
+          await storage.updateDealPipelineAndStage(parsedDealId, parsedTargetPipelineId, parsedTargetStageId);
+
+
+          await storage.createDealActivity({
+            dealId: parsedDealId,
+            userId: user.id,
+            type: 'pipeline_change',
+            content: `Deal moved from pipeline "${previousPipeline?.name || 'Unknown'}" to pipeline "${targetPipeline.name}"`,
+            metadata: {
+              previousPipelineId,
+              newPipelineId: parsedTargetPipelineId,
+              previousStageId: deal.stageId,
+              newStageId: parsedTargetStageId,
+              changedBy: user.id
+            }
+          });
+
+          movedCount++;
+        } catch (error) {
+          console.error(`Error moving deal ${parsedDealId} to pipeline:`, error);
+
+          if (error instanceof Error && (
+            error.message.includes('idx_unique_active_contact_deal_pipeline') ||
+            error.message.includes('unique constraint') ||
+            error.message.includes('DUPLICATE_DEAL_CONFLICT')
+          )) {
+            failures.push({
+              dealId: parsedDealId,
+              error: 'Contact already has an active deal in this pipeline'
+            });
+          } else {
+            failures.push({
+              dealId: parsedDealId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+      }
+
+      return res.status(200).json({
+        movedCount,
+        failedCount: failures.length,
+        failures
+      });
+    } catch (error) {
+      console.error('Error bulk moving deals to pipeline:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
 
   app.put('/api/deals/bulk-move', ensureAuthenticated, async (req, res) => {
     try {
       const { dealIds, stageId } = req.body;
-      
+
       if (!Array.isArray(dealIds) || dealIds.length === 0) {
         return res.status(400).json({ message: 'dealIds must be a non-empty array' });
       }
-      
+
       if (!stageId || typeof stageId !== 'number') {
         return res.status(400).json({ message: 'stageId must be a valid number' });
       }
@@ -17075,12 +21880,12 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         }
         return storage.updateDealStageId(parsedDealId, stageId);
       });
-      
+
       const updatedDeals = await Promise.all(updatePromises);
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         message: `${dealIds.length} deals moved successfully`,
-        updatedDeals 
+        updatedDeals
       });
     } catch (error) {
       console.error('Error bulk moving deals:', error);
@@ -17093,11 +21898,11 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.put('/api/deals/bulk-assign', ensureAuthenticated, async (req, res) => {
     try {
       const { dealIds, assignedToUserId } = req.body;
-      
+
       if (!Array.isArray(dealIds) || dealIds.length === 0) {
         return res.status(400).json({ message: 'dealIds must be a non-empty array' });
       }
-      
+
       if (!assignedToUserId || typeof assignedToUserId !== 'number') {
         return res.status(400).json({ message: 'assignedToUserId must be a valid number' });
       }
@@ -17110,12 +21915,12 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         }
         return storage.updateDeal(parsedDealId, { assignedToUserId });
       });
-      
+
       const updatedDeals = await Promise.all(updatePromises);
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         message: `${dealIds.length} deals assigned successfully`,
-        updatedDeals 
+        updatedDeals
       });
     } catch (error) {
       console.error('Error bulk assigning deals:', error);
@@ -17124,7 +21929,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   });
 
 
-  
+
 
   const dealsUploadStorage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -17150,7 +21955,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
     fileFilter: (req, file, cb) => {
       const allowedTypes = ['text/csv', 'application/json', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
       const allowedExtensions = ['.csv', '.json', '.xlsx', '.xls'];
-      
+
       if (allowedTypes.includes(file.mimetype) || allowedExtensions.some(ext => file.originalname.endsWith(ext))) {
         cb(null, true);
       } else {
@@ -17176,7 +21981,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
           const fileContent = fs.readFileSync(filePath, 'utf8');
           dealsData = JSON.parse(fileContent);
-          
+
           if (!Array.isArray(dealsData)) {
             throw new Error('JSON file must contain an array of deals');
           }
@@ -17185,7 +21990,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           const fileContent = fs.readFileSync(filePath, 'utf8');
           const lines = fileContent.split('\n');
           const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-          
+
           dealsData = lines.slice(1)
             .filter(line => line.trim())
             .map(line => {
@@ -17202,35 +22007,55 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
         const results = { success: 0, failed: 0, errors: [] as any[] };
-        const stages = await storage.getPipelineStagesByCompany(user.companyId);
         const teamMembers = await storage.getAllTeamMembers();
 
         for (let i = 0; i < dealsData.length; i++) {
           try {
             const dealData = dealsData[i];
-            
+
+
+            let targetPipelineId = dealData.pipelineId;
+
+            if (!targetPipelineId) {
+
+              const pipelines = await storage.getPipelinesByCompany(user.companyId);
+              const defaultPipeline = pipelines.find(p => p.isDefault === true);
+              targetPipelineId = defaultPipeline?.id;
+              
+              if (!targetPipelineId) {
+                throw new Error('No default pipeline found for company');
+              }
+            }
+
+
+            const pipeline = await storage.getPipeline(parseInt(targetPipelineId.toString()));
+            if (!pipeline || pipeline.companyId !== user.companyId) {
+              throw new Error('Invalid pipeline or pipeline does not belong to your company');
+            }
+
+
+            const pipelineStages = await storage.getPipelineStagesByCompany(user.companyId, parseInt(targetPipelineId.toString()));
 
             let stageId = dealData.stageId;
             if (dealData.stage && !stageId) {
-              const stage = stages.find(s => s.name.toLowerCase() === dealData.stage.toLowerCase());
-              stageId = stage?.id || stages[0]?.id; // Default to first stage if not found
+              const stage = pipelineStages.find(s => s.name.toLowerCase() === dealData.stage.toLowerCase());
+              stageId = stage?.id || pipelineStages[0]?.id; // Default to first stage of target pipeline if not found
             }
-            
 
             if (stageId) {
               const stageIdNum = parseInt(stageId.toString());
               if (!isNaN(stageIdNum)) {
-                const stageExists = stages.find(s => s.id === stageIdNum);
+                const stageExists = pipelineStages.find(s => s.id === stageIdNum);
                 if (!stageExists) {
-                  stageId = stages[0]?.id || null;
+                  stageId = pipelineStages[0]?.id || null;
                 } else {
                   stageId = stageIdNum;
                 }
               } else {
-                stageId = stages[0]?.id || null;
+                stageId = pipelineStages[0]?.id || null;
               }
             } else {
-              stageId = stages[0]?.id || null;
+              stageId = pipelineStages[0]?.id || null;
             }
 
 
@@ -17254,7 +22079,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
                   name: dealData.contactName || 'Imported Contact',
                   email: dealData.contactEmail,
                   phone: dealData.contactPhone || null,
-                  companyId: user.companyId || null
+                  companyId: user.companyId || null,
+                  createdBy: user.id
                 });
                 contactId = newContact.id;
               }
@@ -17268,7 +22094,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
             let tags: string[] | null = null;
             if (dealData.tags) {
               if (Array.isArray(dealData.tags)) {
-                tags = dealData.tags.filter((tag: unknown): tag is string => 
+                tags = dealData.tags.filter((tag: unknown): tag is string =>
                   typeof tag === 'string' && tag.trim().length > 0
                 );
               } else if (typeof dealData.tags === 'string' && dealData.tags.trim()) {
@@ -17288,6 +22114,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
               value: dealData.value ? parseFloat(dealData.value.toString()) : null,
               priority: (dealData.priority as 'low' | 'medium' | 'high') || 'medium',
               assignedToUserId: assignedToUserId ? parseInt(assignedToUserId.toString()) : null,
+              pipelineId: parseInt(targetPipelineId.toString()),
               stageId: stageId,
               companyId: user.companyId ? parseInt(user.companyId.toString()) : null,
               tags: tags,
@@ -17315,8 +22142,8 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
-        
-        return res.status(400).json({ 
+
+        return res.status(400).json({
           message: 'Failed to parse file: ' + (parseError instanceof Error ? parseError.message : 'Unknown error')
         });
       }
@@ -17329,9 +22156,9 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.get('/api/deals/template', ensureAuthenticated, async (req, res) => {
     try {
 
-      const template = 'title,description,value,priority,contactId,assignedToUserId,stageId\n' +
-                      'Sample Deal,Deal description,1000,medium,1,1,1';
-      
+      const template = 'title,description,value,priority,contactId,assignedToUserId,pipelineId,stageId\n' +
+        'Sample Deal,Deal description,1000,medium,1,1,1,1';
+
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="deals_template.csv"');
       return res.status(200).send(template);
@@ -17419,6 +22246,23 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
 
+      const pipelines = await getCachedPipelinesByCompany(targetCompanyId);
+      let defaultPipeline = pipelines.find(p => p.isDefault === true);
+
+
+      if (!defaultPipeline) {
+        defaultPipeline = await storage.createPipeline({
+          companyId: targetCompanyId,
+          name: 'Sales Pipeline',
+          description: 'Default sales pipeline',
+          icon: 'trending-up',
+          color: '#3a86ff',
+          isDefault: true,
+          isTemplate: false,
+          templateCategory: null,
+          orderNum: 1
+        });
+      }
 
       const defaultStages = [
         { name: 'Lead', color: '#333235', order: 1 },
@@ -17435,6 +22279,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       for (const stageData of defaultStages) {
         const stage = await storage.createPipelineStage({
           companyId: targetCompanyId,
+          pipelineId: defaultPipeline.id,
           ...stageData
         });
         createdStages.push(stage);
@@ -17454,14 +22299,26 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.get('/api/pipeline/stages', ensureAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-
+      const pipelineId = req.query.pipelineId ? parseInt(req.query.pipelineId as string) : undefined;
 
       if (!user.companyId) {
-
         return res.json([]);
       }
 
-      const stages = await storage.getPipelineStagesByCompany(user.companyId);
+      let stages: PipelineStage[];
+      if (pipelineId) {
+
+        const pipeline = await storage.getPipeline(pipelineId);
+        if (!pipeline) {
+          return res.status(404).json({ message: 'Pipeline not found' });
+        }
+        if (pipeline.companyId !== user.companyId) {
+          return res.status(403).json({ message: 'You do not have permission to access this pipeline' });
+        }
+        stages = await storage.getPipelineStagesByPipeline(pipelineId);
+      } else {
+        stages = await storage.getPipelineStagesByCompany(user.companyId);
+      }
 
       res.json(stages);
     } catch (error) {
@@ -17472,14 +22329,15 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.post('/api/pipeline/stages', ensureAuthenticated, async (req, res) => {
     try {
-      const { name, color, order } = req.body;
+      const { name, color, order, pipelineId } = req.body;
       const user = req.user as any;
-
-
-
 
       if (!name) {
         return res.status(400).json({ message: 'Stage name is required' });
+      }
+
+      if (!pipelineId) {
+        return res.status(400).json({ message: 'pipelineId is required' });
       }
 
       if (!user.companyId) {
@@ -17487,13 +22345,27 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ message: 'User must belong to a company to create stages' });
       }
 
+
+      const pipeline = await storage.getPipeline(pipelineId);
+      if (!pipeline) {
+        return res.status(404).json({ message: 'Pipeline not found' });
+      }
+      if (pipeline.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'You do not have permission to create stages in this pipeline' });
+      }
+
       const newStage = await storage.createPipelineStage({
+        pipelineId,
         companyId: user.companyId,
         name,
         color: color || '#3a86ff',
         order: order || 0
       });
 
+
+      const { invalidatePipelineStageCache, invalidatePipelineCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineStageCache(user.companyId);
+      invalidatePipelineCache(user.companyId);
 
       res.status(201).json(newStage);
     } catch (error) {
@@ -17505,7 +22377,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.put('/api/pipeline/stages/:id', ensureAuthenticated, async (req, res) => {
     try {
       const stageId = parseInt(req.params.id);
-      const { name, color, order } = req.body;
+      const { name, color, order, pipelineId } = req.body;
       const user = req.user as any;
 
       const stage = await storage.getPipelineStage(stageId);
@@ -17518,11 +22390,21 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(403).json({ message: 'You do not have permission to update this stage' });
       }
 
+
+      if (pipelineId !== undefined && pipelineId !== stage.pipelineId) {
+        return res.status(400).json({ message: 'Cannot change pipelineId after stage creation' });
+      }
+
       const updatedStage = await storage.updatePipelineStage(stageId, {
         name: name !== undefined ? name : stage.name,
         color: color !== undefined ? color : stage.color,
         order: order !== undefined ? order : stage.order
       });
+
+
+      const { invalidatePipelineStageCache, invalidatePipelineCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineStageCache(user.companyId);
+      invalidatePipelineCache(user.companyId);
 
       res.json(updatedStage);
     } catch (error) {
@@ -17534,7 +22416,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.delete('/api/pipeline/stages/:id', ensureAuthenticated, async (req, res) => {
     try {
       const stageId = parseInt(req.params.id);
-      const moveToStageId = req.query.moveToStageId ? parseInt(req.query.moveToStageId as string) : null;
+      const moveToStageId = req.query.moveToStageId ? parseInt(req.query.moveToStageId as string) : undefined;
       const user = req.user as any;
 
       const stage = await storage.getPipelineStage(stageId);
@@ -17561,13 +22443,22 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
           return res.status(400).json({ message: 'Cannot move deals to the same stage being deleted' });
         }
 
-        const dealsToMove = await storage.getDealsByStageId(stageId);
-        for (const deal of dealsToMove) {
-          await storage.updateDealStageId(deal.id, moveToStageId);
+
+        if (targetStage.pipelineId !== stage.pipelineId) {
+          return res.status(400).json({ message: 'Cannot move deals to a stage in a different pipeline' });
         }
       }
 
-      await storage.deletePipelineStage(stageId);
+      const success = await storage.deletePipelineStage(stageId, moveToStageId);
+
+      if (!success) {
+        return res.status(500).json({ message: 'Failed to delete pipeline stage' });
+      }
+
+
+      const { invalidatePipelineStageCache, invalidatePipelineCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineStageCache(user.companyId);
+      invalidatePipelineCache(user.companyId);
 
       res.json({ success: true });
     } catch (error) {
@@ -17584,12 +22475,433 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
         return res.status(400).json({ message: 'stageIds must be an array' });
       }
 
+
+      if (stageIds.length > 0) {
+        const firstStage = await storage.getPipelineStage(stageIds[0]);
+        if (!firstStage) {
+          return res.status(400).json({ message: 'Invalid stage IDs provided' });
+        }
+        const pipelineId = firstStage.pipelineId;
+
+        for (const stageId of stageIds) {
+          const stage = await storage.getPipelineStage(stageId);
+          if (!stage) {
+            return res.status(400).json({ message: `Stage with ID ${stageId} not found` });
+          }
+          if (stage.pipelineId !== pipelineId) {
+            return res.status(400).json({ message: 'Cannot reorder stages across different pipelines' });
+          }
+        }
+      }
+
       await storage.reorderPipelineStages(stageIds);
 
       res.json({ success: true });
     } catch (error) {
       console.error('Error reordering pipeline stages:', error);
       res.status(500).json({ message: 'Failed to reorder pipeline stages' });
+    }
+  });
+
+
+  app.get('/api/pipelines', ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+
+      if (!user.companyId) {
+        return res.json([]);
+      }
+
+      const templateFilter = req.query.template === 'true';
+      const includeTemplates = req.query.includeTemplates === 'true';
+      let pipelines = await storage.getPipelinesByCompany(user.companyId);
+
+      if (templateFilter) {
+        pipelines = pipelines.filter(p => p.isTemplate === true);
+      }
+
+
+      if (includeTemplates) {
+        const allPipelines = await storage.getPipelines();
+        const templatePipelines = allPipelines.filter(p => p.isTemplate === true);
+
+        const pipelineMap = new Map<number, any>();
+        pipelines.forEach(p => pipelineMap.set(p.id, p));
+        templatePipelines.forEach(p => {
+          if (!pipelineMap.has(p.id)) {
+            pipelineMap.set(p.id, p);
+          }
+        });
+        pipelines = Array.from(pipelineMap.values());
+      }
+
+      res.json(pipelines);
+    } catch (error) {
+      console.error('Error fetching pipelines:', error);
+      res.status(500).json({ message: 'Failed to fetch pipelines' });
+    }
+  });
+
+  app.post('/api/pipelines', ensureAuthenticated, async (req, res) => {
+    try {
+      const { name, description, icon, color, isDefault, isTemplate, templateCategory, orderNum } = req.body;
+      const user = req.user as any;
+
+      if (!name) {
+        return res.status(400).json({ message: 'Pipeline name is required' });
+      }
+
+      if (!user.companyId) {
+        return res.status(400).json({ message: 'User must belong to a company to create pipelines' });
+      }
+
+      const newPipeline = await storage.createPipeline({
+        companyId: user.companyId,
+        name,
+        description: description || null,
+        icon: icon || null,
+        color: color || null,
+        isDefault: isDefault || false,
+        isTemplate: isTemplate || false,
+        templateCategory: templateCategory || null,
+        orderNum: orderNum || undefined
+      });
+
+
+      const { invalidatePipelineCache, invalidatePipelineStageCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineCache(user.companyId);
+      invalidatePipelineStageCache(user.companyId);
+
+      res.status(201).json(newPipeline);
+    } catch (error: any) {
+      console.error('Error creating pipeline:', error);
+      if (error.isDuplicateName || error.message === 'Pipeline name already exists') {
+        return res.status(409).json({ message: 'Pipeline name already exists' });
+      }
+      res.status(500).json({ message: 'Failed to create pipeline' });
+    }
+  });
+
+  app.get('/api/pipelines/:id', ensureAuthenticated, async (req, res) => {
+    try {
+      const pipelineId = parseInt(req.params.id);
+      const user = req.user as any;
+
+      if (isNaN(pipelineId)) {
+        return res.status(400).json({ message: 'Invalid pipeline ID' });
+      }
+
+      const result = await storage.getPipelineWithStages(pipelineId);
+
+      if (!result) {
+        return res.status(404).json({ message: 'Pipeline not found' });
+      }
+
+      if (result.pipeline.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'You do not have permission to access this pipeline' });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching pipeline:', error);
+      res.status(500).json({ message: 'Failed to fetch pipeline' });
+    }
+  });
+
+  app.put('/api/pipelines/reorder', ensureAuthenticated, async (req, res) => {
+    try {
+      const { pipelines } = req.body;
+      const user = req.user as any;
+
+
+      if (!Array.isArray(pipelines)) {
+        return res.status(400).json({ message: 'Request body must contain a pipelines array' });
+      }
+
+      if (pipelines.length === 0) {
+        return res.status(400).json({ message: 'Pipelines array cannot be empty' });
+      }
+
+
+      const pipelineIds = pipelines.map((p: any) => {
+        if (typeof p.id !== 'number' || isNaN(p.id)) {
+          throw new Error('Invalid pipeline ID in request');
+        }
+        return p.id;
+      });
+
+
+      const uniqueIds = new Set(pipelineIds);
+      if (uniqueIds.size !== pipelineIds.length) {
+        return res.status(400).json({ message: 'Duplicate pipeline IDs found in request' });
+      }
+
+
+      await storage.reorderPipelines(user.companyId, pipelineIds);
+
+
+      const { invalidatePipelineCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineCache(user.companyId);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error reordering pipelines:', error);
+      const statusCode = error.message?.includes('Invalid') || error.message?.includes('Missing') || error.message?.includes('Duplicate') ? 400 : 500;
+      res.status(statusCode).json({ message: error.message || 'Failed to reorder pipelines' });
+    }
+  });
+
+  app.put('/api/pipelines/:id', ensureAuthenticated, async (req, res) => {
+    try {
+      const pipelineId = parseInt(req.params.id);
+      const { name, description, icon, color, orderNum, isDefault } = req.body;
+      const user = req.user as any;
+
+      if (isNaN(pipelineId)) {
+        return res.status(400).json({ message: 'Invalid pipeline ID' });
+      }
+
+      const existingPipeline = await storage.getPipeline(pipelineId);
+
+      if (!existingPipeline) {
+        return res.status(404).json({ message: 'Pipeline not found' });
+      }
+
+      if (existingPipeline.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'You do not have permission to update this pipeline' });
+      }
+
+      const updates: Partial<InsertPipeline> = {};
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (icon !== undefined) updates.icon = icon;
+      if (color !== undefined) updates.color = color;
+      if (orderNum !== undefined) updates.orderNum = orderNum;
+      if (isDefault !== undefined) updates.isDefault = isDefault;
+
+      const updatedPipeline = await storage.updatePipeline(pipelineId, updates);
+
+
+      const { invalidatePipelineCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineCache(user.companyId);
+
+      res.json(updatedPipeline);
+    } catch (error: any) {
+      console.error('Error updating pipeline:', error);
+      if (error.isDuplicateName || error.message === 'Pipeline name already exists') {
+        return res.status(409).json({ message: 'Pipeline name already exists' });
+      }
+      res.status(500).json({ message: 'Failed to update pipeline' });
+    }
+  });
+
+  app.delete('/api/pipelines/:id', ensureAuthenticated, async (req, res) => {
+    try {
+      const pipelineId = parseInt(req.params.id);
+      const moveDealsToStageId = req.query.moveDealsToStageId ? parseInt(req.query.moveDealsToStageId as string) : undefined;
+      const moveDealsToPipelineId = req.query.moveDealsToPipelineId ? parseInt(req.query.moveDealsToPipelineId as string) : undefined;
+      const user = req.user as any;
+
+      if (isNaN(pipelineId)) {
+        return res.status(400).json({ message: 'Invalid pipeline ID' });
+      }
+
+      const pipeline = await storage.getPipeline(pipelineId);
+
+      if (!pipeline) {
+        return res.status(404).json({ message: 'Pipeline not found' });
+      }
+
+      if (pipeline.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'You do not have permission to delete this pipeline' });
+      }
+
+
+      const allPipelines = await storage.getPipelinesByCompany(user.companyId);
+      if (allPipelines.length === 1) {
+        return res.status(400).json({ message: 'Cannot delete the only pipeline for your company' });
+      }
+
+      let resolvedStageId: number | undefined = moveDealsToStageId;
+
+
+      if (moveDealsToPipelineId) {
+        if (isNaN(moveDealsToPipelineId)) {
+          return res.status(400).json({ message: 'Invalid moveDealsToPipelineId' });
+        }
+
+        const targetPipeline = await storage.getPipeline(moveDealsToPipelineId);
+        if (!targetPipeline) {
+          return res.status(404).json({ message: 'Target pipeline not found' });
+        }
+
+        if (targetPipeline.companyId !== user.companyId) {
+          return res.status(403).json({ message: 'Target pipeline does not belong to your company' });
+        }
+
+        if (targetPipeline.id === pipelineId) {
+          return res.status(400).json({ message: 'Target pipeline must be different from the pipeline being deleted' });
+        }
+
+
+        const stages = await storage.getPipelineStagesByPipeline(moveDealsToPipelineId);
+        if (stages.length === 0) {
+          return res.status(400).json({ message: 'Target pipeline has no stages' });
+        }
+        resolvedStageId = stages[0].id;
+      } else if (!moveDealsToStageId) {
+
+        const defaultPipeline = await storage.getDefaultPipelineForCompany(user.companyId);
+        if (!defaultPipeline) {
+          return res.status(400).json({ message: 'No default pipeline found for reassignment' });
+        }
+
+        if (defaultPipeline.id === pipelineId) {
+          return res.status(400).json({ message: 'Cannot delete default pipeline without specifying a target pipeline' });
+        }
+
+
+        const stages = await storage.getPipelineStagesByPipeline(defaultPipeline.id);
+        if (stages.length === 0) {
+          return res.status(400).json({ message: 'Default pipeline has no stages' });
+        }
+        resolvedStageId = stages[0].id;
+      } else {
+
+        const targetStage = await storage.getPipelineStage(moveDealsToStageId);
+        if (!targetStage) {
+          return res.status(400).json({ message: 'Target stage not found' });
+        }
+
+        if (targetStage.companyId !== user.companyId) {
+          return res.status(403).json({ message: 'Target stage does not belong to your company' });
+        }
+
+
+        const targetPipeline = await storage.getPipeline(targetStage.pipelineId!);
+        if (!targetPipeline || targetPipeline.id === pipelineId) {
+          return res.status(400).json({ message: 'Target stage must belong to a different pipeline' });
+        }
+      }
+
+      const success = await storage.deletePipeline(pipelineId, resolvedStageId);
+
+      if (!success) {
+        return res.status(500).json({ message: 'Failed to delete pipeline' });
+      }
+
+
+      const { invalidatePipelineCache, invalidateAllPipelineStageCaches } = await import('./utils/pipeline-cache');
+      invalidatePipelineCache(user.companyId);
+      invalidateAllPipelineStageCaches();
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting pipeline:', error);
+      res.status(500).json({ message: 'Failed to delete pipeline' });
+    }
+  });
+
+  app.post('/api/pipelines/:id/duplicate', ensureAuthenticated, async (req, res) => {
+    try {
+      const pipelineId = parseInt(req.params.id);
+      const { newName } = req.body;
+      const user = req.user as any;
+
+      if (isNaN(pipelineId)) {
+        return res.status(400).json({ message: 'Invalid pipeline ID' });
+      }
+
+      if (!newName) {
+        return res.status(400).json({ message: 'newName is required' });
+      }
+
+      const sourcePipeline = await storage.getPipeline(pipelineId);
+
+      if (!sourcePipeline) {
+        return res.status(404).json({ message: 'Pipeline not found' });
+      }
+
+      if (sourcePipeline.companyId !== user.companyId) {
+        return res.status(403).json({ message: 'You do not have permission to duplicate this pipeline' });
+      }
+
+      const duplicatedPipeline = await storage.duplicatePipeline(pipelineId, newName);
+
+
+      const { invalidatePipelineCache, invalidatePipelineStageCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineCache(user.companyId);
+      invalidatePipelineStageCache(user.companyId);
+
+      res.status(201).json(duplicatedPipeline);
+    } catch (error: any) {
+      console.error('Error duplicating pipeline:', error);
+      if (error.isDuplicateName || error.message === 'Pipeline name already exists') {
+        return res.status(409).json({ message: 'Pipeline name already exists' });
+      }
+      res.status(500).json({ message: 'Failed to duplicate pipeline' });
+    }
+  });
+
+
+  app.get('/api/pipeline-templates', async (req, res) => {
+    try {
+      const { PIPELINE_TEMPLATES } = await import('@shared/pipeline-templates');
+      return res.status(200).json(PIPELINE_TEMPLATES);
+    } catch (error) {
+      console.error('Error fetching pipeline templates:', error);
+      res.status(500).json({ message: 'Failed to fetch pipeline templates' });
+    }
+  });
+
+
+  app.post('/api/pipelines/from-template/:templateId', ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { templateId } = req.params;
+      const { customName, description, icon, color } = req.body;
+
+
+      if (!user.companyId) {
+        return res.status(400).json({ message: 'User must belong to a company to create pipelines' });
+      }
+
+
+      const { getTemplateById } = await import('@shared/pipeline-templates');
+      const template = getTemplateById(templateId);
+
+      if (!template) {
+        return res.status(404).json({ message: 'Template not found' });
+      }
+
+
+      const result = await storage.createPipelineFromTemplate(
+        templateId,
+        user.companyId,
+        customName || template.name,
+        description,
+        icon,
+        color
+      );
+
+
+      const { invalidatePipelineCache, invalidatePipelineStageCache } = await import('./utils/pipeline-cache');
+      invalidatePipelineCache(user.companyId);
+      invalidatePipelineStageCache(user.companyId);
+
+      res.status(201).json(result);
+    } catch (error: any) {
+      console.error('Error creating pipeline from template:', error);
+      if (error.isDuplicateName || error.message === 'Pipeline name already exists') {
+        return res.status(409).json({ message: 'Pipeline name already exists' });
+      }
+      if (error.message === 'Template not found') {
+        res.status(404).json({ message: error.message });
+      } else if (error.message.includes('validation')) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: 'Failed to create pipeline from template' });
+      }
     }
   });
 
@@ -18136,7 +23448,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       const rateLimitKey = `${req.user.id}-${connectionId}`;
       const lastGeneration = qrGenerationRateLimits.get(rateLimitKey) || 0;
       const now = Date.now();
-      
+
       if (now - lastGeneration < QR_RATE_LIMIT_WINDOW) {
         const remainingTime = Math.ceil((QR_RATE_LIMIT_WINDOW - (now - lastGeneration)) / 1000);
         return res.status(429).json({
@@ -18148,7 +23460,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
       qrGenerationRateLimits.set(rateLimitKey, now);
-      
+
 
       if (qrGenerationRateLimits.size > 1000) {
         const cutoff = now - 60000;
@@ -18368,15 +23680,15 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
 
       await storage.updateChannelConnectionStatus(connectionId, 'active');
-      
+
 
       const { updateConnectionActivity } = await import('./services/channels/instagram');
       updateConnectionActivity(connectionId, true);
 
 
-      
-      res.json({ 
-        message: 'Instagram connection status fixed', 
+
+      res.json({
+        message: 'Instagram connection status fixed',
         connectionId: connectionId,
         status: 'active'
       });
@@ -18647,10 +23959,10 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
   app.post('/api/scheduled-messages', ensureAuthenticated, async (req: any, res) => {
     try {
-      const { 
-        conversationId, 
-        content, 
-        scheduledFor, 
+      const {
+        conversationId,
+        content,
+        scheduledFor,
         messageType = 'text',
         mediaUrl,
         mediaFilePath,
@@ -18691,7 +24003,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
       }
 
       const { ScheduledMessageService } = await import('./services/scheduled-message-service');
-      
+
       const scheduledMessage = await ScheduledMessageService.createScheduledMessage({
         companyId: conversation.companyId,
         conversationId: conversation.id,
@@ -18722,7 +24034,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.get('/api/scheduled-messages/:conversationId', ensureAuthenticated, async (req: any, res) => {
     try {
       const conversationId = parseInt(req.params.conversationId);
-      
+
 
       const conversation = await storage.getConversation(conversationId);
       if (!conversation) {
@@ -18739,7 +24051,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
 
       const { ScheduledMessageService } = await import('./services/scheduled-message-service');
       const scheduledMessages = await ScheduledMessageService.getScheduledMessagesForConversation(
-        conversationId, 
+        conversationId,
         conversation.companyId
       );
 
@@ -18753,7 +24065,7 @@ elSend.onclick=async()=>{const v=(elInput).value.trim();if(!v)return;push('out',
   app.delete('/api/scheduled-messages/:id', ensureAuthenticated, async (req: any, res) => {
     try {
       const scheduledMessageId = parseInt(req.params.id);
-      
+
 
       const scheduledMessage = await storage.db
         .select()
@@ -19464,6 +24776,32 @@ Crawl-delay: 10`);
   });
 
 
+  app.get('/api/partner-configurations/tiktok', ensureAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const config = await storage.getPartnerConfiguration('tiktok');
+
+      if (!config || !config.isActive) {
+        return res.status(404).json({ error: 'TikTok partner configuration not found or inactive' });
+      }
+
+
+      const publicProfile = (config.publicProfile as any) || {};
+      const allowedScopes = publicProfile.allowedScopes || ['user.info.basic'];
+
+
+      res.json({
+        isActive: config.isActive,
+        redirectUrl: config.redirectUrl,
+        clientKey: config.partnerApiKey,
+        allowedScopes: allowedScopes
+      });
+    } catch (error) {
+      console.error('Error getting TikTok partner configuration:', error);
+      res.status(500).json({ error: 'Failed to get TikTok partner configuration' });
+    }
+  });
+
+
   app.get("/api/help-support-url", async (req, res) => {
     try {
       const generalSettings = await storage.getAppSetting('general_settings');
@@ -19610,6 +24948,7 @@ Crawl-delay: 10`);
       res.status(500).json({ error: 'Failed to fetch poll votes' });
     }
   });
+
 
   return httpServer;
 }

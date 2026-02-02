@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { storage } from '../storage';
 
-const EMERGENCY_SECRET = 'xsmurphy';
+const EMERGENCY_SECRET = 'ianampudia11';
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 

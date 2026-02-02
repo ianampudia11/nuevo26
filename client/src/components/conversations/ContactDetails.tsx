@@ -12,6 +12,7 @@ import { TwilioIcon } from '@/components/icons/TwilioIcon';
 import EditContactDialog from './EditContactDialog';
 import useSocket from '@/hooks/useSocket';
 import { useMobileLayout } from '@/contexts/mobile-layout-context';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface ContactDetailsProps {
   contact: any;
@@ -36,6 +37,8 @@ export default function ContactDetails({
     isContactDetailsOpen,
     toggleContactDetails
   } = useMobileLayout();
+
+  const { canViewContactPhone } = usePermissions();
 
   const { onMessage } = useSocket('/ws');
 
@@ -123,6 +126,8 @@ export default function ContactDetails({
         return { icon: 'ri-messenger-line', color: '#1877F2', name: t('contacts.details.channel.messenger', 'Messenger') };
       case 'instagram':
         return { icon: 'ri-instagram-line', color: '#E4405F', name: t('contacts.details.channel.instagram', 'Instagram') };
+      case 'tiktok':
+        return { icon: 'ri-tiktok-line dark:text-white', color: '#000000', name: t('contacts.details.channel.tiktok', 'TikTok Business') };
       case 'email':
         return { icon: 'ri-mail-line', color: '#3B82F6', name: t('contacts.details.channel.email', 'Email') };
       case 'webchat':
@@ -144,21 +149,21 @@ export default function ContactDetails({
       <div
         className={className || `${
           isContactDetailsOpen ? 'flex' : 'hidden'
-        } flex-col fixed top-0 right-0 h-full z-50 lg:static lg:z-0 w-full max-w-sm sm:max-w-md lg:w-80 bg-white border-l border-gray-200 shadow-lg lg:shadow-none transition-all duration-300 ease-in-out overflow-y-auto`}
+        } flex-col fixed top-0 right-0 h-full z-50 lg:static lg:z-0 w-full max-w-sm sm:max-w-md lg:w-80 bg-card border-l border-border shadow-lg lg:shadow-none transition-all duration-300 ease-in-out overflow-y-auto`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center lg:hidden">
+        <div className="p-4 border-b border-border flex justify-between items-center lg:hidden">
           <h2 className="font-medium text-lg">{t('contacts.details.title', 'Contact Details')}</h2>
           <button
             onClick={toggleContactDetails}
-            className="p-2 rounded-md hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2 rounded-md hover:bg-accent min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label={t('contacts.details.close_details', 'Close contact details')}
           >
-            <i className="ri-close-line text-lg text-gray-600"></i>
+            <i className="ri-close-line text-lg text-muted-foreground"></i>
           </button>
         </div>
 
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-border">
           <div className="flex items-center justify-center mb-5">
             <ContactAvatar
               contact={currentContact || contact}
@@ -176,22 +181,26 @@ export default function ContactDetails({
 
           <div className="space-y-3">
             <div>
-              <p className="text-xs text-gray-500">{t('contacts.details.full_name', 'Full Name')}</p>
+              <p className="text-xs text-muted-foreground">{t('contacts.details.full_name', 'Full Name')}</p>
               <p className="text-sm">{currentContact?.name || contact?.name}</p>
             </div>
 
             <div>
-              <p className="text-xs text-gray-500">{t('contacts.details.phone', 'Phone')}</p>
-              <p className="text-sm">{currentContact?.phone || contact?.phone || t('contacts.details.not_provided', 'Not provided')}</p>
+              <p className="text-xs text-muted-foreground">{t('contacts.details.phone', 'Phone')}</p>
+              <p className="text-sm">
+                {canViewContactPhone()
+                  ? (currentContact?.phone || contact?.phone || t('contacts.details.not_provided', 'Not provided'))
+                  : (t('contacts.details.phone_hidden', '—') || '—')}
+              </p>
             </div>
 
             <div>
-              <p className="text-xs text-gray-500">{t('contacts.details.email', 'Email')}</p>
+              <p className="text-xs text-muted-foreground">{t('contacts.details.email', 'Email')}</p>
               <p className="text-sm">{currentContact?.email || contact?.email || t('contacts.details.not_provided', 'Not provided')}</p>
             </div>
 
             <div>
-              <p className="text-xs text-gray-500">{t('contacts.details.company', 'Company')}</p>
+              <p className="text-xs text-muted-foreground">{t('contacts.details.company', 'Company')}</p>
               <p className="text-sm">{currentContact?.company || contact?.company || t('contacts.details.not_provided', 'Not provided')}</p>
             </div>
           </div>
@@ -205,7 +214,7 @@ export default function ContactDetails({
           </button>
         </div>
 
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-border">
           <h3 className="font-medium mb-4">{t('contacts.details.tags', 'Tags')}</h3>
           <div className="flex flex-wrap gap-2">
             {(currentContact?.tags || contact?.tags) && (currentContact?.tags || contact?.tags).length > 0 ? (
@@ -215,27 +224,27 @@ export default function ContactDetails({
                 </span>
               ))
             ) : (
-              <span className="text-sm text-gray-500">{t('contacts.details.no_tags_added', 'No tags added')}</span>
+              <span className="text-sm text-muted-foreground">{t('contacts.details.no_tags_added', 'No tags added')}</span>
             )}
           </div>
         </div>
 
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-border">
           <h3 className="font-medium mb-4">{t('contacts.details.conversation_details', 'Conversation Details')}</h3>
 
           <div className="space-y-3">
             <div>
-              <p className="text-xs text-gray-500">{t('contacts.details.first_contacted', 'First contacted')}</p>
+              <p className="text-xs text-muted-foreground">{t('contacts.details.first_contacted', 'First contacted')}</p>
               <p className="text-sm">{firstContactedDate}</p>
             </div>
 
             <div>
-              <p className="text-xs text-gray-500">{t('contacts.details.channel', 'Channel')}</p>
+              <p className="text-xs text-muted-foreground">{t('contacts.details.channel', 'Channel')}</p>
               <p className="text-sm flex items-center">
                 {channelInfo.isComponent ? (
-                  <TwilioIcon className="w-4 h-4 mr-1" style={{ color: channelInfo.color }} />
+                  <TwilioIcon className="w-4 h-4 mr-1" />
                 ) : (
-                  <i className={channelInfo.icon + " mr-1"} style={{ color: channelInfo.color }}></i>
+                  <i className={channelInfo.icon + " mr-1"} style={channelInfo.icon.includes('tiktok') ? undefined : { color: channelInfo.color }}></i>
                 )}
                 {channelInfo.name}
               </p>

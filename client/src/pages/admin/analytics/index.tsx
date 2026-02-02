@@ -121,7 +121,7 @@ export default function AnalyticsPage() {
           </div>
         ) : analyticsError ? (
           <div className="flex flex-col items-center justify-center py-8">
-            <div className="text-red-500 mb-4">
+            <div className="text-red-500 dark:text-red-400 mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="12" y1="8" x2="12" y2="12"></line>
@@ -129,7 +129,7 @@ export default function AnalyticsPage() {
               </svg>
             </div>
             <h3 className="text-xl font-bold mb-2">{t('admin.analytics.error_loading', 'Error Loading Analytics')}</h3>
-            <p className="text-gray-600 mb-4 text-center max-w-md">
+            <p className="text-gray-600 dark:text-gray-400 mb-4 text-center max-w-md">
               {analyticsError instanceof Error ? analyticsError.message : t('admin.analytics.failed_load_data', 'Failed to load analytics data')}
             </p>
             <Button onClick={() => window.location.reload()}>

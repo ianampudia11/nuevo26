@@ -127,7 +127,7 @@ export function EditWhatsAppBusinessApiForm({ isOpen, onClose, onSuccess, connec
 
     setIsValidating(true);
     try {
-      const response = await fetch(`https://graph.facebook.com/v22.0/${formData.phoneNumberId}?access_token=${formData.accessToken}`);
+      const response = await fetch(`https://graph.facebook.com/v24.0/${formData.phoneNumberId}?access_token=${formData.accessToken}`);
 
       if (response.ok) {
         const data = await response.json();

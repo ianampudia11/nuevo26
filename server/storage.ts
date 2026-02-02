@@ -13,23 +13,26 @@ import {
   channelConnections, type ChannelConnection, type InsertChannelConnection,
   historySyncBatches, type HistorySyncBatch, type InsertHistorySyncBatch,
   partnerConfigurations, type PartnerConfiguration, type InsertPartnerConfiguration,
-  dialog360Clients, type Dialog360Client, type InsertDialog360Client,
-  dialog360Channels, type Dialog360Channel, type InsertDialog360Channel,
   metaWhatsappClients, type MetaWhatsappClient, type InsertMetaWhatsappClient,
   metaWhatsappPhoneNumbers, type MetaWhatsappPhoneNumber, type InsertMetaWhatsappPhoneNumber,
   apiKeys, type ApiKey, type InsertApiKey,
   apiUsage, type ApiUsage, type InsertApiUsage,
   apiRateLimits, type ApiRateLimit, type InsertApiRateLimit,
+  apiWebhooks, type ApiWebhook, type InsertApiWebhook,
   flows, type Flow, type InsertFlow,
   flowAssignments, type FlowAssignment, type InsertFlowAssignment,
   flowExecutions, flowStepExecutions,
   flowSessions, flowSessionVariables, flowSessionCursors,
   followUpSchedules, followUpTemplates, followUpExecutionLog,
   googleCalendarTokens, zohoCalendarTokens, calendlyCalendarTokens,
+  calendarBookings, type CalendarBooking, type InsertCalendarBooking,
   teamInvitations, type TeamInvitation, type InsertTeamInvitation,
   deals, type Deal, type InsertDeal,
   dealActivities, type DealActivity, type InsertDealActivity,
+  pipelines, type Pipeline, type InsertPipeline,
   pipelineStages, type PipelineStage, type InsertPipelineStage,
+  pipelineStageReverts, type PipelineStageRevert, type InsertPipelineStageRevert,
+  pipelineStageRevertLogs, type PipelineStageRevertLog, type InsertPipelineStageRevertLog,
   companies, type Company, type InsertCompany,
   rolePermissions,
   companyPages, type CompanyPage, type InsertCompanyPage,
@@ -39,6 +42,7 @@ import {
   planAiBillingEvents, type PlanAiBillingEvent, type InsertPlanAiBillingEvent,
   appSettings,
   companySettings,
+  companyCustomFields,
   paymentTransactions,
   languages,
   translationNamespaces,
@@ -77,7 +81,7 @@ import {
   type CompanySetting} from "@shared/schema";
 
 import session from "express-session";
-import { eq, and, desc, asc, or, sql, count, isNull, isNotNull, gt, gte, lt, lte, inArray, ne, not } from "drizzle-orm";
+import { eq, and, desc, asc, or, sql, count, isNull, isNotNull, gt, gte, lt, lte, inArray, ne, not, SQL } from "drizzle-orm";
 import { filterGroupChatsFromConversations, isWhatsAppGroupChatId } from "./utils/whatsapp-group-filter";
 import { validatePhoneNumber as validatePhoneNumberUtil } from "./utils/phone-validation";
 
@@ -97,7 +101,7 @@ export interface PaymentTransaction {
   amount: number;
   currency: string;
   status: 'pending' | 'completed' | 'failed' | 'refunded' | 'cancelled';
-  paymentMethod: 'stripe' | 'bank_transfer' | 'other' | 'mercadopago' | 'paypal' | 'moyasar' | 'mpesa';
+  paymentMethod: 'stripe' | 'bank_transfer' | 'other' | 'mercadopago' | 'paypal' | 'moyasar' | 'mpesa' | 'paystack';
   paymentIntentId?: string | null;
   externalTransactionId?: string | null;
   receiptUrl?: string | null;
@@ -112,7 +116,7 @@ export interface InsertPaymentTransaction {
   amount: string;
   currency: string;
   status: 'pending' | 'completed' | 'failed' | 'refunded' | 'cancelled';
-  paymentMethod: 'stripe' | 'bank_transfer' | 'other' | 'mercadopago' | 'paypal' | 'moyasar' | 'mpesa';
+  paymentMethod: 'stripe' | 'bank_transfer' | 'other' | 'mercadopago' | 'paypal' | 'moyasar' | 'mpesa' | 'paystack';
   paymentIntentId?: string | null;
   externalTransactionId?: string | null;
   receiptUrl?: string | null;
@@ -239,6 +243,16 @@ export interface WhatsAppProxyConfig {
   lastTested: Date | null;
 }
 
+export interface DataRetentionPolicyConfig {
+  enabled: boolean;
+  retentionDays: number;
+  autoAnonymize: boolean;
+  deleteInactiveConversations: boolean;
+  inactivityThresholdDays: number;
+  notifyBeforeDeletion?: boolean;
+  notificationDays?: number;
+}
+
 export interface IStorage {
   getAllCompanies(): Promise<Company[]>;
   getCompany(id: number): Promise<Company | undefined>;
@@ -254,6 +268,7 @@ export interface IStorage {
   getUserByUsernameOrEmail(credential: string): Promise<User | undefined>;
   getUserByUsernameCaseInsensitive(username: string): Promise<User | undefined>;
   getUsersByCompany(companyId: number): Promise<User[]>;
+  getCompanyUserSummaries(companyId: number): Promise<Array<{ id: number; fullName: string; email: string; role: string; avatarUrl: string | null; username: string; isSuperAdmin: boolean }>>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
   updateUserPassword(id: number, newPassword: string, isAlreadyHashed?: boolean): Promise<boolean>;
@@ -353,6 +368,7 @@ export interface IStorage {
   getChannelConnections(userId: number | null, companyId?: number): Promise<ChannelConnection[]>;
   getChannelConnectionsByCompany(companyId: number): Promise<ChannelConnection[]>;
   getChannelConnectionsByType(channelType: string): Promise<ChannelConnection[]>;
+  getTikTokConnectionIdsNeedingTokenRefresh(thresholdMs: number): Promise<number[]>;
   getChannelConnection(id: number): Promise<ChannelConnection | undefined>;
   createChannelConnection(connection: InsertChannelConnection): Promise<ChannelConnection>;
   updateChannelConnectionStatus(id: number, status: string): Promise<ChannelConnection>;
@@ -370,6 +386,8 @@ export interface IStorage {
   saveCompanySetting(companyId: number, key: string, value: unknown): Promise<CompanySetting>;
   deleteCompanySetting(companyId: number, key: string): Promise<boolean>;
 
+  getDataRetentionPolicy(companyId: number, platform: string): Promise<DataRetentionPolicyConfig | null>;
+  setDataRetentionPolicy(companyId: number, platform: string, policyConfig: DataRetentionPolicyConfig): Promise<CompanySetting>;
 
   getWhatsAppProxyConfig(companyId: number): Promise<WhatsAppProxyConfig | null>;
   saveWhatsAppProxyConfig(companyId: number, config: WhatsAppProxyConfig): Promise<WhatsAppProxyConfig>;
@@ -395,7 +413,16 @@ export interface IStorage {
   saveCalendlyTokens(userId: number, companyId: number, tokens: CalendlyTokens): Promise<boolean>;
   deleteCalendlyTokens(userId: number, companyId: number): Promise<boolean>;
 
-  getContacts(options?: { page?: number; limit?: number; search?: string; channel?: string; tags?: string[]; companyId?: number; includeArchived?: boolean }): Promise<{ contacts: Contact[]; total: number }>;
+  createCalendarBooking(bookingData: { userId: number; companyId: number; calendarType: string; startDateTime: Date; endDateTime: Date; eventId?: string; eventLink?: string }): Promise<{ success: boolean; bookingId?: number; error?: string }>;
+  getCalendarBookingByEventLink(userId: number, companyId: number, calendarType: string, eventLink: string): Promise<CalendarBooking | null>;
+  getCalendarBookings(userId: number, companyId: number, calendarType: string, startDateTime: Date, endDateTime: Date): Promise<CalendarBooking[]>;
+  deleteCalendarBooking(userId: number, companyId: number, calendarType: string, eventId: string): Promise<boolean>;
+  getCalendarBookingByEventId(userId: number, companyId: number, calendarType: string, eventId: string): Promise<CalendarBooking | null>;
+  getRecentCalendarBookings(userId: number, companyId: number, calendarType: string, limit?: number): Promise<CalendarBooking[]>;
+  extractEventIdFromLink(eventLink: string): string | null;
+  checkBookingConflict(userId: number, companyId: number, calendarType: string, startDateTime: Date, endDateTime: Date): Promise<boolean>;
+
+  getContacts(options?: { page?: number; limit?: number; search?: string; channel?: string; tags?: string[]; companyId?: number; includeArchived?: boolean; archivedOnly?: boolean; dateRange?: string; userId?: number; contactScope?: 'own' | 'assigned' | 'company' }): Promise<{ contacts: Contact[]; total: number }>;
   getContact(id: number): Promise<Contact | undefined>;
   getContactByIdentifier(identifier: string, identifierType: string): Promise<Contact | undefined>;
   getContactByEmail(email: string, companyId: number): Promise<Contact | undefined>;
@@ -519,6 +546,19 @@ export interface IStorage {
   createFollowUpExecutionLog(log: Record<string, unknown>): Promise<unknown>;
   getFollowUpExecutionLogs(scheduleId: string): Promise<Record<string, unknown>[]>;
 
+  createPipelineStageRevert(data: InsertPipelineStageRevert): Promise<PipelineStageRevert>;
+  getPipelineStageRevert(scheduleId: string): Promise<PipelineStageRevert | undefined>;
+  getScheduledPipelineStageReverts(limit?: number): Promise<PipelineStageRevert[]>;
+  getPipelineStageRevertsByDeal(dealId: number, companyId: number): Promise<PipelineStageRevert[]>;
+  getPipelineStageRevertsStats(companyId: number): Promise<{ totalScheduled: number; totalExecuted: number; totalFailed: number; totalSkipped: number; totalCancelled: number }>;
+  updatePipelineStageRevert(scheduleId: string, updates: Partial<PipelineStageRevert>): Promise<PipelineStageRevert>;
+  cancelPipelineStageRevert(scheduleId: string): Promise<void>;
+  createPipelineStageRevertLog(data: InsertPipelineStageRevertLog): Promise<PipelineStageRevertLog>;
+  getPipelineStageRevertLogs(scheduleId: string): Promise<PipelineStageRevertLog[]>;
+  getDealActivitiesSince(dealId: number, sinceDate: Date): Promise<DealActivity[]>;
+
+
+
   createFlowExecution(data: {
     executionId: string;
     flowId: number;
@@ -597,15 +637,41 @@ export interface IStorage {
   deletePipelineStage(id: number, moveDealsToStageId?: number): Promise<boolean>;
   reorderPipelineStages(stageIds: number[]): Promise<boolean>;
 
+
+  getPipelines(): Promise<Pipeline[]>;
+  getPipelinesByCompany(companyId: number): Promise<Pipeline[]>;
+  getPipeline(id: number): Promise<Pipeline | undefined>;
+  createPipeline(pipeline: InsertPipeline): Promise<Pipeline>;
+  updatePipeline(id: number, updates: Partial<InsertPipeline>): Promise<Pipeline>;
+  deletePipeline(id: number, moveDealsToStageId?: number): Promise<boolean>;
+  duplicatePipeline(id: number, newName: string): Promise<Pipeline>;
+  reorderPipelines(companyId: number, pipelineIds: number[]): Promise<boolean>;
+  createPipelineFromTemplate(templateId: string, companyId: number, customName?: string, description?: string, icon?: string, color?: string): Promise<{ pipeline: Pipeline; stages: PipelineStage[] }>;
+  getPipelineWithStages(id: number): Promise<{ pipeline: Pipeline; stages: PipelineStage[] } | null>;
+  getPipelineStagesByPipeline(pipelineId: number): Promise<PipelineStage[]>;
+
   getDeals(filter?: {
     companyId?: number;
     generalSearch?: string;
+    pipelineId?: number;
+    stageIds?: number[];
+    priorities?: ('low' | 'medium' | 'high')[];
+    minValue?: number;
+    maxValue?: number;
+    dueDateFrom?: string;
+    dueDateTo?: string;
+    assignedUserIds?: number[];
+    includeUnassigned?: boolean;
+    tags?: string[];
+    status?: string;
+    createdFrom?: string;
+    createdTo?: string;
   }): Promise<Deal[]>;
   getDealsByStage(stage: DealStatus): Promise<Deal[]>;
   getDealsByStageId(stageId: number): Promise<Deal[]>;
   getDeal(id: number): Promise<Deal | undefined>;
   getDealsByContact(contactId: number): Promise<Deal[]>;
-  getActiveDealByContact(contactId: number, companyId?: number): Promise<Deal | null>;
+  getActiveDealByContact(contactId: number, companyId?: number, pipelineId?: number): Promise<Deal | null>;
   getDealsByAssignedUser(userId: number): Promise<Deal[]>;
   getDealTags(companyId: number): Promise<string[]>;
   getContactTags(companyId: number): Promise<string[]>;
@@ -617,6 +683,8 @@ export interface IStorage {
     createdBefore?: string;
     search?: string;
     channel?: string;
+    userId?: number;
+    contactScope?: 'own' | 'assigned' | 'company';
   }): Promise<Contact[]>;
 
 
@@ -661,6 +729,7 @@ export interface IStorage {
 
   createContactAuditLog(auditLog: InsertContactAuditLog): Promise<ContactAuditLog>;
   getContactAuditLogs(contactId: number, options?: { page?: number; limit?: number; actionType?: string }): Promise<{ logs: ContactAuditLog[]; total: number }>;
+  getCompanyDeletionAuditLogs(companyId: number, options?: { page?: number; limit?: number }): Promise<{ logs: ContactAuditLog[]; total: number }>;
   logContactActivity(params: {
     companyId: number;
     contactId: number;
@@ -682,6 +751,7 @@ export interface IStorage {
   updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal>;
   updateDealStage(id: number, stage: DealStatus): Promise<Deal>;
   updateDealStageId(id: number, stageId: number): Promise<Deal>;
+  updateDealPipelineAndStage(id: number, pipelineId: number, stageId: number): Promise<Deal>;
   deleteDeal(id: number, companyId?: number): Promise<{ success: boolean; reason?: string }>;
 
   getDealActivities(dealId: number): Promise<DealActivity[]>;
@@ -919,6 +989,27 @@ export class DatabaseStorage implements IStorage {
         .orderBy(users.fullName);
     } catch (error) {
       console.error(`Error getting users for company ${companyId}:`, error);
+      return [];
+    }
+  }
+
+  async getCompanyUserSummaries(companyId: number): Promise<Array<{ id: number; fullName: string; email: string; role: string; avatarUrl: string | null; username: string; isSuperAdmin: boolean }>> {
+    try {
+      return await db
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          email: users.email,
+          role: users.role,
+          avatarUrl: users.avatarUrl,
+          username: users.username,
+          isSuperAdmin: users.isSuperAdmin,
+        })
+        .from(users)
+        .where(eq(users.companyId, companyId))
+        .orderBy(users.fullName);
+    } catch (error) {
+      console.error(`Error getting user summaries for company ${companyId}:`, error);
       return [];
     }
   }
@@ -1750,6 +1841,347 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  /**
+   * Create a confirmed calendar booking record
+   * @param bookingData Booking data including userId, companyId, calendarType, startDateTime, endDateTime, and optional eventId and eventLink
+   * @returns Success status with bookingId or error message
+   */
+  async createCalendarBooking(bookingData: { userId: number; companyId: number; calendarType: string; startDateTime: Date; endDateTime: Date; eventId?: string; eventLink?: string }): Promise<{ success: boolean; bookingId?: number; error?: string }> {
+    try {
+      const [booking] = await db
+        .insert(calendarBookings)
+        .values({
+          userId: bookingData.userId,
+          companyId: bookingData.companyId,
+          calendarType: bookingData.calendarType,
+          startDateTime: bookingData.startDateTime,
+          endDateTime: bookingData.endDateTime,
+          eventId: bookingData.eventId || null,
+          eventLink: bookingData.eventLink || null
+        })
+        .onConflictDoNothing()
+        .returning();
+
+      if (booking) {
+        return { success: true, bookingId: booking.id };
+      } else {
+        return { success: false, error: 'Booking already exists or conflict detected' };
+      }
+    } catch (error: any) {
+
+      if (error.code === '23505' || error.message?.includes('unique constraint') || error.message?.includes('duplicate key')) {
+        return { success: false, error: 'Time slot is already booked' };
+      }
+      
+      console.error('Error creating calendar booking:', error);
+      return { success: false, error: error.message || 'Failed to create booking' };
+    }
+  }
+
+  /**
+   * Get all confirmed calendar bookings within a time range
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param calendarType The calendar type ('google' or 'zoho')
+   * @param startDateTime Start of the time range
+   * @param endDateTime End of the time range
+   * @returns Array of calendar bookings that overlap with the time range
+   */
+  async getCalendarBookings(userId: number, companyId: number, calendarType: string, startDateTime: Date, endDateTime: Date): Promise<CalendarBooking[]> {
+    try {
+      const bookings = await db
+        .select()
+        .from(calendarBookings)
+        .where(
+          and(
+            eq(calendarBookings.userId, userId),
+            eq(calendarBookings.companyId, companyId),
+            eq(calendarBookings.calendarType, calendarType),
+
+
+            lt(calendarBookings.startDateTime, endDateTime),
+            gt(calendarBookings.endDateTime, startDateTime)
+          )
+        )
+        .orderBy(calendarBookings.startDateTime);
+
+      return bookings;
+    } catch (error) {
+      console.error('Error getting calendar bookings:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a calendar booking by event ID
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param calendarType The calendar type ('google' or 'zoho')
+   * @param eventId The calendar provider's event ID
+   * @returns True if deleted successfully, false otherwise
+   */
+  async deleteCalendarBooking(userId: number, companyId: number, calendarType: string, eventId: string): Promise<boolean> {
+    try {
+      await db
+        .delete(calendarBookings)
+        .where(
+          and(
+            eq(calendarBookings.userId, userId),
+            eq(calendarBookings.companyId, companyId),
+            eq(calendarBookings.calendarType, calendarType),
+            eq(calendarBookings.eventId, eventId)
+          )
+        );
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting calendar booking:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get a calendar booking by event ID
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param calendarType The calendar type ('google' or 'zoho')
+   * @param eventId The calendar provider's event ID
+   * @returns The calendar booking if found, null otherwise
+   */
+  async getCalendarBookingByEventId(userId: number, companyId: number, calendarType: string, eventId: string): Promise<CalendarBooking | null> {
+    try {
+      const [booking] = await db
+        .select()
+        .from(calendarBookings)
+        .where(
+          and(
+            eq(calendarBookings.userId, userId),
+            eq(calendarBookings.companyId, companyId),
+            eq(calendarBookings.calendarType, calendarType),
+            eq(calendarBookings.eventId, eventId)
+          )
+        )
+        .limit(1);
+
+      return booking || null;
+    } catch (error) {
+      console.error('Error getting calendar booking by event ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get a calendar booking by event link
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param calendarType The calendar type ('google' or 'zoho')
+   * @param eventLink The full calendar event link URL
+   * @returns The calendar booking if found, null otherwise
+   */
+  async getCalendarBookingByEventLink(userId: number, companyId: number, calendarType: string, eventLink: string): Promise<CalendarBooking | null> {
+    try {
+      const [booking] = await db
+        .select()
+        .from(calendarBookings)
+        .where(
+          and(
+            eq(calendarBookings.userId, userId),
+            eq(calendarBookings.companyId, companyId),
+            eq(calendarBookings.calendarType, calendarType),
+            eq(calendarBookings.eventLink, eventLink)
+          )
+        )
+        .limit(1);
+
+      return booking || null;
+    } catch (error) {
+      console.error('Error getting calendar booking by event link:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get recent calendar bookings ordered by creation date
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param calendarType The calendar type ('google' or 'zoho')
+   * @param limit Maximum number of bookings to return (default: 10)
+   * @returns Array of recent calendar bookings
+   */
+  async getRecentCalendarBookings(userId: number, companyId: number, calendarType: string, limit: number = 10): Promise<CalendarBooking[]> {
+    try {
+      const bookings = await db
+        .select()
+        .from(calendarBookings)
+        .where(
+          and(
+            eq(calendarBookings.userId, userId),
+            eq(calendarBookings.companyId, companyId),
+            eq(calendarBookings.calendarType, calendarType)
+          )
+        )
+        .orderBy(desc(calendarBookings.createdAt))
+        .limit(limit);
+
+      return bookings;
+    } catch (error) {
+      console.error('Error getting recent calendar bookings:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Extract event ID from Google Calendar event link
+   * @param eventLink The event link URL (e.g., https://www.google.com/calendar/event?eid=<eventId>)
+   * @returns The extracted event ID or null if not found
+   */
+  extractEventIdFromLink(eventLink: string): string | null {
+    try {
+      if (!eventLink || typeof eventLink !== 'string') {
+        return null;
+      }
+
+
+      const googleCalendarMatch = eventLink.match(/[?&]eid=([^&]+)/);
+      if (googleCalendarMatch && googleCalendarMatch[1]) {
+        let eidParam = decodeURIComponent(googleCalendarMatch[1]);
+        
+
+
+        try {
+
+          let base64String = eidParam.replace(/-/g, '+').replace(/_/g, '/');
+          
+
+          const padding = base64String.length % 4;
+          if (padding) {
+            base64String += '='.repeat(4 - padding);
+          }
+          
+
+          const decoded = Buffer.from(base64String, 'base64').toString('utf-8');
+          
+
+          const parts = decoded.split(' ');
+          if (parts.length > 0 && parts[0]) {
+            return parts[0];
+          }
+        } catch (decodeError) {
+
+
+        }
+        
+        return eidParam;
+      }
+
+
+      const altGoogleMatch = eventLink.match(/calendar\.google\.com\/event\?eid=([^&]+)/);
+      if (altGoogleMatch && altGoogleMatch[1]) {
+        let eidParam = decodeURIComponent(altGoogleMatch[1]);
+        
+
+        try {
+          let base64String = eidParam.replace(/-/g, '+').replace(/_/g, '/');
+          const padding = base64String.length % 4;
+          if (padding) {
+            base64String += '='.repeat(4 - padding);
+          }
+          const decoded = Buffer.from(base64String, 'base64').toString('utf-8');
+          const parts = decoded.split(' ');
+          if (parts.length > 0 && parts[0]) {
+            return parts[0];
+          }
+        } catch (decodeError) {
+
+        }
+        
+        return eidParam;
+      }
+
+
+      if (eventLink.length > 0 && !eventLink.includes('http') && !eventLink.includes('/')) {
+        return eventLink;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error extracting event ID from link:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if a time slot conflicts with existing bookings
+   * @param userId The user ID
+   * @param companyId The company ID
+   * @param calendarType The calendar type ('google' or 'zoho')
+   * @param startDateTime Start of the time slot
+   * @param endDateTime End of the time slot
+   * @returns True if there's a conflict, false if the slot is available
+   */
+  async checkBookingConflict(userId: number, companyId: number, calendarType: string, startDateTime: Date, endDateTime: Date): Promise<boolean> {
+    try {
+      const conflictingBookings: CalendarBooking[] = await db
+        .select()
+        .from(calendarBookings)
+        .where(
+          and(
+            eq(calendarBookings.userId, userId),
+            eq(calendarBookings.companyId, companyId),
+            eq(calendarBookings.calendarType, calendarType),
+
+
+            lt(calendarBookings.startDateTime, endDateTime),
+            gt(calendarBookings.endDateTime, startDateTime)
+          )
+        );
+
+      if (conflictingBookings.length > 0) {
+        return true;
+      }
+
+      return false;
+    } catch (error: any) {
+      console.error('Error checking booking conflict:', error.message);
+
+      return true;
+    }
+  }
+
+  /**
+   * Generate a human-readable explanation of how two time ranges overlap
+   * 
+   * @param range1Start Start of first time range
+   * @param range1End End of first time range
+   * @param range2Start Start of second time range
+   * @param range2End End of second time range
+   * @returns String describing the overlap
+   */
+  private explainOverlap(range1Start: Date, range1End: Date, range2Start: Date, range2End: Date): string {
+    const formatTime = (date: Date) => date.toISOString();
+    
+    const range1Str = `${formatTime(range1Start)} - ${formatTime(range1End)}`;
+    const range2Str = `${formatTime(range2Start)} - ${formatTime(range2End)}`;
+    
+
+    const overlaps = range1Start.getTime() < range2End.getTime() && range1End.getTime() > range2Start.getTime();
+    
+    if (!overlaps) {
+      return `Range 1 (${range1Str}) does not overlap with Range 2 (${range2Str})`;
+    }
+    
+
+    if (range1Start.getTime() <= range2Start.getTime() && range1End.getTime() >= range2End.getTime()) {
+      return `Range 1 (${range1Str}) fully contains Range 2 (${range2Str})`;
+    } else if (range2Start.getTime() <= range1Start.getTime() && range2End.getTime() >= range1End.getTime()) {
+      return `Range 2 (${range2Str}) fully contains Range 1 (${range1Str})`;
+    } else if (range1Start.getTime() < range2Start.getTime()) {
+      return `Range 1 (${range1Str}) overlaps with Range 2 (${range2Str}): Range 1 ends after Range 2 starts`;
+    } else {
+      return `Range 1 (${range1Str}) overlaps with Range 2 (${range2Str}): Range 2 ends after Range 1 starts`;
+    }
+  }
+
   async getUser(id: number): Promise<User | undefined> {
     try {
       const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -1938,6 +2370,21 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(channelConnections).where(eq(channelConnections.channelType, channelType));
   }
 
+  async getTikTokConnectionIdsNeedingTokenRefresh(thresholdMs: number): Promise<number[]> {
+    const rows = await db
+      .select({ id: channelConnections.id })
+      .from(channelConnections)
+      .where(
+        and(
+          eq(channelConnections.channelType, 'tiktok'),
+          inArray(channelConnections.status, ['active', 'connected']),
+          sql`(connection_data->>'tokenExpiresAt')::bigint IS NOT NULL`,
+          sql`(connection_data->>'tokenExpiresAt')::bigint < ${thresholdMs}`
+        )
+      );
+    return rows.map((r: { id: number }) => r.id);
+  }
+
   async getChannelConnection(id: number): Promise<ChannelConnection | undefined> {
     const [connection] = await db.select().from(channelConnections).where(eq(channelConnections.id, id));
     return connection;
@@ -1978,6 +2425,7 @@ export class DatabaseStorage implements IStorage {
   /**
    * Ensure all existing Instagram channels are marked as active
    * This method is used to update existing Instagram channels that might be inactive
+   * Includes rows where status is null, connected, pending, or other non-error statuses
    */
   async ensureInstagramChannelsActive(): Promise<number> {
     const result = await db.update(channelConnections)
@@ -1985,8 +2433,10 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(channelConnections.channelType, 'instagram'),
-
-          not(inArray(channelConnections.status, ['error', 'disabled']))
+          or(
+            isNull(channelConnections.status),
+            not(inArray(channelConnections.status, ['error', 'disabled']))
+          )
         )
       );
 
@@ -2026,7 +2476,7 @@ export class DatabaseStorage implements IStorage {
 
 
 
-  async getContacts(options?: { page?: number; limit?: number; search?: string; channel?: string; tags?: string[]; companyId?: number; includeArchived?: boolean; archivedOnly?: boolean; dateRange?: string }): Promise<{ contacts: Contact[]; total: number }> {
+  async getContacts(options?: { page?: number; limit?: number; search?: string; channel?: string; tags?: string[]; companyId?: number; includeArchived?: boolean; archivedOnly?: boolean; dateRange?: string; userId?: number; contactScope?: 'own' | 'assigned' | 'company' }): Promise<{ contacts: Contact[]; total: number }> {
     try {
 
 
@@ -2037,6 +2487,24 @@ export class DatabaseStorage implements IStorage {
       let whereConditions = undefined;
 
       const companyCondition = options?.companyId ? eq(contacts.companyId, options.companyId) : undefined;
+
+
+      let scopeCondition = undefined;
+      if (options?.contactScope && options?.userId && options?.companyId) {
+        if (options.contactScope === 'own') {
+
+          scopeCondition = eq(contacts.createdBy, options.userId);
+        } else if (options.contactScope === 'assigned') {
+
+          scopeCondition = sql`EXISTS (
+            SELECT 1 FROM ${conversations}
+            WHERE ${conversations.contactId} = ${contacts.id}
+            AND ${conversations.companyId} = ${options.companyId}
+            AND ${conversations.assignedToUserId} = ${options.userId}
+          )`;
+        }
+
+      }
 
 
       let archiveCondition = undefined;
@@ -2159,6 +2627,9 @@ export class DatabaseStorage implements IStorage {
 
           conditions.push(companyCondition);
         }
+        if (scopeCondition) {
+          conditions.push(scopeCondition);
+        }
         if (archiveCondition) {
 
           conditions.push(archiveCondition);
@@ -2225,6 +2696,9 @@ export class DatabaseStorage implements IStorage {
         if (companyCondition) {
 
           conditions.push(companyCondition);
+        }
+        if (scopeCondition) {
+          conditions.push(scopeCondition);
         }
         if (archiveCondition) {
 
@@ -2615,6 +3089,27 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(contacts.id, id))
       .returning();
+
+
+    if (updates.tags !== undefined) {
+      try {
+        const contactDeals = await this.getDealsByContact(id);
+        if (contactDeals.length > 0) {
+
+          await db
+            .update(deals)
+            .set({ 
+              tags: updates.tags || null,
+              updatedAt: new Date()
+            })
+            .where(eq(deals.contactId, id));
+        }
+      } catch (error) {
+
+        console.error(`Error syncing contact tags to deals for contact ${id}:`, error);
+      }
+    }
+
     return updatedContact;
   }
 
@@ -4469,6 +4964,13 @@ export class DatabaseStorage implements IStorage {
 
   async upsertFlowSessionVariable(variable: any) {
     try {
+
+      const session = await this.getFlowSession(variable.sessionId);
+      if (!session) {
+        console.warn(`Flow session ${variable.sessionId} does not exist, skipping variable upsert for key: ${variable.variableKey}`);
+        return null;
+      }
+
       return await db.insert(flowSessionVariables)
         .values(variable)
         .onConflictDoUpdate({
@@ -4485,6 +4987,11 @@ export class DatabaseStorage implements IStorage {
         })
         .returning();
     } catch (error) {
+
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23503') {
+        console.warn(`Flow session ${variable.sessionId} does not exist, skipping variable upsert for key: ${variable.variableKey}`);
+        return null;
+      }
       console.error('Error upserting flow session variable:', error);
       throw error;
     }
@@ -4745,6 +5252,162 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+
+  async createPipelineStageRevert(data: InsertPipelineStageRevert): Promise<PipelineStageRevert> {
+    try {
+      const result = await db.insert(pipelineStageReverts).values(data).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating pipeline stage revert:', error);
+      throw error;
+    }
+  }
+
+  async getPipelineStageRevert(scheduleId: string): Promise<PipelineStageRevert | undefined> {
+    try {
+      const result = await db.select()
+        .from(pipelineStageReverts)
+        .where(eq(pipelineStageReverts.scheduleId, scheduleId))
+        .limit(1);
+      return result[0];
+    } catch (error) {
+      console.error('Error getting pipeline stage revert:', error);
+      return undefined;
+    }
+  }
+
+  async getScheduledPipelineStageReverts(limit: number = 100): Promise<PipelineStageRevert[]> {
+    try {
+      const results = await db.select()
+        .from(pipelineStageReverts)
+        .where(
+          and(
+            eq(pipelineStageReverts.status, 'scheduled'),
+            sql`${pipelineStageReverts.scheduledFor} <= NOW()`
+          )
+        )
+        .orderBy(asc(pipelineStageReverts.scheduledFor))
+        .limit(limit);
+
+      return results.filter((revert: any) => {
+        const scheduledTime = new Date(revert.scheduledFor);
+        const now = new Date();
+        return scheduledTime.getTime() <= now.getTime();
+      });
+    } catch (error) {
+      console.error('Error getting scheduled pipeline stage reverts:', error);
+      return [];
+    }
+  }
+
+  async updatePipelineStageRevert(scheduleId: string, updates: Partial<PipelineStageRevert>): Promise<PipelineStageRevert> {
+    try {
+      const result = await db.update(pipelineStageReverts)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(pipelineStageReverts.scheduleId, scheduleId))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating pipeline stage revert:', error);
+      throw error;
+    }
+  }
+
+  async cancelPipelineStageRevert(scheduleId: string): Promise<void> {
+    try {
+      await db.update(pipelineStageReverts)
+        .set({
+          status: 'cancelled',
+          updatedAt: new Date()
+        })
+        .where(eq(pipelineStageReverts.scheduleId, scheduleId));
+    } catch (error) {
+      console.error('Error cancelling pipeline stage revert:', error);
+      throw error;
+    }
+  }
+
+  async createPipelineStageRevertLog(data: InsertPipelineStageRevertLog): Promise<PipelineStageRevertLog> {
+    try {
+      const result = await db.insert(pipelineStageRevertLogs).values(data).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating pipeline stage revert log:', error);
+      throw error;
+    }
+  }
+
+  async getPipelineStageRevertLogs(scheduleId: string): Promise<PipelineStageRevertLog[]> {
+    try {
+      return await db.select()
+        .from(pipelineStageRevertLogs)
+        .where(eq(pipelineStageRevertLogs.scheduleId, scheduleId))
+        .orderBy(desc(pipelineStageRevertLogs.createdAt));
+    } catch (error) {
+      console.error('Error getting pipeline stage revert logs:', error);
+      return [];
+    }
+  }
+
+  async getPipelineStageRevertsByDeal(dealId: number, companyId: number): Promise<PipelineStageRevert[]> {
+    try {
+      return await db.select()
+        .from(pipelineStageReverts)
+        .where(
+          and(
+            eq(pipelineStageReverts.dealId, dealId),
+            eq(pipelineStageReverts.companyId, companyId)
+          )
+        )
+        .orderBy(desc(pipelineStageReverts.createdAt));
+    } catch (error) {
+      console.error('Error getting pipeline stage reverts by deal:', error);
+      return [];
+    }
+  }
+
+  async getPipelineStageRevertsStats(companyId: number): Promise<{ totalScheduled: number; totalExecuted: number; totalFailed: number; totalSkipped: number; totalCancelled: number }> {
+    try {
+      const allReverts = await db.select()
+        .from(pipelineStageReverts)
+        .where(eq(pipelineStageReverts.companyId, companyId));
+
+      return {
+        totalScheduled: allReverts.filter((r: any) => r.status === 'scheduled').length,
+        totalExecuted: allReverts.filter((r: any) => r.status === 'executed').length,
+        totalFailed: allReverts.filter((r: any) => r.status === 'failed').length,
+        totalSkipped: allReverts.filter((r: any) => r.status === 'skipped').length,
+        totalCancelled: allReverts.filter((r: any) => r.status === 'cancelled').length
+      };
+    } catch (error) {
+      console.error('Error getting pipeline stage reverts stats:', error);
+      return {
+        totalScheduled: 0,
+        totalExecuted: 0,
+        totalFailed: 0,
+        totalSkipped: 0,
+        totalCancelled: 0
+      };
+    }
+  }
+
+  async getDealActivitiesSince(dealId: number, sinceDate: Date): Promise<DealActivity[]> {
+    try {
+      return await db.select()
+        .from(dealActivities)
+        .where(
+          and(
+            eq(dealActivities.dealId, dealId),
+            gt(dealActivities.createdAt, sinceDate)
+          )
+        )
+        .orderBy(desc(dealActivities.createdAt));
+    } catch (error) {
+      console.error('Error getting deal activities since date:', error);
+      return [];
+    }
+  }
+
   async createFlowExecution(data: {
     executionId: string;
     flowId: number;
@@ -4941,6 +5604,16 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  /**
+   * Save an app setting to the database.
+   * 
+   * Auth Background Settings:
+   * - branding_admin_auth_background: string (image URL) - Admin authentication page background image
+   * - branding_user_auth_background: string (image URL) - User authentication page background image
+   * - auth_background_config: JSON object - Configuration for auth backgrounds including:
+   *   - adminAuthBackground: { backgroundColor?, gradientConfig?, priority: 'image'|'color'|'layer' }
+   *   - userAuthBackground: { backgroundColor?, gradientConfig?, priority: 'image'|'color'|'layer' }
+   */
   async saveAppSetting(key: string, value: unknown): Promise<AppSetting> {
     try {
       if (!key) {
@@ -5877,6 +6550,27 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getDataRetentionPolicy(companyId: number, platform: string): Promise<DataRetentionPolicyConfig | null> {
+    try {
+      const key = `data_retention_policy_${platform}`;
+      const setting = await this.getCompanySetting(companyId, key);
+      const policy = (setting?.value as DataRetentionPolicyConfig) ?? null;
+      if (!policy) return null;
+      const retentionDays = typeof policy.retentionDays === 'number' && Number.isFinite(policy.retentionDays) && policy.retentionDays > 0
+        ? policy.retentionDays
+        : 0;
+      return { ...policy, retentionDays };
+    } catch (error) {
+      console.error(`Error getting data retention policy for company ${companyId} platform ${platform}:`, error);
+      return null;
+    }
+  }
+
+  async setDataRetentionPolicy(companyId: number, platform: string, policyConfig: DataRetentionPolicyConfig): Promise<CompanySetting> {
+    const key = `data_retention_policy_${platform}`;
+    return this.saveCompanySetting(companyId, key, policyConfig);
+  }
+
 
 
 async getDealsByStage(stage: DealStatus): Promise<Deal[]> {
@@ -5923,7 +6617,7 @@ async getDealsByContact(contactId: number): Promise<Deal[]> {
   }
 }
 
-async getActiveDealByContact(contactId: number, companyId?: number): Promise<Deal | null> {
+async getActiveDealByContact(contactId: number, companyId?: number, pipelineId?: number): Promise<Deal | null> {
   try {
     const conditions = [
       eq(deals.contactId, contactId),
@@ -5932,6 +6626,10 @@ async getActiveDealByContact(contactId: number, companyId?: number): Promise<Dea
 
     if (companyId) {
       conditions.push(eq(deals.companyId, companyId));
+    }
+
+    if (pipelineId !== undefined) {
+      conditions.push(eq(deals.pipelineId, pipelineId));
     }
 
     const result = await db
@@ -6034,12 +6732,31 @@ async getContactsForExport(options: {
   createdBefore?: string;
   search?: string;
   channel?: string;
+  userId?: number;
+  contactScope?: 'own' | 'assigned' | 'company';
 }): Promise<Contact[]> {
   try {
     let whereConditions = [
       eq(contacts.companyId, options.companyId),
       eq(contacts.isActive, true)
     ];
+
+
+    if (options?.contactScope && options?.userId) {
+      if (options.contactScope === 'own') {
+
+        whereConditions.push(eq(contacts.createdBy, options.userId));
+      } else if (options.contactScope === 'assigned') {
+
+        whereConditions.push(sql`EXISTS (
+          SELECT 1 FROM ${conversations}
+          WHERE ${conversations.contactId} = ${contacts.id}
+          AND ${conversations.companyId} = ${options.companyId}
+          AND ${conversations.assignedToUserId} = ${options.userId}
+        )`);
+      }
+
+    }
 
 
 
@@ -6115,6 +6832,8 @@ async getContactsWithoutConversations(companyId: number, options?: {
   search?: string;
   limit?: number;
   offset?: number;
+  userId?: number;
+  contactScope?: 'own' | 'assigned' | 'company';
 }): Promise<{ contacts: Contact[]; total: number }> {
   let searchTerm = options?.search?.trim();
 
@@ -6134,6 +6853,21 @@ async getContactsWithoutConversations(companyId: number, options?: {
       isNotNull(contacts.identifierType),
       ne(contacts.identifierType, 'email')
     ];
+
+
+    if (options?.contactScope && options.contactScope !== 'company') {
+      if (options.contactScope === 'own' && options.userId) {
+
+        whereConditions.push(eq(contacts.createdBy, options.userId));
+      } else if (options.contactScope === 'assigned' && options.userId) {
+
+
+
+
+        return { contacts: [], total: 0 };
+      }
+
+    }
 
 
     const phoneNumberFilter = and(
@@ -6333,8 +7067,18 @@ async createDeal(deal: InsertDeal): Promise<Deal> {
       throw new Error('Contact ID is required');
     }
 
+
+    let pipelineId = deal.pipelineId;
+    if (!pipelineId && deal.companyId) {
+      const defaultPipeline = await this.getDefaultPipelineForCompany(deal.companyId);
+      if (defaultPipeline) {
+        pipelineId = defaultPipeline.id;
+      }
+    }
+
     const processedDeal = {
       ...deal,
+      pipelineId,
       dueDate: deal.dueDate ? new Date(deal.dueDate) : undefined,
       lastActivityAt: new Date(),
       createdAt: new Date(),
@@ -6348,6 +7092,17 @@ async createDeal(deal: InsertDeal): Promise<Deal> {
       .insert(deals)
       .values(processedDeal)
       .returning();
+
+
+    if (deal.tags && deal.tags.length > 0 && deal.contactId) {
+      try {
+        await this.updateContact(deal.contactId, { tags: deal.tags });
+      } catch (error) {
+
+        console.error(`Error syncing deal tags to contact for new deal:`, error);
+      }
+    }
+
     return newDeal;
   } catch (error: any) {
     console.error('Error creating deal:', error);
@@ -6360,6 +7115,49 @@ async createDeal(deal: InsertDeal): Promise<Deal> {
 
 async updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal> {
   try {
+
+    const [existingDeal] = await db.select().from(deals).where(eq(deals.id, id));
+    if (!existingDeal) {
+      throw new Error(`Deal with ID ${id} not found`);
+    }
+    
+
+    if (updates.pipelineId !== undefined || updates.stageId !== undefined) {
+      let pipelineId = updates.pipelineId ?? existingDeal.pipelineId;
+      let stageId = updates.stageId ?? existingDeal.stageId;
+      
+      if (stageId) {
+
+        const [stage] = await db
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.id, stageId));
+        
+        if (stage) {
+          if (pipelineId && stage.pipelineId !== pipelineId) {
+            pipelineId = stage.pipelineId;
+            updates.pipelineId = pipelineId;
+          } else if (!pipelineId) {
+
+            pipelineId = stage.pipelineId;
+            updates.pipelineId = pipelineId;
+          }
+        }
+      } else if (pipelineId && !updates.stageId) {
+
+        const [firstStage] = await db
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.pipelineId, pipelineId))
+          .orderBy(pipelineStages.order)
+          .limit(1);
+        
+        if (firstStage) {
+          updates.stageId = firstStage.id;
+        }
+      }
+    }
+
     if (updates.stageId !== undefined) {
       const stageId = updates.stageId;
       const otherUpdates = { ...updates };
@@ -6383,7 +7181,19 @@ async updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal> {
           .where(eq(deals.id, id))
           .returning();
 
-        return finalUpdatedDeal || dealWithNewStage;
+        const resultDeal = finalUpdatedDeal || dealWithNewStage;
+
+
+        if (otherUpdates.tags !== undefined && existingDeal.contactId) {
+          try {
+            await this.updateContact(existingDeal.contactId, { tags: otherUpdates.tags || null });
+          } catch (error) {
+
+            console.error(`Error syncing deal tags to contact for deal ${id}:`, error);
+          }
+        }
+
+        return resultDeal;
       }
 
       if (dealWithNewStage) {
@@ -6416,6 +7226,16 @@ async updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal> {
 
     if (!updatedDeal) {
       throw new Error(`Deal with ID ${id} not found`);
+    }
+
+
+    if (updates.tags !== undefined && existingDeal.contactId) {
+      try {
+        await this.updateContact(existingDeal.contactId, { tags: updates.tags || null });
+      } catch (error) {
+
+        console.error(`Error syncing deal tags to contact for deal ${id}:`, error);
+      }
     }
 
     return updatedDeal;
@@ -6523,6 +7343,8 @@ async createDealActivity(activity: InsertDealActivity): Promise<DealActivity> {
 }
 
 async getPipelineStages(): Promise<PipelineStage[]> {
+
+  console.warn('[DEPRECATED] getPipelineStages() is deprecated. Use getPipelineStagesByCompany() or getPipelineStagesByPipeline() instead.');
   try {
     return db
       .select()
@@ -6548,12 +7370,24 @@ async getPipelineStageById(id: number): Promise<PipelineStage | null> {
   }
 }
 
-async getPipelineStagesByCompany(companyId: number): Promise<PipelineStage[]> {
+async getPipelineStagesByCompany(companyId: number, pipelineId?: number): Promise<PipelineStage[]> {
   try {
+
+    if (!pipelineId) {
+      const defaultPipeline = await this.getDefaultPipelineForCompany(companyId);
+      if (defaultPipeline) {
+        pipelineId = defaultPipeline.id;
+      }
+    }
+    
+    const conditions = [eq(pipelineStages.companyId, companyId)];
+    if (pipelineId) {
+      conditions.push(eq(pipelineStages.pipelineId, pipelineId));
+    }
     return db
       .select()
       .from(pipelineStages)
-      .where(eq(pipelineStages.companyId, companyId))
+      .where(and(...conditions))
       .orderBy(pipelineStages.order);
   } catch (error) {
     console.error(`Error getting pipeline stages for company ${companyId}:`, error);
@@ -6576,10 +7410,18 @@ async getPipelineStage(id: number): Promise<PipelineStage | undefined> {
 
 async createPipelineStage(stage: InsertPipelineStage): Promise<PipelineStage> {
   try {
+    if (!stage.pipelineId) {
+      throw new Error('pipelineId is required to create a pipeline stage');
+    }
+
+
     const maxOrderResult = await db
       .select({ maxOrder: sql`MAX(${pipelineStages.order})` })
       .from(pipelineStages)
-      .where(stage.companyId ? eq(pipelineStages.companyId, stage.companyId) : isNull(pipelineStages.companyId));
+      .where(and(
+        eq(pipelineStages.pipelineId, stage.pipelineId),
+        stage.companyId ? eq(pipelineStages.companyId, stage.companyId) : isNull(pipelineStages.companyId)
+      ));
 
     const maxOrder = maxOrderResult[0]?.maxOrder || 0;
     const newOrder = stage.order || (maxOrder as number) + 1;
@@ -6626,7 +7468,31 @@ async updatePipelineStage(id: number, updates: Partial<InsertPipelineStage>): Pr
 async deletePipelineStage(id: number, moveDealsToStageId?: number): Promise<boolean> {
   try {
     return await db.transaction(async (tx: any) => {
+
+      const [stageToDelete] = await tx
+        .select()
+        .from(pipelineStages)
+        .where(eq(pipelineStages.id, id));
+
+      if (!stageToDelete) {
+        throw new Error(`Pipeline stage with ID ${id} not found`);
+      }
+
       if (moveDealsToStageId) {
+
+        const [targetStage] = await tx
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.id, moveDealsToStageId));
+
+        if (!targetStage) {
+          throw new Error('Target stage not found');
+        }
+
+        if (targetStage.pipelineId !== stageToDelete.pipelineId) {
+          throw new Error('Cannot move deals to a stage in a different pipeline');
+        }
+
         await tx
           .update(deals)
           .set({
@@ -6640,9 +7506,11 @@ async deletePipelineStage(id: number, moveDealsToStageId?: number): Promise<bool
         .delete(pipelineStages)
         .where(eq(pipelineStages.id, id));
 
+
       const remainingStages = await tx
         .select()
         .from(pipelineStages)
+        .where(eq(pipelineStages.pipelineId, stageToDelete.pipelineId))
         .orderBy(pipelineStages.order);
 
       for (let i = 0; i < remainingStages.length; i++) {
@@ -6680,9 +7548,562 @@ async reorderPipelineStages(stageIds: number[]): Promise<boolean> {
   }
 }
 
+
+async getPipelines(): Promise<Pipeline[]> {
+  try {
+    return await db
+      .select()
+      .from(pipelines)
+      .orderBy(pipelines.orderNum);
+  } catch (error) {
+    console.error('Error getting all pipelines:', error);
+    return [];
+  }
+}
+
+async getPipelinesByCompany(companyId: number): Promise<Pipeline[]> {
+  try {
+    return await db
+      .select()
+      .from(pipelines)
+      .where(eq(pipelines.companyId, companyId))
+      .orderBy(pipelines.orderNum);
+  } catch (error) {
+    console.error(`Error getting pipelines for company ${companyId}:`, error);
+    return [];
+  }
+}
+
+
+async getDefaultPipelineForCompany(companyId: number): Promise<Pipeline | null> {
+  try {
+
+    const [defaultPipeline] = await db
+      .select()
+      .from(pipelines)
+      .where(and(
+        eq(pipelines.companyId, companyId),
+        eq(pipelines.isDefault, true)
+      ))
+      .limit(1);
+    
+    if (defaultPipeline) {
+      return defaultPipeline;
+    }
+    
+
+    const [firstPipeline] = await db
+      .select()
+      .from(pipelines)
+      .where(eq(pipelines.companyId, companyId))
+      .orderBy(pipelines.orderNum)
+      .limit(1);
+    
+    if (firstPipeline) {
+      return firstPipeline;
+    }
+    
+
+    console.warn(`Company ${companyId} has no pipelines. Creating default pipeline.`);
+    try {
+      const newPipeline = await this.createPipeline({
+        companyId,
+        name: 'Sales Pipeline',
+        description: 'Default sales pipeline',
+        icon: 'trending-up',
+        color: '#3a86ff',
+        isDefault: true,
+        isTemplate: false,
+        orderNum: 1
+      });
+      
+
+      const defaultStages = [
+        { name: 'Lead', color: '#94a3b8', order: 1 },
+        { name: 'Qualified', color: '#3b82f6', order: 2 },
+        { name: 'Proposal', color: '#8b5cf6', order: 3 },
+        { name: 'Negotiation', color: '#f59e0b', order: 4 },
+        { name: 'Closed Won', color: '#10b981', order: 5 },
+        { name: 'Closed Lost', color: '#ef4444', order: 6 }
+      ];
+      
+      for (const stageData of defaultStages) {
+        await this.createPipelineStage({
+          pipelineId: newPipeline.id,
+          companyId,
+          name: stageData.name,
+          color: stageData.color,
+          order: stageData.order
+        });
+      }
+      
+      return newPipeline;
+    } catch (createError) {
+      console.error(`Error creating default pipeline for company ${companyId}:`, createError);
+      return null;
+    }
+  } catch (error) {
+    console.error(`Error getting default pipeline for company ${companyId}:`, error);
+    return null;
+  }
+}
+
+async getPipeline(id: number): Promise<Pipeline | undefined> {
+  try {
+    const [pipeline] = await db
+      .select()
+      .from(pipelines)
+      .where(eq(pipelines.id, id));
+    return pipeline;
+  } catch (error) {
+    console.error(`Error getting pipeline with ID ${id}:`, error);
+    return undefined;
+  }
+}
+
+async createPipeline(pipeline: InsertPipeline): Promise<Pipeline> {
+  try {
+
+    const maxOrderResult = await db
+      .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
+      .from(pipelines)
+      .where(pipeline.companyId ? eq(pipelines.companyId, pipeline.companyId) : isNull(pipelines.companyId));
+
+    const maxOrder = maxOrderResult[0]?.maxOrder || 0;
+    const newOrderNum = pipeline.orderNum || (maxOrder as number) + 1;
+
+    const [newPipeline] = await db
+      .insert(pipelines)
+      .values({
+        ...pipeline,
+        orderNum: newOrderNum,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+
+    return newPipeline;
+  } catch (error: any) {
+    console.error('Error creating pipeline:', error);
+
+    if (error.code === '23505' && (
+      error.constraint === 'idx_pipelines_company_name_unique' ||
+      error.message?.includes('idx_pipelines_company_name_unique')
+    )) {
+      const duplicateError = new Error('Pipeline name already exists');
+      (duplicateError as any).isDuplicateName = true;
+      throw duplicateError;
+    }
+    throw new Error('Failed to create pipeline');
+  }
+}
+
+async updatePipeline(id: number, updates: Partial<InsertPipeline>): Promise<Pipeline> {
+  try {
+
+
+    if (updates.isDefault === true) {
+      return await db.transaction(async (tx: any) => {
+
+        const [existingPipeline] = await tx
+          .select()
+          .from(pipelines)
+          .where(eq(pipelines.id, id));
+
+        if (!existingPipeline) {
+          throw new Error(`Pipeline with ID ${id} not found`);
+        }
+
+        const companyId = existingPipeline.companyId;
+
+
+        if (companyId !== null) {
+          await tx
+            .update(pipelines)
+            .set({
+              isDefault: false,
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(pipelines.companyId, companyId),
+                ne(pipelines.id, id)
+              )
+            );
+        }
+
+
+        const [updatedPipeline] = await tx
+          .update(pipelines)
+          .set({
+            ...updates,
+            updatedAt: new Date()
+          })
+          .where(eq(pipelines.id, id))
+          .returning();
+
+        if (!updatedPipeline) {
+          throw new Error(`Pipeline with ID ${id} not found`);
+        }
+
+        return updatedPipeline;
+      });
+    }
+
+
+    const [updatedPipeline] = await db
+      .update(pipelines)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(pipelines.id, id))
+      .returning();
+
+    if (!updatedPipeline) {
+      throw new Error(`Pipeline with ID ${id} not found`);
+    }
+
+    return updatedPipeline;
+  } catch (error: any) {
+    console.error(`Error updating pipeline with ID ${id}:`, error);
+
+    if (error.code === '23505' && (
+      error.constraint === 'idx_pipelines_company_name_unique' ||
+      error.message?.includes('idx_pipelines_company_name_unique')
+    )) {
+      const duplicateError = new Error('Pipeline name already exists');
+      (duplicateError as any).isDuplicateName = true;
+      throw duplicateError;
+    }
+    throw new Error('Failed to update pipeline');
+  }
+}
+
+async reorderPipelines(companyId: number, pipelineIds: number[]): Promise<boolean> {
+  try {
+
+    const companyPipelines = await this.getPipelinesByCompany(companyId);
+    const companyPipelineIds = new Set(companyPipelines.map(p => p.id));
+
+
+    const invalidIds = pipelineIds.filter(id => !companyPipelineIds.has(id));
+    if (invalidIds.length > 0) {
+      throw new Error(`Invalid pipeline IDs: ${invalidIds.join(', ')}. These pipelines do not belong to your company.`);
+    }
+
+
+    const uniqueIds = new Set(pipelineIds);
+    if (uniqueIds.size !== pipelineIds.length) {
+      throw new Error('Duplicate pipeline IDs found in reorder request');
+    }
+
+
+    const providedIds = new Set(pipelineIds);
+    const missingIds = companyPipelines.filter(p => !providedIds.has(p.id)).map(p => p.id);
+    if (missingIds.length > 0) {
+      throw new Error(`Missing pipeline IDs: ${missingIds.join(', ')}. All pipelines must be included in the reorder.`);
+    }
+
+
+    return await db.transaction(async (tx: any) => {
+      for (let i = 0; i < pipelineIds.length; i++) {
+        await tx
+          .update(pipelines)
+          .set({
+            orderNum: i + 1,
+            updatedAt: new Date()
+          })
+          .where(eq(pipelines.id, pipelineIds[i]));
+      }
+      return true;
+    });
+  } catch (error) {
+    console.error('Error reordering pipelines:', error);
+    throw error;
+  }
+}
+
+async deletePipeline(id: number, moveDealsToStageId?: number): Promise<boolean> {
+  try {
+    return await db.transaction(async (tx: any) => {
+
+      const [pipelineToDelete] = await tx
+        .select()
+        .from(pipelines)
+        .where(eq(pipelines.id, id));
+
+      if (!pipelineToDelete) {
+        throw new Error(`Pipeline with ID ${id} not found`);
+      }
+
+      const companyId = pipelineToDelete.companyId;
+
+
+      if (moveDealsToStageId) {
+
+        const targetStage = await tx
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.id, moveDealsToStageId));
+
+        if (targetStage.length === 0) {
+          throw new Error('Target stage not found');
+        }
+
+        if (targetStage[0].pipelineId === id) {
+          throw new Error('Cannot move deals to a stage in the same pipeline');
+        }
+
+
+
+        await tx
+          .update(deals)
+          .set({
+            stageId: moveDealsToStageId,
+            pipelineId: targetStage[0].pipelineId,
+            updatedAt: new Date()
+          })
+          .where(eq(deals.pipelineId, id));
+      }
+
+
+      await tx
+        .delete(pipelineStages)
+        .where(eq(pipelineStages.pipelineId, id));
+
+
+      await tx
+        .delete(pipelines)
+        .where(eq(pipelines.id, id));
+
+
+      if (companyId) {
+        const remainingPipelines = await tx
+          .select()
+          .from(pipelines)
+          .where(eq(pipelines.companyId, companyId))
+          .orderBy(pipelines.orderNum);
+
+        for (let i = 0; i < remainingPipelines.length; i++) {
+          await tx
+            .update(pipelines)
+            .set({ orderNum: i + 1 })
+            .where(eq(pipelines.id, remainingPipelines[i].id));
+        }
+      }
+
+      return true;
+    });
+  } catch (error) {
+    console.error(`Error deleting pipeline with ID ${id}:`, error);
+    return false;
+  }
+}
+
+async duplicatePipeline(id: number, newName: string): Promise<Pipeline> {
+  try {
+    return await db.transaction(async (tx: any) => {
+
+      const sourcePipeline = await tx
+        .select()
+        .from(pipelines)
+        .where(eq(pipelines.id, id));
+
+      if (sourcePipeline.length === 0) {
+        throw new Error(`Pipeline with ID ${id} not found`);
+      }
+
+      const pipeline = sourcePipeline[0];
+
+
+      const maxOrderResult = await tx
+        .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
+        .from(pipelines)
+        .where(pipeline.companyId ? eq(pipelines.companyId, pipeline.companyId) : isNull(pipelines.companyId));
+
+      const maxOrder = maxOrderResult[0]?.maxOrder || 0;
+      const newOrderNum = (maxOrder as number) + 1;
+
+
+      const [newPipeline] = await tx
+        .insert(pipelines)
+        .values({
+          companyId: pipeline.companyId,
+          name: newName,
+          description: pipeline.description,
+          icon: pipeline.icon,
+          color: pipeline.color,
+          isDefault: false, // Duplicated pipelines should not be default
+          isTemplate: pipeline.isTemplate,
+          templateCategory: pipeline.templateCategory,
+          orderNum: newOrderNum,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+
+      const sourceStages = await tx
+        .select()
+        .from(pipelineStages)
+        .where(eq(pipelineStages.pipelineId, id))
+        .orderBy(pipelineStages.order);
+
+
+      for (const stage of sourceStages) {
+        await tx
+          .insert(pipelineStages)
+          .values({
+            pipelineId: newPipeline.id,
+            companyId: stage.companyId,
+            name: stage.name,
+            color: stage.color,
+            order: stage.order,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+      }
+
+      return newPipeline;
+    });
+  } catch (error: any) {
+    console.error(`Error duplicating pipeline with ID ${id}:`, error);
+
+    if (error.code === '23505' && (
+      error.constraint === 'idx_pipelines_company_name_unique' ||
+      error.message?.includes('idx_pipelines_company_name_unique')
+    )) {
+      const duplicateError = new Error('Pipeline name already exists');
+      (duplicateError as any).isDuplicateName = true;
+      throw duplicateError;
+    }
+    throw new Error('Failed to duplicate pipeline');
+  }
+}
+
+async createPipelineFromTemplate(templateId: string, companyId: number, customName?: string, description?: string, icon?: string, color?: string): Promise<{ pipeline: Pipeline; stages: PipelineStage[] }> {
+  try {
+
+    if (!companyId) {
+      throw new Error('Company ID is required for pipeline creation');
+    }
+
+    const { getTemplateById } = await import('@shared/pipeline-templates');
+    const template = getTemplateById(templateId);
+
+    if (!template) {
+      throw new Error('Template not found');
+    }
+
+    return await db.transaction(async (tx: any) => {
+
+      const maxOrderResult = await tx
+        .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
+        .from(pipelines)
+        .where(eq(pipelines.companyId, companyId));
+
+      const maxOrder = maxOrderResult[0]?.maxOrder || 0;
+      const newOrderNum = (maxOrder as number) + 1;
+
+
+      const [newPipeline] = await tx
+        .insert(pipelines)
+        .values({
+          companyId,
+          name: customName || template.name,
+          description: description !== undefined ? description : template.description,
+          icon: icon !== undefined ? icon : template.icon,
+          color: color !== undefined ? color : template.color,
+          isDefault: false,
+          isTemplate: false,
+          templateCategory: template.category,
+          orderNum: newOrderNum,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+
+      const createdStages: PipelineStage[] = [];
+      for (const stageData of template.stages) {
+        const [stage] = await tx
+          .insert(pipelineStages)
+          .values({
+            pipelineId: newPipeline.id,
+            companyId,
+            name: stageData.name,
+            color: stageData.color,
+            order: stageData.order,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+          .returning();
+        createdStages.push(stage);
+      }
+
+      return { pipeline: newPipeline, stages: createdStages };
+    });
+  } catch (error: any) {
+    console.error(`Error creating pipeline from template ${templateId}:`, error);
+
+    if (error.code === '23505' && (
+      error.constraint === 'idx_pipelines_company_name_unique' ||
+      error.message?.includes('idx_pipelines_company_name_unique')
+    )) {
+      const duplicateError = new Error('Pipeline name already exists');
+      (duplicateError as any).isDuplicateName = true;
+      throw duplicateError;
+    }
+    throw error;
+  }
+}
+
+async getPipelineWithStages(id: number): Promise<{ pipeline: Pipeline; stages: PipelineStage[] } | null> {
+  try {
+    const pipeline = await this.getPipeline(id);
+    if (!pipeline) {
+      return null;
+    }
+
+    const stages = await this.getPipelineStagesByPipeline(id);
+    return { pipeline, stages };
+  } catch (error) {
+    console.error(`Error getting pipeline with stages for ID ${id}:`, error);
+    return null;
+  }
+}
+
+async getPipelineStagesByPipeline(pipelineId: number): Promise<PipelineStage[]> {
+  try {
+    return await db
+      .select()
+      .from(pipelineStages)
+      .where(eq(pipelineStages.pipelineId, pipelineId))
+      .orderBy(pipelineStages.order);
+  } catch (error) {
+    console.error(`Error getting pipeline stages for pipeline ${pipelineId}:`, error);
+    return [];
+  }
+}
+
 async getDeals(filter?: {
   companyId?: number;
   generalSearch?: string;
+  pipelineId?: number;
+  stageIds?: number[];
+  priorities?: ('low' | 'medium' | 'high')[];
+  minValue?: number;
+  maxValue?: number;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+  assignedUserIds?: number[];
+  includeUnassigned?: boolean;
+  tags?: string[];
+  status?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  customFields?: Record<string, {operator: 'equals' | 'contains' | 'gt' | 'lt' | 'inArray'; value: string | number | string[]}>;
 }): Promise<Deal[]> {
   try {
     const conditions = [sql`${deals.status} != 'archived'`];
@@ -6692,6 +8113,76 @@ async getDeals(filter?: {
         conditions.push(eq(deals.companyId, filter.companyId));
       }
 
+
+      if (!filter.pipelineId && filter.companyId) {
+        const defaultPipeline = await this.getDefaultPipelineForCompany(filter.companyId);
+        if (defaultPipeline) {
+          conditions.push(eq(deals.pipelineId, defaultPipeline.id));
+        }
+      } else if (filter.pipelineId) {
+        conditions.push(eq(deals.pipelineId, filter.pipelineId));
+      }
+
+      if (filter.stageIds && filter.stageIds.length > 0) {
+        conditions.push(inArray(deals.stageId, filter.stageIds));
+      }
+
+      if (filter.priorities && filter.priorities.length > 0) {
+        conditions.push(inArray(deals.priority, filter.priorities));
+      }
+
+      if (filter.minValue !== undefined) {
+        conditions.push(gte(deals.value, filter.minValue));
+      }
+
+      if (filter.maxValue !== undefined) {
+        conditions.push(lte(deals.value, filter.maxValue));
+      }
+
+      if (filter.dueDateFrom) {
+        conditions.push(gte(deals.dueDate, new Date(filter.dueDateFrom)));
+      }
+
+      if (filter.dueDateTo) {
+        conditions.push(lte(deals.dueDate, new Date(filter.dueDateTo)));
+      }
+
+      if (filter.assignedUserIds && filter.assignedUserIds.length > 0) {
+        if (filter.includeUnassigned) {
+          conditions.push(
+            or(
+              inArray(deals.assignedToUserId, filter.assignedUserIds),
+              isNull(deals.assignedToUserId)
+            )!
+          );
+        } else {
+          conditions.push(inArray(deals.assignedToUserId, filter.assignedUserIds));
+        }
+      } else if (filter.includeUnassigned) {
+        conditions.push(isNull(deals.assignedToUserId));
+      }
+
+      if (filter.tags && filter.tags.length > 0) {
+        const tagConditions = filter.tags.map(tag => 
+          sql`EXISTS (
+            SELECT 1 FROM unnest(${deals.tags}) AS deal_tag 
+            WHERE deal_tag = ${tag}
+          )`
+        );
+        conditions.push(or(...tagConditions)!);
+      }
+
+      if (filter.status) {
+        conditions.push(eq(deals.status, filter.status));
+      }
+
+      if (filter.createdFrom) {
+        conditions.push(gte(deals.createdAt, new Date(filter.createdFrom)));
+      }
+
+      if (filter.createdTo) {
+        conditions.push(lte(deals.createdAt, new Date(filter.createdTo)));
+      }
 
       if (filter.generalSearch) {
         const searchTerm = '%' + filter.generalSearch + '%';
@@ -6709,6 +8200,59 @@ async getDeals(filter?: {
           )!
         );
       }
+
+
+      if (filter.customFields && Object.keys(filter.customFields).length > 0) {
+        const customFieldConditions = Object.entries(filter.customFields).map(([fieldName, filterConfig]) => {
+          const { operator, value } = filterConfig;
+
+          const escapedFieldName = fieldName.replace(/'/g, "''");
+          const fieldPath = sql`${deals.customFields}->>${sql.raw(`'${escapedFieldName}'`)}`;
+
+          switch (operator) {
+            case 'equals':
+              if (typeof value === 'number') {
+                return sql`(${fieldPath})::numeric = ${value}`;
+              } else {
+                const escapedValue = String(value).replace(/'/g, "''");
+                return sql`${fieldPath} = ${sql.raw(`'${escapedValue}'`)}`;
+              }
+            case 'contains':
+              const escapedContainsValue = String(value).replace(/'/g, "''");
+              return sql`${fieldPath} ILIKE ${sql.raw(`'%${escapedContainsValue}%'`)}`;
+            case 'gt':
+              if (typeof value === 'number') {
+                return sql`(${fieldPath})::numeric > ${value}`;
+              } else {
+                const escapedGtValue = String(value).replace(/'/g, "''");
+                return sql`${fieldPath} > ${sql.raw(`'${escapedGtValue}'`)}`;
+              }
+            case 'lt':
+              if (typeof value === 'number') {
+                return sql`(${fieldPath})::numeric < ${value}`;
+              } else {
+                const escapedLtValue = String(value).replace(/'/g, "''");
+                return sql`${fieldPath} < ${sql.raw(`'${escapedLtValue}'`)}`;
+              }
+            case 'inArray':
+              if (Array.isArray(value) && value.length > 0) {
+
+                const valueList = value.map(v => {
+                  const escaped = String(v).replace(/'/g, "''");
+                  return `'${escaped}'`;
+                }).join(',');
+                return sql`${fieldPath} IN (${sql.raw(valueList)})`;
+              }
+              return sql`1=0`; // No match if empty array
+            default:
+              return sql`1=1`; // No filter
+          }
+        });
+
+        if (customFieldConditions.length > 0) {
+          conditions.push(and(...customFieldConditions)!);
+        }
+      }
     }
 
     const result = await db
@@ -6716,6 +8260,7 @@ async getDeals(filter?: {
         id: deals.id,
         companyId: deals.companyId,
         contactId: deals.contactId,
+        pipelineId: deals.pipelineId,
         title: deals.title,
         stageId: deals.stageId,
         stage: deals.stage,
@@ -6725,6 +8270,7 @@ async getDeals(filter?: {
         assignedToUserId: deals.assignedToUserId,
         description: deals.description,
         tags: deals.tags,
+        customFields: deals.customFields,
         status: deals.status,
         lastActivityAt: deals.lastActivityAt,
         createdAt: deals.createdAt,
@@ -6775,6 +8321,20 @@ async updateDealStageId(id: number, stageId: number): Promise<Deal> {
         throw new Error(`Pipeline stage with ID ${stageId} not found`);
       }
 
+
+      const [deal] = await tx.select().from(deals).where(eq(deals.id, id));
+      if (!deal) {
+        throw new Error(`Deal with ID ${id} not found`);
+      }
+
+
+      const previousStageId = deal.stageId;
+
+
+      if (pipelineStage.pipelineId !== deal.pipelineId) {
+        throw new Error(`Pipeline stage ${stageId} does not belong to deal's pipeline ${deal.pipelineId}`);
+      }
+
       const stageEnumValue = this.mapPipelineStageToEnum(pipelineStage.name);
 
       const [updatedDeal] = await tx
@@ -6802,8 +8362,9 @@ async updateDealStageId(id: number, stageId: number): Promise<Deal> {
           type: 'stage_change',
           content: `Deal moved to ${stageName} stage`,
           metadata: {
-            previousStageId: updatedDeal.stageId,
-            newStageId: stageId
+            previousStageId: previousStageId,
+            newStageId: stageId,
+            pipelineId: deal.pipelineId
           },
           createdAt: new Date()
         });
@@ -6845,6 +8406,74 @@ async updateDealStageId(id: number, stageId: number): Promise<Deal> {
     }
 
     return 'lead';
+  }
+
+  async updateDealPipelineAndStage(id: number, pipelineId: number, stageId: number): Promise<Deal> {
+    try {
+      return await db.transaction(async (tx: any) => {
+
+        const [deal] = await tx.select().from(deals).where(eq(deals.id, id));
+        if (!deal) {
+          throw new Error(`Deal with ID ${id} not found`);
+        }
+
+
+        const [pipelineStage] = await tx
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.id, stageId));
+
+        if (!pipelineStage) {
+          throw new Error(`Pipeline stage with ID ${stageId} not found`);
+        }
+
+
+        if (pipelineStage.pipelineId !== pipelineId) {
+          throw new Error(`Pipeline stage ${stageId} does not belong to pipeline ${pipelineId}`);
+        }
+
+        const stageEnumValue = this.mapPipelineStageToEnum(pipelineStage.name);
+
+
+        const [updatedDeal] = await tx
+          .update(deals)
+          .set({
+            pipelineId,
+            stageId,
+            stage: stageEnumValue as any,
+            updatedAt: new Date(),
+            lastActivityAt: new Date()
+          })
+          .where(eq(deals.id, id))
+          .returning();
+
+        if (!updatedDeal) {
+          throw new Error(`Deal with ID ${id} not found`);
+        }
+
+        return updatedDeal;
+      });
+    } catch (error) {
+      console.error(`Error updating pipeline and stage for deal ${id}:`, error);
+      
+
+      const isUniqueConstraintError = 
+        (error as any)?.code === '23505' || // PostgreSQL unique violation error code
+        (error instanceof Error && (
+          error.message.includes('idx_unique_active_contact_deal_pipeline') ||
+          error.message.includes('unique constraint') ||
+          error.message.includes('duplicate key value')
+        ));
+      
+      if (isUniqueConstraintError) {
+
+        const conflictError = new Error('DUPLICATE_DEAL_CONFLICT: Contact already has an active deal in this pipeline');
+        (conflictError as any).isConflictError = true;
+        throw conflictError;
+      }
+      
+      throw new Error(`Failed to update deal pipeline and stage: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async getRolePermissions(companyId?: number): Promise<RolePermission[]> {
@@ -7563,7 +9192,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     }
   }
 
-  async updatePartnerConfiguration(id: number, data: Partial<InsertPartnerConfiguration>): Promise<PartnerConfiguration> {
+  async updatePartnerConfiguration(id: number, data: Partial<Omit<PartnerConfiguration, 'id' | 'createdAt'>>): Promise<PartnerConfiguration> {
     try {
       const [config] = await db
         .update(partnerConfigurations)
@@ -7596,129 +9225,6 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
         .orderBy(desc(partnerConfigurations.createdAt));
     } catch (error) {
       console.error("Error getting all partner configurations:", error);
-      throw error;
-    }
-  }
-
-  async createDialog360Client(data: InsertDialog360Client): Promise<Dialog360Client> {
-    try {
-      const [client] = await db
-        .insert(dialog360Clients)
-        .values(data)
-        .returning();
-      return client;
-    } catch (error) {
-      console.error("Error creating 360Dialog client:", error);
-      throw error;
-    }
-  }
-
-  async getDialog360ClientByClientId(clientId: string): Promise<Dialog360Client | null> {
-    try {
-      const [client] = await db
-        .select()
-        .from(dialog360Clients)
-        .where(eq(dialog360Clients.clientId, clientId))
-        .limit(1);
-      return client || null;
-    } catch (error) {
-      console.error("Error getting 360Dialog client:", error);
-      throw error;
-    }
-  }
-
-  async getDialog360ClientByCompanyId(companyId: number): Promise<Dialog360Client | null> {
-    try {
-      const [client] = await db
-        .select()
-        .from(dialog360Clients)
-        .where(eq(dialog360Clients.companyId, companyId))
-        .limit(1);
-      return client || null;
-    } catch (error) {
-      console.error("Error getting 360Dialog client by company:", error);
-      throw error;
-    }
-  }
-
-  async updateDialog360Client(id: number, data: Partial<InsertDialog360Client>): Promise<Dialog360Client> {
-    try {
-      const [client] = await db
-        .update(dialog360Clients)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(dialog360Clients.id, id))
-        .returning();
-      return client;
-    } catch (error) {
-      console.error("Error updating 360Dialog client:", error);
-      throw error;
-    }
-  }
-
-  async createDialog360Channel(data: InsertDialog360Channel): Promise<Dialog360Channel> {
-    try {
-      const [channel] = await db
-        .insert(dialog360Channels)
-        .values(data)
-        .returning();
-      return channel;
-    } catch (error) {
-      console.error("Error creating 360Dialog channel:", error);
-      throw error;
-    }
-  }
-
-  async getDialog360ChannelByChannelId(channelId: string): Promise<Dialog360Channel | null> {
-    try {
-      const [channel] = await db
-        .select()
-        .from(dialog360Channels)
-        .where(eq(dialog360Channels.channelId, channelId))
-        .limit(1);
-      return channel || null;
-    } catch (error) {
-      console.error("Error getting 360Dialog channel:", error);
-      throw error;
-    }
-  }
-
-  async getDialog360ChannelsByClientId(clientId: number): Promise<Dialog360Channel[]> {
-    try {
-      return await db
-        .select()
-        .from(dialog360Channels)
-        .where(eq(dialog360Channels.clientId, clientId))
-        .orderBy(desc(dialog360Channels.createdAt));
-    } catch (error) {
-      console.error("Error getting 360Dialog channels by client:", error);
-      throw error;
-    }
-  }
-
-  async updateDialog360Channel(id: number, data: Partial<InsertDialog360Channel>): Promise<Dialog360Channel> {
-    try {
-      const [channel] = await db
-        .update(dialog360Channels)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(dialog360Channels.id, id))
-        .returning();
-      return channel;
-    } catch (error) {
-      console.error("Error updating 360Dialog channel:", error);
-      throw error;
-    }
-  }
-
-  async getDialog360ChannelByPhoneNumber(phoneNumber: string): Promise<Dialog360Channel | null> {
-    try {
-      const [channel] = await db
-        .select()
-        .from(dialog360Channels)
-        .where(eq(dialog360Channels.phoneNumber, phoneNumber))
-        .limit(1);
-      return channel || null;
-    } catch (error) {
-      console.error("Error getting 360Dialog channel by phone number:", error);
       throw error;
     }
   }
@@ -7764,7 +9270,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     }
   }
 
-  async updateMetaWhatsappClient(id: number, data: Partial<InsertMetaWhatsappClient>): Promise<MetaWhatsappClient> {
+  async updateMetaWhatsappClient(id: number, data: Partial<Omit<MetaWhatsappClient, 'id' | 'createdAt'>>): Promise<MetaWhatsappClient> {
     try {
       const [client] = await db
         .update(metaWhatsappClients)
@@ -7785,8 +9291,36 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
         .values(data)
         .returning();
       return phoneNumber;
-    } catch (error) {
-      console.error("Error creating Meta WhatsApp phone number:", error);
+    } catch (error: any) {
+
+      const errorData: any = {
+        error: error.message,
+        code: error.code,
+        constraint: error.constraint,
+        data: {
+          clientId: data.clientId,
+          phoneNumberId: data.phoneNumberId,
+          phoneNumber: data.phoneNumber,
+          displayName: data.displayName,
+          status: data.status,
+          qualityRating: data.qualityRating,
+          messagingLimit: data.messagingLimit
+
+        }
+      };
+      
+
+      if (error.constraint === 'meta_whatsapp_phone_numbers_quality_rating_check') {
+        errorData.suggestion = 'Quality rating value not allowed. Valid values: green, yellow, red, UNKNOWN, GREEN, YELLOW, RED, unknown';
+      }
+      
+
+      if (error.code === '23514') {
+        errorData.errorType = 'CHECK constraint violation';
+        errorData.constraintName = error.constraint;
+      }
+      
+      console.error("Error creating Meta WhatsApp phone number:", errorData);
       throw error;
     }
   }
@@ -7816,7 +9350,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     }
   }
 
-  async updateMetaWhatsappPhoneNumber(id: number, data: Partial<InsertMetaWhatsappPhoneNumber>): Promise<MetaWhatsappPhoneNumber> {
+  async updateMetaWhatsappPhoneNumber(id: number, data: Partial<Omit<MetaWhatsappPhoneNumber, 'id' | 'createdAt'>>): Promise<MetaWhatsappPhoneNumber> {
     try {
       const [phoneNumber] = await db
         .update(metaWhatsappPhoneNumbers)
@@ -7884,6 +9418,19 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
         .select()
         .from(apiKeys)
         .where(eq(apiKeys.keyHash, keyHash))
+        .limit(1);
+      return apiKey || null;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getApiKeyById(id: number): Promise<ApiKey | null> {
+    try {
+      const [apiKey] = await db
+        .select()
+        .from(apiKeys)
+        .where(eq(apiKeys.id, id))
         .limit(1);
       return apiKey || null;
     } catch (error) {
@@ -8022,6 +9569,51 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
           .returning();
         return created;
       }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async createApiWebhook(data: InsertApiWebhook): Promise<ApiWebhook> {
+    try {
+      const [webhook] = await db
+        .insert(apiWebhooks)
+        .values({
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+      return webhook;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async updateApiWebhook(webhookId: number, updates: Partial<InsertApiWebhook>): Promise<ApiWebhook> {
+    try {
+      const [updated] = await db
+        .update(apiWebhooks)
+        .set({
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(apiWebhooks.id, webhookId))
+        .returning();
+      return updated;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getApiWebhookById(webhookId: number): Promise<ApiWebhook | null> {
+    try {
+      const [webhook] = await db
+        .select()
+        .from(apiWebhooks)
+        .where(eq(apiWebhooks.id, webhookId))
+        .limit(1);
+      return webhook || null;
     } catch (error) {
       throw error;
     }
@@ -8993,9 +10585,74 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
 
   async getAffiliateAnalytics(params: Record<string, unknown>): Promise<unknown[]> {
     try {
+      const affiliateId = params.affiliateId as number | undefined;
+      const startDate = params.startDate ? new Date(params.startDate as string) : undefined;
+      const endDate = params.endDate ? new Date(params.endDate as string) : undefined;
+      const periodType = (params.periodType as "daily" | "weekly" | "monthly") || "daily";
+      const groupBy = params.groupBy as "affiliate" | "date" | "country" | "source" | undefined;
 
+      const conditions = [];
 
-      return [];
+      if (affiliateId) {
+        conditions.push(eq(affiliateAnalytics.affiliateId, affiliateId));
+      }
+
+      if (startDate) {
+        conditions.push(gte(affiliateAnalytics.date, startDate.toISOString().split('T')[0]));
+      }
+
+      if (endDate) {
+        conditions.push(lte(affiliateAnalytics.date, endDate.toISOString().split('T')[0]));
+      }
+
+      if (periodType) {
+        conditions.push(eq(affiliateAnalytics.periodType, periodType));
+      }
+
+      let query = db
+        .select({
+          id: affiliateAnalytics.id,
+          affiliateId: affiliateAnalytics.affiliateId,
+          affiliateName: affiliates.name,
+          affiliateCode: affiliates.affiliateCode,
+          companyId: affiliateAnalytics.companyId,
+          date: affiliateAnalytics.date,
+          periodType: affiliateAnalytics.periodType,
+          clicks: affiliateAnalytics.clicks,
+          uniqueClicks: affiliateAnalytics.uniqueClicks,
+          impressions: affiliateAnalytics.impressions,
+          referrals: affiliateAnalytics.referrals,
+          conversions: affiliateAnalytics.conversions,
+          conversionRate: affiliateAnalytics.conversionRate,
+          revenue: affiliateAnalytics.revenue,
+          commissionEarned: affiliateAnalytics.commissionEarned,
+          averageOrderValue: affiliateAnalytics.averageOrderValue,
+          topCountries: affiliateAnalytics.topCountries,
+          topSources: affiliateAnalytics.topSources,
+          createdAt: affiliateAnalytics.createdAt,
+          updatedAt: affiliateAnalytics.updatedAt
+        })
+        .from(affiliateAnalytics)
+        .leftJoin(affiliates, eq(affiliateAnalytics.affiliateId, affiliates.id));
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as typeof query;
+      }
+
+      if (groupBy === "affiliate") {
+        query = query.groupBy(
+          affiliateAnalytics.affiliateId,
+          affiliates.name,
+          affiliates.affiliateCode
+        ) as typeof query;
+      } else if (groupBy === "date") {
+        query = query.groupBy(affiliateAnalytics.date) as typeof query;
+      }
+
+      query = query.orderBy(desc(affiliateAnalytics.date)) as typeof query;
+
+      const results = await query;
+      return results;
     } catch (error) {
       console.error("Error fetching affiliate analytics:", error);
       throw error;
@@ -9004,9 +10661,65 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
 
   async getAffiliatePerformance(params: Record<string, unknown>): Promise<unknown[]> {
     try {
+      const startDate = params.startDate ? new Date(params.startDate as string) : undefined;
+      const endDate = params.endDate ? new Date(params.endDate as string) : undefined;
+      const topN = (params.topN as number) || 10;
 
+      const conditions = [eq(affiliates.status, 'active')];
 
-      return [];
+      if (startDate) {
+        conditions.push(gte(affiliateReferrals.convertedAt, startDate));
+      }
+
+      if (endDate) {
+        conditions.push(lte(affiliateReferrals.convertedAt, endDate));
+      }
+
+      const results = await db
+        .select({
+          affiliateId: affiliates.id,
+          affiliateName: affiliates.name,
+          affiliateCode: affiliates.affiliateCode,
+          email: affiliates.email,
+          status: affiliates.status,
+          totalReferrals: sql<number>`COUNT(${affiliateReferrals.id})::int`,
+          convertedReferrals: sql<number>`COUNT(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN 1 END)::int`,
+          pendingReferrals: sql<number>`COUNT(CASE WHEN ${affiliateReferrals.status} = 'pending' THEN 1 END)::int`,
+          expiredReferrals: sql<number>`COUNT(CASE WHEN ${affiliateReferrals.status} = 'expired' THEN 1 END)::int`,
+          totalRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN ${affiliateReferrals.conversionValue} ELSE 0 END), 0)::numeric`,
+          totalCommission: sql<number>`COALESCE(SUM(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN ${affiliateReferrals.commissionAmount} ELSE 0 END), 0)::numeric`,
+          conversionRate: sql<number>`CASE 
+            WHEN COUNT(${affiliateReferrals.id}) > 0 
+            THEN (COUNT(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN 1 END) * 100.0 / COUNT(${affiliateReferrals.id}))::numeric
+            ELSE 0::numeric
+          END`,
+          averageOrderValue: sql<number>`CASE 
+            WHEN COUNT(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN 1 END) > 0
+            THEN (SUM(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN ${affiliateReferrals.conversionValue} ELSE 0 END) / COUNT(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN 1 END))::numeric
+            ELSE 0::numeric
+          END`,
+          totalEarnings: affiliates.totalEarnings,
+          pendingEarnings: affiliates.pendingEarnings,
+          paidEarnings: affiliates.paidEarnings,
+          lastConversionDate: sql<Date | null>`MAX(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN ${affiliateReferrals.convertedAt} END)`
+        })
+        .from(affiliates)
+        .leftJoin(affiliateReferrals, eq(affiliates.id, affiliateReferrals.affiliateId))
+        .where(and(...conditions))
+        .groupBy(
+          affiliates.id,
+          affiliates.name,
+          affiliates.affiliateCode,
+          affiliates.email,
+          affiliates.status,
+          affiliates.totalEarnings,
+          affiliates.pendingEarnings,
+          affiliates.paidEarnings
+        )
+        .orderBy(desc(sql`COALESCE(SUM(CASE WHEN ${affiliateReferrals.status} = 'converted' THEN ${affiliateReferrals.commissionAmount} ELSE 0 END), 0)`))
+        .limit(topN);
+
+      return results;
     } catch (error) {
       console.error("Error fetching affiliate performance:", error);
       throw error;
@@ -9015,11 +10728,215 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
 
   async exportAffiliateData(params: Record<string, unknown>): Promise<string> {
     try {
+      const type = params.type as "affiliates" | "referrals" | "payouts" | "analytics";
+      const format = (params.format as "csv" | "xlsx") || "csv";
+      const startDate = params.startDate ? new Date(params.startDate as string) : undefined;
+      const endDate = params.endDate ? new Date(params.endDate as string) : undefined;
+      const affiliateId = params.affiliateId as number | undefined;
+
+      if (format === "xlsx") {
+
+        throw new Error("XLSX export format not implemented. Please use CSV format.");
+      }
+
+      let data: unknown[] = [];
+      let headers: string[] = [];
+
+      switch (type) {
+        case "affiliates": {
+          const conditions = [];
+          if (affiliateId) {
+            conditions.push(eq(affiliates.id, affiliateId));
+          }
+          
+          const results = await db
+            .select()
+            .from(affiliates)
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(affiliates.createdAt));
+
+          data = results;
+          headers = [
+            "id", "name", "email", "affiliateCode", "status", "totalReferrals",
+            "successfulReferrals", "totalEarnings", "pendingEarnings", "paidEarnings",
+            "defaultCommissionRate", "commissionType", "createdAt", "updatedAt"
+          ];
+          break;
+        }
+
+        case "referrals": {
+          const conditions = [];
+          if (affiliateId) {
+            conditions.push(eq(affiliateReferrals.affiliateId, affiliateId));
+          }
+          if (startDate) {
+            conditions.push(gte(affiliateReferrals.createdAt, startDate));
+          }
+          if (endDate) {
+            conditions.push(lte(affiliateReferrals.createdAt, endDate));
+          }
+
+          const results = await db
+            .select({
+              id: affiliateReferrals.id,
+              affiliateId: affiliateReferrals.affiliateId,
+              affiliateName: affiliates.name,
+              affiliateCode: affiliates.affiliateCode,
+              referralCode: affiliateReferrals.referralCode,
+              referredCompanyId: affiliateReferrals.referredCompanyId,
+              referredUserId: affiliateReferrals.referredUserId,
+              referredEmail: affiliateReferrals.referredEmail,
+              status: affiliateReferrals.status,
+              conversionValue: affiliateReferrals.conversionValue,
+              commissionAmount: affiliateReferrals.commissionAmount,
+              commissionRate: affiliateReferrals.commissionRate,
+              convertedAt: affiliateReferrals.convertedAt,
+              createdAt: affiliateReferrals.createdAt
+            })
+            .from(affiliateReferrals)
+            .leftJoin(affiliates, eq(affiliateReferrals.affiliateId, affiliates.id))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(affiliateReferrals.createdAt));
+
+          data = results;
+          headers = [
+            "id", "affiliateId", "affiliateName", "affiliateCode", "referralCode",
+            "referredCompanyId", "referredUserId", "referredEmail", "status",
+            "conversionValue", "commissionAmount", "commissionRate", "convertedAt", "createdAt"
+          ];
+          break;
+        }
+
+        case "payouts": {
+          const conditions = [];
+          if (affiliateId) {
+            conditions.push(eq(affiliatePayouts.affiliateId, affiliateId));
+          }
+          if (startDate) {
+            conditions.push(gte(affiliatePayouts.periodStart, startDate));
+          }
+          if (endDate) {
+            conditions.push(lte(affiliatePayouts.periodEnd, endDate));
+          }
+
+          const results = await db
+            .select({
+              id: affiliatePayouts.id,
+              affiliateId: affiliatePayouts.affiliateId,
+              affiliateName: affiliates.name,
+              affiliateCode: affiliates.affiliateCode,
+              amount: affiliatePayouts.amount,
+              currency: affiliatePayouts.currency,
+              status: affiliatePayouts.status,
+              paymentMethod: affiliatePayouts.paymentMethod,
+              paymentReference: affiliatePayouts.paymentReference,
+              periodStart: affiliatePayouts.periodStart,
+              periodEnd: affiliatePayouts.periodEnd,
+              processedBy: affiliatePayouts.processedBy,
+              processedAt: affiliatePayouts.processedAt,
+              referralIds: affiliatePayouts.referralIds,
+              createdAt: affiliatePayouts.createdAt
+            })
+            .from(affiliatePayouts)
+            .leftJoin(affiliates, eq(affiliatePayouts.affiliateId, affiliates.id))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(affiliatePayouts.createdAt));
+
+          data = results;
+          headers = [
+            "id", "affiliateId", "affiliateName", "affiliateCode", "amount", "currency",
+            "status", "paymentMethod", "paymentReference", "periodStart", "periodEnd",
+            "processedBy", "processedAt", "referralIds", "createdAt"
+          ];
+          break;
+        }
+
+        case "analytics": {
+          const conditions = [];
+          if (affiliateId) {
+            conditions.push(eq(affiliateAnalytics.affiliateId, affiliateId));
+          }
+          if (startDate) {
+            conditions.push(gte(affiliateAnalytics.date, startDate.toISOString().split('T')[0]));
+          }
+          if (endDate) {
+            conditions.push(lte(affiliateAnalytics.date, endDate.toISOString().split('T')[0]));
+          }
+
+          const results = await db
+            .select({
+              id: affiliateAnalytics.id,
+              affiliateId: affiliateAnalytics.affiliateId,
+              affiliateName: affiliates.name,
+              affiliateCode: affiliates.affiliateCode,
+              date: affiliateAnalytics.date,
+              periodType: affiliateAnalytics.periodType,
+              clicks: affiliateAnalytics.clicks,
+              uniqueClicks: affiliateAnalytics.uniqueClicks,
+              impressions: affiliateAnalytics.impressions,
+              referrals: affiliateAnalytics.referrals,
+              conversions: affiliateAnalytics.conversions,
+              conversionRate: affiliateAnalytics.conversionRate,
+              revenue: affiliateAnalytics.revenue,
+              commissionEarned: affiliateAnalytics.commissionEarned,
+              averageOrderValue: affiliateAnalytics.averageOrderValue
+            })
+            .from(affiliateAnalytics)
+            .leftJoin(affiliates, eq(affiliateAnalytics.affiliateId, affiliates.id))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(affiliateAnalytics.date));
+
+          data = results;
+          headers = [
+            "id", "affiliateId", "affiliateName", "affiliateCode", "date", "periodType",
+            "clicks", "uniqueClicks", "impressions", "referrals", "conversions",
+            "conversionRate", "revenue", "commissionEarned", "averageOrderValue"
+          ];
+          break;
+        }
+
+        default:
+          throw new Error(`Invalid export type: ${type}`);
+      }
+
+      if (data.length === 0) {
+        return "No data available for export";
+      }
 
 
-      return "No data available for export";
+      const csvRows: string[] = [];
+      
+
+      csvRows.push(headers.map(h => `"${h}"`).join(","));
+
+
+      for (const row of data) {
+        const values = headers.map(header => {
+          const value = (row as Record<string, unknown>)[header];
+          if (value === null || value === undefined) {
+            return "";
+          }
+          if (value instanceof Date) {
+            return value.toISOString();
+          }
+          if (Array.isArray(value)) {
+            return JSON.stringify(value);
+          }
+          if (typeof value === "object") {
+            return JSON.stringify(value);
+          }
+
+          return `"${String(value).replace(/"/g, '""')}"`;
+        });
+        csvRows.push(values.join(","));
+      }
+
+      return csvRows.join("\n");
     } catch (error) {
       console.error("Error exporting affiliate data:", error);
+      if (error instanceof Error && error.message.includes("not implemented")) {
+        throw error; // Re-throw 501 errors
+      }
       throw error;
     }
   }
@@ -11130,6 +13047,35 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     }
   }
 
+  async getCompanyDeletionAuditLogs(
+    companyId: number,
+    options?: { page?: number; limit?: number }
+  ): Promise<{ logs: ContactAuditLog[]; total: number }> {
+    try {
+      const page = options?.page || 1;
+      const limit = options?.limit || 50;
+      const offset = (page - 1) * limit;
+      const whereConditions = [
+        eq(contactAuditLogs.companyId, companyId),
+        eq(contactAuditLogs.actionType, 'tiktok_user_deletion')
+      ];
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(contactAuditLogs)
+        .where(and(...whereConditions));
+      const logs = await db
+        .select()
+        .from(contactAuditLogs)
+        .where(and(...whereConditions))
+        .orderBy(desc(contactAuditLogs.createdAt))
+        .limit(limit)
+        .offset(offset);
+      return { logs, total: count };
+    } catch (error) {
+      console.error('Error getting company deletion audit logs:', error);
+      throw error;
+    }
+  }
 
   async logContactActivity(params: {
     companyId: number;
@@ -11206,6 +13152,90 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
     } catch (error) {
       console.error('Error unarchiving contact:', error);
       throw error;
+    }
+  }
+
+  async getCompanyCustomFields(companyId: number, entity: 'deal' | 'contact' | 'company'): Promise<any[]> {
+    try {
+      return await db
+        .select()
+        .from(companyCustomFields)
+        .where(
+          and(
+            eq(companyCustomFields.companyId, companyId),
+            eq(companyCustomFields.entity, entity)
+          )
+        )
+        .orderBy(companyCustomFields.displayOrder, companyCustomFields.fieldName);
+    } catch (error) {
+      console.error(`Error getting custom fields for company ${companyId}, entity ${entity}:`, error);
+      return [];
+    }
+  }
+
+  async createCompanyCustomField(data: {
+    companyId: number;
+    entity: 'deal' | 'contact' | 'company';
+    fieldName: string;
+    fieldType: 'text' | 'number' | 'select' | 'multi_select' | 'date' | 'boolean';
+    fieldLabel: string;
+    options?: any;
+    required?: boolean;
+    displayOrder?: number;
+  }): Promise<any> {
+    try {
+      const [result] = await db
+        .insert(companyCustomFields)
+        .values({
+          companyId: data.companyId,
+          entity: data.entity,
+          fieldName: data.fieldName,
+          fieldType: data.fieldType,
+          fieldLabel: data.fieldLabel,
+          options: data.options || null,
+          required: data.required || false,
+          displayOrder: data.displayOrder || 0,
+        })
+        .returning();
+      return result;
+    } catch (error) {
+      console.error('Error creating custom field:', error);
+      throw error;
+    }
+  }
+
+  async updateCompanyCustomField(id: number, updates: Partial<{
+    fieldLabel: string;
+    fieldType: 'text' | 'number' | 'select' | 'multi_select' | 'date' | 'boolean';
+    options?: any;
+    required?: boolean;
+    displayOrder?: number;
+  }>): Promise<any> {
+    try {
+      const [result] = await db
+        .update(companyCustomFields)
+        .set({
+          ...updates,
+          updatedAt: new Date(),
+        })
+        .where(eq(companyCustomFields.id, id))
+        .returning();
+      return result;
+    } catch (error) {
+      console.error(`Error updating custom field ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteCompanyCustomField(id: number): Promise<boolean> {
+    try {
+      await db
+        .delete(companyCustomFields)
+        .where(eq(companyCustomFields.id, id));
+      return true;
+    } catch (error) {
+      console.error(`Error deleting custom field ${id}:`, error);
+      return false;
     }
   }
 }

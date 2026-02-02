@@ -118,6 +118,53 @@ app.use((req, res, next) => {
         
         }
 
+        logger.info('twilio-voice', 'Checking Twilio Voice SDK credentials configuration...');
+        try {
+          const { storage } = await import('./storage');
+          const { db } = await import('./db');
+          const { sql } = await import('drizzle-orm');
+          
+
+          const missingCredentials = await db.execute(sql`
+            SELECT id, company_id, account_name, status
+            FROM channel_connections
+            WHERE channel_type = 'twilio_voice'
+              AND status = 'active'
+              AND (
+                connection_data->>'apiKey' IS NULL 
+                OR connection_data->>'apiKey' = ''
+                OR connection_data->>'apiSecret' IS NULL 
+                OR connection_data->>'apiSecret' = ''
+                OR connection_data->>'twimlAppSid' IS NULL 
+                OR connection_data->>'twimlAppSid' = ''
+              )
+            LIMIT 20
+          `);
+          
+          if (missingCredentials.rows && missingCredentials.rows.length > 0) {
+            const count = missingCredentials.rows.length;
+            logger.warn('twilio-voice', `⚠️  Found ${count} Twilio Voice connection(s) missing Voice SDK credentials`);
+            logger.warn('twilio-voice', 'These connections will need to be reconfigured with API Key, API Secret, and TwiML App SID');
+            logger.warn('twilio-voice', 'Direct calls will fail until Voice SDK credentials are added');
+            logger.warn('twilio-voice', 'See docs/TWILIO_VOICE_SDK_SETUP.md for configuration instructions');
+            
+
+            const connectionsToLog = Math.min(5, count);
+            for (let i = 0; i < connectionsToLog; i++) {
+              const conn = missingCredentials.rows[i];
+              logger.warn('twilio-voice', `  - Connection ID: ${conn.id}, Company ID: ${conn.company_id}, Name: ${conn.account_name || 'N/A'}`);
+            }
+            
+            if (count > connectionsToLog) {
+              logger.warn('twilio-voice', `  ... and ${count - connectionsToLog} more connection(s)`);
+            }
+          } else {
+            logger.info('twilio-voice', '✅ All active Twilio Voice connections have Voice SDK credentials configured');
+          }
+        } catch (error) {
+          logger.error('twilio-voice', '❌ Failed to check Twilio Voice SDK credentials:', error);
+        }
+
 
         logger.info('whatsapp', 'Starting WhatsApp auto-reconnection...');
         try {
@@ -295,6 +342,24 @@ app.use((req, res, next) => {
           logger.error('backup', '❌ Database backup scheduler failed to start:', error);
         }
 
+        logger.info('conference-cleanup', 'Starting Conference Cleanup Scheduler...');
+        try {
+          const { conferenceCleanupScheduler } = await import('./services/conference-cleanup-scheduler');
+          await conferenceCleanupScheduler.start();
+          logger.info('conference-cleanup', '✅ Conference Cleanup Scheduler started successfully');
+          conferenceCleanupScheduler.on('cleanup-completed', (data: any) => {
+            logger.info('conference-cleanup', 'Cleanup completed', data);
+          });
+          conferenceCleanupScheduler.on('cleanup-failed', (data: any) => {
+            logger.error('conference-cleanup', 'Cleanup failed', data);
+          });
+          conferenceCleanupScheduler.on('conference-terminated', (data: any) => {
+            logger.info('conference-cleanup', 'Conference terminated', data);
+          });
+        } catch (error) {
+          logger.error('conference-cleanup', '❌ Conference Cleanup Scheduler failed to start:', error);
+        }
+
         logger.info('campaigns', 'Starting campaign queue processor...');
         try {
           const { CampaignQueueService } = await import('./services/campaignQueueService');
@@ -303,6 +368,16 @@ app.use((req, res, next) => {
           logger.info('campaigns', '✅ Campaign queue processor started successfully');
         } catch (error) {
           logger.error('campaigns', '❌ Campaign queue processor failed to start:', error);
+        }
+
+        logger.info('campaign-scheduler', 'Starting Campaign Scheduler...');
+        try {
+          const { CampaignScheduler } = await import('./services/campaign-scheduler');
+          const campaignScheduler = CampaignScheduler.getInstance();
+          campaignScheduler.start();
+          logger.info('campaign-scheduler', '✅ Campaign Scheduler started successfully');
+        } catch (error) {
+          logger.error('campaign-scheduler', '❌ Campaign Scheduler failed to start:', error);
         }
 
         logger.info('message-scheduler', 'Starting Message Scheduler...');
@@ -332,6 +407,33 @@ app.use((req, res, next) => {
           logger.info('follow-ups', '✅ Follow-up Scheduler started successfully');
         } catch (error) {
           logger.error('follow-ups', '❌ Follow-up Scheduler failed to start:', error);
+        }
+
+        logger.info('pipeline-reverts', 'Starting Pipeline Stage Revert Scheduler...');
+        try {
+          const PipelineStageRevertScheduler = (await import('./services/pipeline-stage-revert-scheduler')).default;
+          const pipelineStageRevertScheduler = PipelineStageRevertScheduler.getInstance();
+          pipelineStageRevertScheduler.start();
+          
+          pipelineStageRevertScheduler.on('started', () => {
+            logger.info('pipeline-reverts', 'Pipeline Stage Revert Scheduler started');
+          });
+          
+          pipelineStageRevertScheduler.on('revertExecuted', ({ scheduleId, dealId }) => {
+            logger.info('pipeline-reverts', `Pipeline stage revert executed: ${scheduleId} for deal ${dealId}`);
+          });
+          
+          pipelineStageRevertScheduler.on('revertFailed', ({ scheduleId, error }) => {
+            logger.error('pipeline-reverts', `Pipeline stage revert failed: ${scheduleId} - ${error}`);
+          });
+          
+          pipelineStageRevertScheduler.on('revertSkipped', ({ scheduleId, reason }) => {
+            logger.info('pipeline-reverts', `Pipeline stage revert skipped: ${scheduleId} - ${reason}`);
+          });
+          
+          logger.info('pipeline-reverts', '✅ Pipeline Stage Revert Scheduler started successfully');
+        } catch (error) {
+          logger.error('pipeline-reverts', '❌ Pipeline Stage Revert Scheduler failed to start:', error);
         }
 
         logger.info('follow-up-cleanup', 'Starting Follow-up Cleanup Service...');
@@ -398,9 +500,56 @@ app.use((req, res, next) => {
           logger.error('template-status-sync', '❌ WhatsApp Template Status Sync failed to start:', error);
         }
 
+        logger.info('tiktok-retention', 'Starting TikTok Data Retention Policy Worker...');
+        try {
+          const TikTokService = (await import('./services/channels/tiktok')).default;
+          const runTikTokRetentionWorker = async () => {
+            try {
+              logger.info('tiktok-retention', 'TikTok Data Retention Policy Worker running');
+              const result = await TikTokService.applyDataRetentionPolicy();
+              logger.info('tiktok-retention', 'TikTok Data Retention Policy Worker completed', {
+                companiesProcessed: result.companiesProcessed,
+                contactsProcessed: result.contactsProcessed,
+                errors: result.errors.length
+              });
+            } catch (error) {
+              logger.error('tiktok-retention', 'TikTok Data Retention Policy Worker error', error);
+            }
+          };
+          const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+          const scheduleNext2AM = () => {
+            const now = new Date();
+            const next = new Date(now);
+            next.setHours(2, 0, 0, 0);
+            if (next <= now) next.setDate(next.getDate() + 1);
+            const ms = next.getTime() - now.getTime();
+            setTimeout(() => {
+              runTikTokRetentionWorker();
+              setInterval(runTikTokRetentionWorker, ONE_DAY_MS);
+            }, ms);
+          };
+          scheduleNext2AM();
+          logger.info('tiktok-retention', '✅ TikTok Data Retention Policy Worker scheduled (daily at 2 AM)');
+        } catch (error) {
+          logger.error('tiktok-retention', '❌ TikTok Data Retention Policy Worker failed to start:', error);
+        }
+
       } catch (error) {
         logger.error('startup', 'Error during service initialization', error);
       }
     }, 1000);
+  });
+
+  process.on('SIGTERM', async () => {
+    logger.info('server', 'SIGTERM received, shutting down TikTok health monitoring...');
+    try {
+      const TikTokService = (await import('./services/channels/tiktok')).default;
+      TikTokService.stopAllHealthMonitoring();
+      logger.info('tiktok', 'TikTok health monitoring stopped');
+    } catch (error) {
+      logger.error('tiktok', 'Error stopping TikTok health monitoring:', error);
+    }
+    await new Promise((r) => setTimeout(r, 5000));
+    logger.info('server', 'Shutdown grace period complete');
   });
 })();

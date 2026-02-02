@@ -225,14 +225,11 @@ export function EditTeamMemberModal({ isOpen, onClose, onSuccess, teamMember }: 
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Administrator</SelectItem>
                 <SelectItem value="agent">Agent</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500">
-              {role === 'admin' ?
-                'Administrators inherit full permissions by default. Customize permissions in Settings → Roles & Permissions.' :
-                'Agents inherit limited permissions by default. Customize permissions in Settings → Roles & Permissions.'}
+              Agents inherit limited permissions by default. Customize permissions in Settings → Roles & Permissions.
             </p>
           </div>
 

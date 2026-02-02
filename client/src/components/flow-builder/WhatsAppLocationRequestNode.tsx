@@ -10,7 +10,6 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  MapPin,
   Trash2
 } from 'lucide-react';
 import {
@@ -85,8 +84,8 @@ const WhatsAppLocationRequestNode: React.FC<WhatsAppLocationRequestNodeProps> = 
 
   return (
     <div className={cn(
-      "node-whatsapp-location-request p-3 rounded-lg bg-white border border-green-200 shadow-sm min-w-[400px] max-w-[500px] group",
-      hasErrors ? "border-red-300" : ""
+      "node-whatsapp-location-request p-3 rounded-lg bg-card border border-border shadow-sm min-w-[400px] max-w-[500px] group",
+      hasErrors ? "border-destructive" : ""
     )}>
       {/* Input Handles */}
       <Handle
@@ -134,10 +133,10 @@ const WhatsAppLocationRequestNode: React.FC<WhatsAppLocationRequestNodeProps> = 
       {/* Node Header */}
       <div className="font-medium flex items-center gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-green-600" />
+          <img src="https://cdn-icons-png.flaticon.com/128/535/535137.png" alt="WhatsApp Location Request" className="h-4 w-4" />
           <span className="text-sm">{t('whatsapp_location_request.node_title', 'WhatsApp Location Request')}</span>
         </div>
-        <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border border-primary/20">
           {t('whatsapp_interactive.official_api', 'Official API')}
         </Badge>
         <button
@@ -160,9 +159,9 @@ const WhatsAppLocationRequestNode: React.FC<WhatsAppLocationRequestNodeProps> = 
 
       {/* Error Indicator */}
       {hasErrors && (
-        <div className="flex items-center gap-2 mb-3 p-2 bg-red-50 border border-red-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-red-500" />
-          <span className="text-sm text-red-700">Please fix the errors below</span>
+        <div className="flex items-center gap-2 mb-3 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-sm text-destructive">Please fix the errors below</span>
         </div>
       )}
 
@@ -170,19 +169,19 @@ const WhatsAppLocationRequestNode: React.FC<WhatsAppLocationRequestNodeProps> = 
       {!isEditing && (
         <div className="space-y-3">
           {/* WhatsApp Message Preview */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <div className="text-sm text-gray-700 mb-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+            <div className="text-sm text-foreground mb-3">
               {bodyText}
             </div>
             <div className="space-y-2">
-              <div className="border border-green-300 rounded-md p-2 text-center text-sm bg-white hover:bg-green-50 transition-colors relative flex items-center justify-center gap-2">
-                <MapPin className="h-4 w-4" />
+              <div className="border border-primary/20 rounded-md p-2 text-center text-sm bg-card hover:bg-primary/10 transition-colors relative flex items-center justify-center gap-2">
+                <img src="https://cdn-icons-png.flaticon.com/128/535/535137.png" alt="Location" className="h-4 w-4" />
                 {t('whatsapp_location_request.send_location_button', 'Send Location')}
               </div>
             </div>
           </div>
           
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {t('whatsapp_location_request.awaits_location', 'Awaits user location response')}
           </div>
         </div>
@@ -195,28 +194,28 @@ const WhatsAppLocationRequestNode: React.FC<WhatsAppLocationRequestNodeProps> = 
           <div className="space-y-2">
             <Label className="text-xs font-medium">
               {t('whatsapp_interactive.body_text', 'Body Text')}
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-destructive ml-1">*</span>
             </Label>
             <Textarea
               value={bodyText}
               onChange={(e) => setBodyText(e.target.value)}
               placeholder={t('whatsapp_location_request.body_placeholder', 'Enter your message text...')}
-              className={cn("text-xs min-h-[60px]", errors.bodyText && "border-red-300")}
+              className={cn("text-xs min-h-[60px]", errors.bodyText && "border-destructive")}
               maxLength={1024}
             />
             {errors.bodyText && (
-              <p className="text-xs text-red-500">{errors.bodyText}</p>
+              <p className="text-xs text-destructive">{errors.bodyText}</p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {bodyText.length}/1024 {t('common.characters', 'characters')}
             </p>
           </div>
 
           {/* API Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div className="text-xs text-blue-800">
+              <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
+              <div className="text-xs text-primary">
                 <p className="font-medium mb-1">{t('whatsapp_location_request.api_info_title', 'Location Request Message')}</p>
                 <p>{t('whatsapp_location_request.api_info_description', 'This message displays body text and a "Send Location" button. When tapped, users can share their location. The flow will continue after receiving the location response.')}</p>
               </div>

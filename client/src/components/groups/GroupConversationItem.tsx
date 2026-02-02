@@ -73,12 +73,17 @@ export default function GroupConversationItem({
         return 'ri-instagram-line text-pink-600';
       case 'messenger':
         return 'ri-messenger-line text-blue-600';
+      case 'tiktok':
+        return 'ri-tiktok-line text-black dark:text-white';
+      case 'twilio_sms':
+      case 'twilio_voice':
+        return 'ri-message-3-line text-red-500 dark:text-white';
       case 'telegram':
         return 'ri-telegram-line text-blue-500';
       case 'email':
-        return 'ri-mail-line text-gray-600';
+        return 'ri-mail-line text-muted-foreground';
       default:
-        return 'ri-chat-3-line text-gray-600';
+        return 'ri-chat-3-line text-muted-foreground';
     }
   };
 
@@ -182,7 +187,7 @@ export default function GroupConversationItem({
               />
               
               {/* Channel indicator */}
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm">
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-background rounded-full flex items-center justify-center shadow-sm">
                 <i className={`${getChannelIcon(conversation.channelType)} text-xs`}></i>
               </div>
             </div>

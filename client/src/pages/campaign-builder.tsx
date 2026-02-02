@@ -5,7 +5,7 @@ import { CampaignBuilder } from '@/components/campaigns/CampaignBuilder';
 
 export default function CampaignBuilderPage() {
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Header />
       
       <div className="flex flex-1 overflow-hidden">

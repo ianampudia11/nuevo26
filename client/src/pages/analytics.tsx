@@ -9,7 +9,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Loader2, Calendar as CalendarIcon, Users, MessageSquare, AlertCircle, HelpCircle, ArrowUpRight, ArrowDownRight, Zap, Target } from 'lucide-react';
 import { RiWhatsappFill, RiMessengerFill, RiInstagramFill, RiMailFill } from 'react-icons/ri';
 import { useQuery } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { format, subDays, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, isAfter, isBefore, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useTheme } from 'next-themes';
 
 
 interface AnalyticsOverview {
@@ -245,6 +246,30 @@ export default function Analytics() {
 
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { theme } = useTheme();
+
+
+  const getCssVariable = (variableName: string): string => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const root = document.documentElement;
+      const value = getComputedStyle(root).getPropertyValue(variableName).trim();
+      return value ? `hsl(${value})` : '';
+    } catch {
+      return '';
+    }
+  };
+
+
+  const chartColors = useMemo(() => {
+    return {
+      background: getCssVariable('--background') || 'hsl(0 0% 100%)',
+      foreground: getCssVariable('--foreground') || 'hsl(222.2 84% 4.9%)',
+      border: getCssVariable('--border') || 'hsl(214.3 31.8% 91.4%)',
+      mutedForeground: getCssVariable('--muted-foreground') || 'hsl(215.4 16.3% 46.9%)',
+      card: getCssVariable('--card') || 'hsl(0 0% 100%)',
+    };
+  }, [theme]);
 
 
   const getChannelIcon = (channelType: string) => {
@@ -252,28 +277,28 @@ export default function Analytics() {
 
 
     if (normalizedType.includes('whatsapp') && normalizedType.includes('official')) {
-      return <RiWhatsappFill className="w-4 h-4 text-green-500" />;
+      return <RiWhatsappFill className="w-4 h-4 text-green-500 dark:text-green-400" />;
     }
     if (normalizedType.includes('whatsapp') && normalizedType.includes('unofficial')) {
-      return <RiWhatsappFill className="w-4 h-4 text-orange-500" />;
+      return <RiWhatsappFill className="w-4 h-4 text-orange-500 dark:text-orange-400" />;
     }
     if (normalizedType.includes('whatsapp')) {
-      return <RiWhatsappFill className="w-4 h-4 text-green-500" />;
+      return <RiWhatsappFill className="w-4 h-4 text-green-500 dark:text-green-400" />;
     }
 
 
     if (normalizedType.includes('messenger')) {
-      return <RiMessengerFill className="w-4 h-4 text-blue-500" />;
+      return <RiMessengerFill className="w-4 h-4 text-blue-500 dark:text-blue-400" />;
     }
     if (normalizedType.includes('instagram')) {
-      return <RiInstagramFill className="w-4 h-4 text-pink-500" />;
+      return <RiInstagramFill className="w-4 h-4 text-pink-500 dark:text-pink-400" />;
     }
     if (normalizedType.includes('email') || normalizedType.includes('mail')) {
-      return <RiMailFill className="w-4 h-4 text-gray-500" />;
+      return <RiMailFill className="w-4 h-4 text-muted-foreground" />;
     }
 
 
-    return <div className="w-4 h-4 rounded-full bg-gray-400" />;
+    return <div className="w-4 h-4 rounded-full bg-muted-foreground" />;
   };
 
 
@@ -283,7 +308,7 @@ export default function Analytics() {
         {payload?.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2">
             {getChannelIcon(entry.value)}
-            <span className="text-sm text-gray-600">{entry.value}</span>
+            <span className="text-sm text-muted-foreground">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -402,7 +427,7 @@ export default function Analytics() {
       <text 
         x={x} 
         y={y} 
-        fill="white" 
+        fill={theme === 'dark' ? 'hsl(var(--foreground))' : 'white'} 
         textAnchor="middle" 
         dominantBaseline="central"
       >
@@ -412,7 +437,7 @@ export default function Analytics() {
   };
   
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Header />
       
       <div className="flex flex-1 overflow-hidden">
@@ -421,10 +446,10 @@ export default function Analytics() {
         <div className="flex-1 overflow-y-auto p-3 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
                 {t('analytics.title', 'Analytics')}
               </h1>
-              <p className="text-gray-600 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Track your communication performance and engagement metrics
               </p>
             </div>
@@ -460,7 +485,7 @@ export default function Analytics() {
                     variant="outline"
                     className={cn(
                       "w-full sm:w-[280px] lg:w-[320px] justify-start text-left font-normal h-10",
-                      dateRangeError && "border-red-500 text-red-600",
+                      dateRangeError && "border-destructive text-destructive",
                       !dateRange && "text-muted-foreground"
                     )}
                   >
@@ -518,7 +543,7 @@ export default function Analytics() {
                       </div>
                     </div>
                     {dateRangeError && (
-                      <p className="text-sm text-red-600 mt-2">{dateRangeError}</p>
+                      <p className="text-sm text-destructive mt-2">{dateRangeError}</p>
                     )}
                   </div>
                 </PopoverContent>
@@ -544,7 +569,7 @@ export default function Analytics() {
               </div>
             </TooltipProvider>
           ) : error ? (
-            <div className="flex flex-col justify-center items-center h-64 text-red-500 space-y-2">
+            <div className="flex flex-col justify-center items-center h-64 text-destructive space-y-2">
               <AlertCircle className="h-8 w-8" />
               <p className="text-center">{error instanceof Error ? error.message : 'Failed to load analytics data'}</p>
               <Button
@@ -558,33 +583,33 @@ export default function Analytics() {
           ) : (
             <TooltipProvider>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6">
-                <Card className="group hover:shadow-lg hover:shadow-green-100/50 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-white to-green-50/30">
+                <Card className="group hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-card via-card to-primary/5">
                   <CardContent className="pt-6">
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <p className="text-sm font-medium text-gray-600 truncate">
+                          <p className="text-sm font-medium text-muted-foreground truncate">
                             {t('analytics.cards.total_conversations', 'Total Conversations')}
                           </p>
                           <UITooltip>
                             <TooltipTrigger asChild>
-                              <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <HelpCircle className="h-3 w-3 text-muted-foreground/70 hover:text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="text-xs">Total number of conversations in the selected period</p>
                             </TooltipContent>
                           </UITooltip>
                         </div>
-                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-gray-900 group-hover:text-green-700 transition-colors">
+                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-foreground group-hover:text-green-700 dark:group-hover:text-green-400 transition-colors">
                           {analyticsData?.overview?.conversationsCount?.toLocaleString() || 0}
                         </p>
                       </div>
-                      <div className="p-3 bg-green-100 text-green-700 rounded-xl flex-shrink-0 group-hover:bg-green-200 group-hover:scale-110 transition-all duration-300">
+                      <div className="p-3 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-xl flex-shrink-0 group-hover:bg-green-200 dark:group-hover:bg-green-900/30 group-hover:scale-110 transition-all duration-300">
                         <MessageSquare className="h-5 w-5" />
                       </div>
                     </div>
                     <div className="flex items-center mt-4 text-sm">
-                      <Badge variant={(analyticsData?.overview?.conversationsGrowth || 0) >= 0 ? "default" : "destructive"} className="flex items-center gap-1 px-2 py-1">
+                      <Badge variant={(analyticsData?.overview?.conversationsGrowth || 0) >= 0 ? "default" : "destructive"} className={`flex items-center gap-1 px-2 py-1 ${(analyticsData?.overview?.conversationsGrowth || 0) >= 0 ? '!bg-green-100 dark:!bg-green-900/20 !text-green-800 dark:!text-green-400' : ''}`}>
                         {(analyticsData?.overview?.conversationsGrowth || 0) >= 0 ? (
                           <ArrowUpRight className="h-3 w-3" />
                         ) : (
@@ -592,40 +617,40 @@ export default function Analytics() {
                         )}
                         {Math.abs(analyticsData?.overview?.conversationsGrowth || 0).toFixed(1)}%
                       </Badge>
-                      <span className="text-gray-500 ml-2 text-xs">
+                      <span className="text-muted-foreground ml-2 text-xs">
                         {t('analytics.vs_last_period', 'vs last period')}
                       </span>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="group hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-white to-blue-50/30">
+                <Card className="group hover:shadow-lg hover:shadow-blue-100/50 dark:hover:shadow-blue-900/20 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-card via-card to-primary/5">
                   <CardContent className="pt-6">
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <p className="text-sm font-medium text-gray-600 truncate">
+                          <p className="text-sm font-medium text-muted-foreground truncate">
                             {t('analytics.cards.total_contacts', 'Total Contacts')}
                           </p>
                           <UITooltip>
                             <TooltipTrigger asChild>
-                              <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <HelpCircle className="h-3 w-3 text-muted-foreground/70 hover:text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="text-xs">Total number of contacts created in the selected period</p>
                             </TooltipContent>
                           </UITooltip>
                         </div>
-                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-gray-900 group-hover:text-blue-700 transition-colors">
+                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-foreground group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
                           {analyticsData?.overview?.contactsCount?.toLocaleString() || 0}
                         </p>
                       </div>
-                      <div className="p-3 bg-blue-100 text-blue-700 rounded-xl flex-shrink-0 group-hover:bg-blue-200 group-hover:scale-110 transition-all duration-300">
+                      <div className="p-3 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl flex-shrink-0 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/30 group-hover:scale-110 transition-all duration-300">
                         <Users className="h-5 w-5" />
                       </div>
                     </div>
                     <div className="flex items-center mt-4 text-sm">
-                      <Badge variant={(analyticsData?.overview?.contactsGrowth || 0) >= 0 ? "default" : "destructive"} className="flex items-center gap-1 px-2 py-1">
+                      <Badge variant={(analyticsData?.overview?.contactsGrowth || 0) >= 0 ? "default" : "destructive"} className={`flex items-center gap-1 px-2 py-1 ${(analyticsData?.overview?.contactsGrowth || 0) >= 0 ? '!bg-green-100 dark:!bg-green-900/20 !text-green-800 dark:!text-green-400' : ''}`}>
                         {(analyticsData?.overview?.contactsGrowth || 0) >= 0 ? (
                           <ArrowUpRight className="h-3 w-3" />
                         ) : (
@@ -633,40 +658,40 @@ export default function Analytics() {
                         )}
                         {Math.abs(analyticsData?.overview?.contactsGrowth || 0).toFixed(1)}%
                       </Badge>
-                      <span className="text-gray-500 ml-2 text-xs">
+                      <span className="text-muted-foreground ml-2 text-xs">
                         {t('analytics.vs_last_period', 'vs last period')}
                       </span>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="group hover:shadow-lg hover:shadow-purple-100/50 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-white to-purple-50/30">
+                <Card className="group hover:shadow-lg hover:shadow-purple-100/50 dark:hover:shadow-purple-900/20 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-card via-card to-primary/5">
                   <CardContent className="pt-6">
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <p className="text-sm font-medium text-gray-600 truncate">
+                          <p className="text-sm font-medium text-muted-foreground truncate">
                             {t('analytics.cards.total_messages', 'Total Messages')}
                           </p>
                           <UITooltip>
                             <TooltipTrigger asChild>
-                              <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <HelpCircle className="h-3 w-3 text-muted-foreground/70 hover:text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="text-xs">Total number of messages sent and received in the selected period</p>
                             </TooltipContent>
                           </UITooltip>
                         </div>
-                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-gray-900 group-hover:text-purple-700 transition-colors">
+                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-foreground group-hover:text-purple-700 dark:group-hover:text-purple-400 transition-colors">
                           {analyticsData?.overview?.messagesCount?.toLocaleString() || 0}
                         </p>
                       </div>
-                      <div className="p-3 bg-purple-100 text-purple-700 rounded-xl flex-shrink-0 group-hover:bg-purple-200 group-hover:scale-110 transition-all duration-300">
+                      <div className="p-3 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 rounded-xl flex-shrink-0 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/30 group-hover:scale-110 transition-all duration-300">
                         <Zap className="h-5 w-5" />
                       </div>
                     </div>
                     <div className="flex items-center mt-4 text-sm">
-                      <Badge variant={(analyticsData?.overview?.messagesGrowth || 0) >= 0 ? "default" : "destructive"} className="flex items-center gap-1 px-2 py-1">
+                      <Badge variant={(analyticsData?.overview?.messagesGrowth || 0) >= 0 ? "default" : "destructive"} className={`flex items-center gap-1 px-2 py-1 ${(analyticsData?.overview?.messagesGrowth || 0) >= 0 ? '!bg-green-100 dark:!bg-green-900/20 !text-green-800 dark:!text-green-400' : ''}`}>
                         {(analyticsData?.overview?.messagesGrowth || 0) >= 0 ? (
                           <ArrowUpRight className="h-3 w-3" />
                         ) : (
@@ -674,40 +699,40 @@ export default function Analytics() {
                         )}
                         {Math.abs(analyticsData?.overview?.messagesGrowth || 0).toFixed(1)}%
                       </Badge>
-                      <span className="text-gray-500 ml-2 text-xs">
+                      <span className="text-muted-foreground ml-2 text-xs">
                         {t('analytics.vs_last_period', 'vs last period')}
                       </span>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="group hover:shadow-lg hover:shadow-emerald-100/50 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-white to-emerald-50/30">
+                <Card className="group hover:shadow-lg hover:shadow-emerald-100/50 dark:hover:shadow-emerald-900/20 transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-card via-card to-primary/5">
                   <CardContent className="pt-6">
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <p className="text-sm font-medium text-gray-600 truncate">
+                          <p className="text-sm font-medium text-muted-foreground truncate">
                             {t('analytics.cards.response_rate', 'Response Rate')}
                           </p>
                           <UITooltip>
                             <TooltipTrigger asChild>
-                              <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <HelpCircle className="h-3 w-3 text-muted-foreground/70 hover:text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="text-xs">Percentage of messages that received a response in the selected period</p>
                             </TooltipContent>
                           </UITooltip>
                         </div>
-                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-gray-900 group-hover:text-emerald-700 transition-colors">
+                        <p className="text-2xl sm:text-3xl font-bold mt-1 text-foreground group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
                           {(analyticsData?.overview?.responseRate || 0).toFixed(1)}%
                         </p>
                       </div>
-                      <div className="p-3 bg-emerald-100 text-emerald-700 rounded-xl flex-shrink-0 group-hover:bg-emerald-200 group-hover:scale-110 transition-all duration-300">
+                      <div className="p-3 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-xl flex-shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/30 group-hover:scale-110 transition-all duration-300">
                         <Target className="h-5 w-5" />
                       </div>
                     </div>
                     <div className="flex items-center mt-4 text-sm">
-                      <Badge variant={(analyticsData?.overview?.responseRateGrowth || 0) >= 0 ? "default" : "destructive"} className="flex items-center gap-1 px-2 py-1">
+                      <Badge variant={(analyticsData?.overview?.responseRateGrowth || 0) >= 0 ? "default" : "destructive"} className={`flex items-center gap-1 px-2 py-1 ${(analyticsData?.overview?.responseRateGrowth || 0) >= 0 ? '!bg-green-100 dark:!bg-green-900/20 !text-green-800 dark:!text-green-400' : ''}`}>
                         {(analyticsData?.overview?.responseRateGrowth || 0) >= 0 ? (
                           <ArrowUpRight className="h-3 w-3" />
                         ) : (
@@ -715,7 +740,7 @@ export default function Analytics() {
                         )}
                         {Math.abs(analyticsData?.overview?.responseRateGrowth || 0).toFixed(1)}%
                       </Badge>
-                      <span className="text-gray-500 ml-2 text-xs">
+                      <span className="text-muted-foreground ml-2 text-xs">
                         {t('analytics.vs_last_period', 'vs last period')}
                       </span>
                     </div>
@@ -724,17 +749,17 @@ export default function Analytics() {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 mb-6">
-                <Card className="group hover:shadow-xl hover:shadow-blue-100/20 transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/20">
-                  <CardHeader className="pb-3 border-b border-gray-100">
+                <Card className="group hover:shadow-xl hover:shadow-blue-100/20 dark:hover:shadow-blue-900/10 transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-card via-card to-primary/5">
+                  <CardHeader className="pb-3 border-b border-border">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800 group-hover:text-blue-700 transition-colors">
+                      <CardTitle className="text-lg sm:text-xl font-semibold text-foreground group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
                         {t('analytics.charts.conversations_by_channel', 'Conversations by Channel')}
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <UITooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                              <HelpCircle className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -748,27 +773,28 @@ export default function Analytics() {
                     <div className="w-full overflow-x-auto">
                       <ResponsiveContainer width="100%" height={320} minWidth={300}>
                         <LineChart data={formattedConversationData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" opacity={0.8} />
+                          <CartesianGrid strokeDasharray="2 2" stroke={chartColors.border} opacity={0.8} />
                           <XAxis
                             dataKey="name"
-                            tick={{ fontSize: 11, fill: '#64748b' }}
-                            tickLine={{ stroke: '#e2e8f0' }}
-                            axisLine={{ stroke: '#e2e8f0' }}
+                            tick={{ fontSize: 11, fill: chartColors.mutedForeground }}
+                            tickLine={{ stroke: chartColors.border }}
+                            axisLine={{ stroke: chartColors.border }}
                           />
                           <YAxis
-                            tick={{ fontSize: 11, fill: '#64748b' }}
-                            tickLine={{ stroke: '#e2e8f0' }}
-                            axisLine={{ stroke: '#e2e8f0' }}
+                            tick={{ fontSize: 11, fill: chartColors.mutedForeground }}
+                            tickLine={{ stroke: chartColors.border }}
+                            axisLine={{ stroke: chartColors.border }}
                           />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                              border: '1px solid #e2e8f0',
+                              backgroundColor: chartColors.background,
+                              border: `1px solid ${chartColors.border}`,
                               borderRadius: '12px',
                               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                              fontSize: '12px'
+                              fontSize: '12px',
+                              color: chartColors.foreground
                             }}
-                            cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                            cursor={{ stroke: chartColors.border, strokeWidth: 1 }}
                           />
                           <Legend
                             content={<CustomLegend />}
@@ -820,17 +846,17 @@ export default function Analytics() {
                   </CardContent>
                 </Card>
 
-                <Card className="group hover:shadow-xl hover:shadow-purple-100/20 transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-white to-purple-50/20">
-                  <CardHeader className="pb-3 border-b border-gray-100">
+                <Card className="group hover:shadow-xl hover:shadow-purple-100/20 dark:hover:shadow-purple-900/10 transition-all duration-300 border-0 shadow-lg bg-gradient-to-br from-card via-card to-primary/5">
+                  <CardHeader className="pb-3 border-b border-border">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800 group-hover:text-purple-700 transition-colors">
+                      <CardTitle className="text-lg sm:text-xl font-semibold text-foreground group-hover:text-purple-700 dark:group-hover:text-purple-400 transition-colors">
                         {t('analytics.charts.channel_distribution', 'Channel Distribution')}
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <UITooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                              <HelpCircle className="h-4 w-4 text-muted-foreground/70 hover:text-muted-foreground" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -846,11 +872,12 @@ export default function Analytics() {
                         <PieChart>
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                              border: '1px solid #e2e8f0',
+                              backgroundColor: chartColors.background,
+                              border: `1px solid ${chartColors.border}`,
                               borderRadius: '12px',
                               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                              fontSize: '12px'
+                              fontSize: '12px',
+                              color: chartColors.foreground
                             }}
                           />
                           <Legend

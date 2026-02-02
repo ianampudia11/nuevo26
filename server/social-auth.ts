@@ -227,7 +227,7 @@ export function setupSocialAuth(app: Express) {
 
 
       
-      const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?` +
+      const authUrl = `https://www.facebook.com/v24.0/dialog/oauth?` +
         `client_id=${config.app_id}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `scope=email,public_profile&` +
@@ -267,7 +267,7 @@ export function setupSocialAuth(app: Express) {
       
 
       const tokenResponse = await fetch(
-        `https://graph.facebook.com/v22.0/oauth/access_token?` +
+        `https://graph.facebook.com/v24.0/oauth/access_token?` +
         `client_id=${config.app_id}&` +
         `client_secret=${config.app_secret}&` +
         `code=${code}&` +

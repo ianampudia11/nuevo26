@@ -578,7 +578,7 @@ export function ConversationProvider({ children }: ConversationProviderProps) {
       return true;
     }
 
-    const whatsappTypes = ['whatsapp', 'whatsapp_unofficial', 'whatsapp_official', 'whatsapp_twilio', 'whatsapp_360dialog'];
+    const whatsappTypes = ['whatsapp', 'whatsapp_unofficial', 'whatsapp_official'];
     const isContactWhatsApp = whatsappTypes.includes(contactChannelType);
     const isConversationWhatsApp = whatsappTypes.includes(conversationChannelType);
 
@@ -867,6 +867,11 @@ export function ConversationProvider({ children }: ConversationProviderProps) {
 
       const isGroup = isGroupConversation(conversationId);
 
+
+      if (page === 1 && !append) {
+        await messageCache.invalidateConversationCache(conversationId);
+      }
+
       const result = await messageCache.loadMessages(conversationId, page, 25, isGroup);
 
 
@@ -947,6 +952,7 @@ export function ConversationProvider({ children }: ConversationProviderProps) {
         } catch (error) {
         }
       };
+
 
       fetchMessages(activeConversationId);
       markConversationAsRead();
@@ -1408,8 +1414,8 @@ export function ConversationProvider({ children }: ConversationProviderProps) {
   }, [onMessage, queryClient]);
 
   useEffect(() => {
-    const unsubscribe = onMessage('whatsappHistorySyncProgress', (data) => {
-      const { connectionId, progress, total, status } = data.data;
+    const unsubscribe = onMessage('historySyncProgress', (data) => {
+      const { connectionId, phase, progress, processedMessages, totalMessages, processedChats, processedContacts } = data.data;
 
       queryClient.setQueryData(['channel-connections'], (oldData: any) => {
         if (!oldData) return oldData;
@@ -1418,17 +1424,22 @@ export function ConversationProvider({ children }: ConversationProviderProps) {
           conn.id === connectionId
             ? {
                 ...conn,
-                historySyncStatus: status,
+                historySyncStatus: 'processing',
                 historySyncProgress: progress,
-                historySyncTotal: total
+                historySyncPhase: phase
               }
             : conn
         );
       });
 
-      if (progress > 0 && progress % 50 === 0) {
+
+      if (processedMessages > 0 && processedMessages % 50 === 0) {
         toast({
           title: t('settings.history_sync_progress', 'History Sync Progress'),
+          description: t('settings.history_sync_in_progress', 
+            `Syncing Phase ${phase}/3: ${progress}% complete`,
+            { phase, progress }
+          ),
         });
       }
     });

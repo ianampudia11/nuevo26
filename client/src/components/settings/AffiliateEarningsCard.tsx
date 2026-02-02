@@ -49,7 +49,7 @@ interface AffiliateTransaction {
 }
 
 export function AffiliateEarningsCard() {
-  const { t } = useTranslation();
+  const { t, currentLanguage } = useTranslation();
   const { toast } = useToast();
   const { formatCurrency } = useCurrency();
   const [showTransactions, setShowTransactions] = useState(false);
@@ -93,7 +93,8 @@ export function AffiliateEarningsCard() {
 
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const languageCode = currentLanguage?.code || 'en';
+    return new Date(dateString).toLocaleDateString(languageCode, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -105,15 +106,15 @@ export function AffiliateEarningsCard() {
   const getTransactionTypeLabel = (type: string) => {
     switch (type) {
       case 'earned':
-        return { label: 'Earned', color: 'bg-green-100 text-green-800' };
+        return { label: t('settings.affiliate_earnings.transaction_types.earned', 'Earned'), color: 'bg-primary/10 text-primary border border-primary/20' };
       case 'applied_to_plan':
-        return { label: 'Applied to Plan', color: 'bg-blue-100 text-blue-800' };
+        return { label: t('settings.affiliate_earnings.transaction_types.applied_to_plan', 'Applied to Plan'), color: 'bg-primary/10 text-primary border border-primary/20' };
       case 'payout':
-        return { label: 'Payout', color: 'bg-purple-100 text-purple-800' };
+        return { label: t('settings.affiliate_earnings.transaction_types.payout', 'Payout'), color: 'bg-accent/10 text-accent border border-accent/20' };
       case 'adjustment':
-        return { label: 'Adjustment', color: 'bg-yellow-100 text-yellow-800' };
+        return { label: t('settings.affiliate_earnings.transaction_types.adjustment', 'Adjustment'), color: 'bg-secondary/10 text-secondary border border-secondary/20' };
       default:
-        return { label: type, color: 'bg-gray-100 text-gray-800' };
+        return { label: type, color: 'bg-muted text-muted-foreground border border-border' };
     }
   };
 
@@ -127,7 +128,7 @@ export function AffiliateEarningsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
+            <DollarSign className="h-5 w-5 text-foreground" />
             {t('settings.affiliate_earnings.title', 'Affiliate Earnings')}
           </CardTitle>
         </CardHeader>
@@ -150,7 +151,7 @@ export function AffiliateEarningsCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5" />
+          <DollarSign className="h-5 w-5 text-foreground" />
           {t('settings.affiliate_earnings.title', 'Affiliate Earnings')}
         </CardTitle>
         <CardDescription>
@@ -177,7 +178,7 @@ export function AffiliateEarningsCard() {
               <TrendingUp className="h-4 w-4" />
               {t('settings.affiliate_earnings.total_earned', 'Total Earned')}
             </div>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-primary">
               {formatCurrency(earningsData.totalEarned)}
             </div>
           </div>
@@ -187,19 +188,19 @@ export function AffiliateEarningsCard() {
               <DollarSign className="h-4 w-4" />
               {t('settings.affiliate_earnings.available_balance', 'Available Balance')}
             </div>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-primary">
               {formatCurrency(earningsData.availableBalance)}
             </div>
           </div>
         </div>
 
         {/* Additional Stats */}
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
           <div className="text-center">
             <div className="text-sm text-muted-foreground">
               {t('settings.affiliate_earnings.applied_to_plans', 'Applied to Plans')}
             </div>
-            <div className="font-semibold text-blue-600">
+            <div className="font-semibold text-primary">
               {formatCurrency(earningsData.appliedToPlans)}
             </div>
           </div>
@@ -208,7 +209,7 @@ export function AffiliateEarningsCard() {
             <div className="text-sm text-muted-foreground">
               {t('settings.affiliate_earnings.pending_payout', 'Pending Payout')}
             </div>
-            <div className="font-semibold text-yellow-600">
+            <div className="font-semibold text-secondary">
               {formatCurrency(earningsData.pendingPayout)}
             </div>
           </div>
@@ -217,7 +218,7 @@ export function AffiliateEarningsCard() {
             <div className="text-sm text-muted-foreground">
               {t('settings.affiliate_earnings.paid_out', 'Paid Out')}
             </div>
-            <div className="font-semibold text-green-600">
+            <div className="font-semibold text-primary">
               {formatCurrency(earningsData.paidOut)}
             </div>
           </div>
@@ -285,7 +286,7 @@ export function AffiliateEarningsCard() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-sm text-muted-foreground">Balance After</div>
+                              <div className="text-sm text-muted-foreground">{t('settings.affiliate_earnings.balance_after', 'Balance After')}</div>
                               <div className="font-medium">
                                 {formatCurrency(transaction.balanceAfter)}
                               </div>
@@ -308,10 +309,10 @@ export function AffiliateEarningsCard() {
 
         {/* Info Note */}
         {earningsData.availableBalance > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div className="text-sm text-blue-800">
+              <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
+              <div className="text-sm text-primary">
                 {t('settings.affiliate_earnings.credit_info', 'You can apply your available balance as credits toward plan purchases during checkout.')}
               </div>
             </div>

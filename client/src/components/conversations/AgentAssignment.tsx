@@ -133,7 +133,7 @@ export default function AgentAssignment({
           <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200 cursor-pointer transition-colors"
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:bg-accent cursor-pointer transition-colors"
             >
               <Avatar className="w-4 h-4 mr-1">
                 <AvatarImage src={assignedAgent.avatarUrl} />
@@ -207,7 +207,7 @@ export default function AgentAssignment({
           <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-border bg-background text-foreground hover:bg-accent cursor-pointer transition-colors"
             >
               <UserPlus className="w-3 h-3 mr-1" />
               {t('agents.unassigned', 'Unassigned')}

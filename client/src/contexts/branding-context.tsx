@@ -2,13 +2,29 @@ import { createContext, ReactNode, useContext, useEffect, useState, useCallback,
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import useSocket from "@/hooks/useSocket";
 import { useAuth } from "@/hooks/use-auth";
+import type { GradientConfig, SimpleGradientConfig, AdvancedGradientConfig } from '@shared/schema';
 
 export type BrandingSettings = {
   appName: string;
   primaryColor: string;
   secondaryColor: string;
+  defaultTheme?: 'dark' | 'light';
   logoUrl?: string;
   faviconUrl?: string;
+  adminAuthBackgroundUrl?: string;
+  userAuthBackgroundUrl?: string;
+  authBackgroundConfig?: {
+    adminAuthBackground?: {
+      backgroundColor?: string;
+      gradientConfig?: GradientConfig;
+      priority: 'image' | 'color' | 'layer';
+    };
+    userAuthBackground?: {
+      backgroundColor?: string;
+      gradientConfig?: GradientConfig;
+      priority: 'image' | 'color' | 'layer';
+    };
+  };
 };
 
 const DEFAULT_BRANDING: BrandingSettings = {
@@ -69,11 +85,6 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       const hoverColor = `rgb(${Math.max(0, primaryRgb.r - 20)}, ${Math.max(0, primaryRgb.g - 20)}, ${Math.max(0, primaryRgb.b - 20)})`;
       document.documentElement.style.setProperty('--brand-primary-hover', hoverColor);
 
-      document.documentElement.style.setProperty(
-        '--primary',
-        `${primaryRgb.r} ${primaryRgb.g} ${primaryRgb.b}`
-      );
-
       const brandElements = document.querySelectorAll('.btn-brand-primary, .bg-brand-primary, .text-brand-primary, .border-brand-primary');
       brandElements.forEach(element => {
         (element as HTMLElement).style.setProperty('--brand-primary-color', settings.primaryColor, 'important');
@@ -85,11 +96,6 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
 
       const hoverColor = `rgb(${Math.max(0, secondaryRgb.r - 20)}, ${Math.max(0, secondaryRgb.g - 20)}, ${Math.max(0, secondaryRgb.b - 20)})`;
       document.documentElement.style.setProperty('--brand-secondary-hover', hoverColor);
-
-      document.documentElement.style.setProperty(
-        '--secondary',
-        `${secondaryRgb.r} ${secondaryRgb.g} ${secondaryRgb.b}`
-      );
 
       const brandElements = document.querySelectorAll('.btn-brand-secondary, .bg-brand-secondary, .text-brand-secondary, .border-brand-secondary');
       brandElements.forEach(element => {
@@ -133,6 +139,9 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       const brandingSetting = settings.find((s: any) => s.key === 'branding');
       const logoSetting = settings.find((s: any) => s.key === 'branding_logo');
       const faviconSetting = settings.find((s: any) => s.key === 'branding_favicon');
+      const adminAuthBackgroundSetting = settings.find((s: any) => s.key === 'branding_admin_auth_background');
+      const userAuthBackgroundSetting = settings.find((s: any) => s.key === 'branding_user_auth_background');
+      const authBackgroundConfigSetting = settings.find((s: any) => s.key === 'auth_background_config');
 
       
       
@@ -150,11 +159,23 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      let authBackgroundConfigValue = authBackgroundConfigSetting?.value;
+      if (typeof authBackgroundConfigValue === 'string') {
+        try {
+          authBackgroundConfigValue = JSON.parse(authBackgroundConfigValue);
+        } catch (e) {
+          authBackgroundConfigValue = undefined;
+        }
+      }
+
       const newBranding: BrandingSettings = {
         ...DEFAULT_BRANDING,
         ...(brandingValue || {}),
         logoUrl: logoSetting?.value,
         faviconUrl: faviconSetting?.value,
+        adminAuthBackgroundUrl: adminAuthBackgroundSetting?.value,
+        userAuthBackgroundUrl: userAuthBackgroundSetting?.value,
+        authBackgroundConfig: authBackgroundConfigValue,
       };
 
       
@@ -197,6 +218,13 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
           return updated;
         });
 
+
+        if (data.value.defaultTheme !== undefined) {
+          window.dispatchEvent(new CustomEvent('defaultThemeUpdated', { 
+            detail: data.value.defaultTheme 
+          }));
+        }
+
         if (data.value.appName) {
           document.title = `${data.value.appName} - Multi-Channel Team Inbox & AI Chatbot Platform`;
         }
@@ -222,6 +250,38 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
         });
 
         window.dispatchEvent(new CustomEvent('brandingUpdated', { detail: { faviconUrl: data.value } }));
+      } else if (data.key === 'branding_admin_auth_background') {
+        setBranding(prev => {
+          const updated = { ...prev, adminAuthBackgroundUrl: data.value };
+          return updated;
+        });
+        window.dispatchEvent(new CustomEvent('brandingUpdated', { 
+          detail: { adminAuthBackgroundUrl: data.value } 
+        }));
+      } else if (data.key === 'branding_user_auth_background') {
+        setBranding(prev => {
+          const updated = { ...prev, userAuthBackgroundUrl: data.value };
+          return updated;
+        });
+        window.dispatchEvent(new CustomEvent('brandingUpdated', { 
+          detail: { userAuthBackgroundUrl: data.value } 
+        }));
+      } else if (data.key === 'auth_background_config') {
+        let authBackgroundConfigValue = data.value;
+        if (typeof authBackgroundConfigValue === 'string') {
+          try {
+            authBackgroundConfigValue = JSON.parse(authBackgroundConfigValue);
+          } catch (e) {
+            authBackgroundConfigValue = undefined;
+          }
+        }
+        setBranding(prev => {
+          const updated = { ...prev, authBackgroundConfig: authBackgroundConfigValue };
+          return updated;
+        });
+        window.dispatchEvent(new CustomEvent('brandingUpdated', { 
+          detail: { authBackgroundConfig: authBackgroundConfigValue } 
+        }));
       }
     });
 

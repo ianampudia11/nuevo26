@@ -42,36 +42,30 @@ export interface ProcessedModel {
 
 
 
+/** OpenRouter model IDs that support tool/function calling (openrouter.ai/models?supported_parameters=tools) */
 const FUNCTION_CALLING_SUPPORTED_MODELS = new Set([
-
-
+  'openai/gpt-5.2',
+  'openai/gpt-5-mini',
+  'openai/gpt-5-nano',
+  'openai/gpt-5.2-pro',
   'openai/gpt-5',
-
-
   'openai/gpt-4o',
   'openai/gpt-4o-mini',
   'openai/gpt-4o-2024-11-20',
   'openai/gpt-4o-2024-08-06',
   'openai/gpt-4o-2024-05-13',
-
-
   'openai/gpt-4',
   'openai/gpt-4-turbo',
   'openai/gpt-4-turbo-preview',
   'openai/gpt-4-turbo-2024-04-09',
   'openai/gpt-4-1106-preview',
   'openai/gpt-4-vision-preview',
-
-
   'openai/gpt-3.5-turbo',
   'openai/gpt-3.5-turbo-0125',
   'openai/gpt-3.5-turbo-1106',
-
-
-  'openai/gpt-oss-120b',  // 117B MoE model with full tool use support
-  'openai/gpt-oss-20b',   // 21B model with agentic capabilities and function calling
-
-
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'anthropic/claude-sonnet-4.5',
   'anthropic/claude-3-5-sonnet',
   'anthropic/claude-3-opus',
   'anthropic/claude-3-sonnet',
@@ -79,58 +73,42 @@ const FUNCTION_CALLING_SUPPORTED_MODELS = new Set([
   'anthropic/claude-3-5-sonnet-20241022',
   'anthropic/claude-3-5-haiku',
   'anthropic/claude-3-5-sonnet-20240620',
-
-
-  'google/gemini-2.5-pro',           // Gemini 2.5 Pro - supports function calling
-  'google/gemini-2.5-flash',         // Gemini 2.5 Flash - supports function calling
-  'google/gemini-2.5-flash-lite',    // Gemini 2.5 Flash-Lite - supports function calling
-  'google/gemini-2.0-flash',         // Gemini 2.0 Flash - supports function calling
-  'google/gemini-2.0-flash-lite',    // Gemini 2.0 Flash-Lite - supports function calling
-  'google/gemini-2.0-flash-exp',     // Gemini 2.0 Flash Experimental - supports function calling
-  'google/gemini-2.0-flash-thinking-exp', // Gemini 2.0 Flash Thinking Experimental - supports function calling
-
+  'google/gemini-3-flash-preview',
+  'google/gemini-2.5-pro',
+  'google/gemini-2.5-flash',
+  'google/gemini-2.5-flash-lite',
+  'google/gemini-2.0-flash',
+  'google/gemini-2.0-flash-lite',
+  'google/gemini-2.0-flash-exp',
+  'google/gemini-2.0-flash-thinking-exp',
   'google/gemini-pro',
   'google/gemini-1.5-pro',
   'google/gemini-1.5-flash',
   'google/gemini-1.5-pro-latest',
   'google/gemini-1.5-flash-latest',
-
-
-  'thudm/glm-4-32b',              // Optimized for code generation and function calling
-  'thudm/glm-z1-32b',             // Enhanced reasoning with JSON tool calling
-  'thudm/glm-z1-rumination-32b',  // Deep reasoning with search/navigation function calls
-
-
-  '01-ai/yi-large-fc',  // Specialized model with function calling capability
-
-
+  'thudm/glm-4-32b',
+  'thudm/glm-z1-32b',
+  'thudm/glm-z1-rumination-32b',
+  '01-ai/yi-large-fc',
   'mistralai/mistral-large',
   'mistralai/mistral-medium',
   'mistralai/mistral-small',
   'mistralai/mixtral-8x7b-instruct',
   'mistralai/mistral-7b-instruct',
   'mistralai/pixtral-12b',
-  'mistralai/mistral-nemo',  // 12B multilingual model with function calling support
-
-
+  'mistralai/mistral-nemo',
   'cohere/command-r-plus',
   'cohere/command-r',
-
-
-  'cognitivecomputations/dolphin-llama-3-70b',     // Fine-tuned Llama 3 with improved function calling
-  'cognitivecomputations/dolphin3.0-mistral-24b',  // Supports coding, math, agentic, and function calling
-
-
-  'xai/grok-4',                    // Grok 4 - supports function calling
-  'xai/grok-4-0709',               // Grok 4 specific version - confirmed function calling support
-  'xai/grok-3',                    // Grok 3 - supports function calling
-  'xai/grok-3-latest',             // Grok 3 latest - supports function calling
-  'xai/grok-2',                    // Grok 2 - confirmed tool calling support
-  'xai/grok-2-latest',             // Grok 2 latest - supports function calling
-  'xai/grok-2-1212',               // Grok 2 specific version - supports function calling
-  'xai/grok-beta',                 // Grok Beta - experimental model with function calling
-
-
+  'cognitivecomputations/dolphin-llama-3-70b',
+  'cognitivecomputations/dolphin3.0-mistral-24b',
+  'xai/grok-4',
+  'xai/grok-4-0709',
+  'xai/grok-3',
+  'xai/grok-3-latest',
+  'xai/grok-2',
+  'xai/grok-2-latest',
+  'xai/grok-2-1212',
+  'xai/grok-beta',
   'qwen/qwen-2.5-72b-instruct',
   'qwen/qwen-2.5-coder-32b-instruct',
   'qwen/qwq-32b-preview',
@@ -142,18 +120,23 @@ const FUNCTION_CALLING_SUPPORTED_MODELS = new Set([
   'perplexity/llama-3.1-sonar-small-128k-online'
 ]);
 
-
+/** Used when OpenRouter /api/openrouter/models fails; tool-capable models */
 const FALLBACK_MODELS: ProcessedModel[] = [
-  { id: 'openai/gpt-5', name: 'GPT-5 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5.2', name: 'GPT-5.2 (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-4o', name: 'GPT-4o (via OpenRouter)', supportsTools: true },
+  { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo (via OpenRouter)', supportsTools: true },
   { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B (OpenAI)', supportsTools: true },
+  { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', supportsTools: true },
   { id: 'anthropic/claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', supportsTools: true },
   { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', supportsTools: true },
+  { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', supportsTools: true },
   { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', supportsTools: true },
+  { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro', supportsTools: true },
   { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash', supportsTools: true },
-  { id: 'thudm/glm-4-32b', name: 'GLM-4 32B (Function Calling Optimized)', supportsTools: true },
-  { id: '01-ai/yi-large-fc', name: 'Yi Large FC (Tool Use Specialized)', supportsTools: true },
+  { id: 'thudm/glm-4-32b', name: 'GLM-4 32B', supportsTools: true },
+  { id: '01-ai/yi-large-fc', name: 'Yi Large FC', supportsTools: true },
   { id: 'mistralai/mistral-nemo', name: 'Mistral Nemo 12B', supportsTools: true },
   { id: 'cognitivecomputations/dolphin-llama-3-70b', name: 'Dolphin Llama 3 70B', supportsTools: true },
   { id: 'cohere/command-r-plus', name: 'Command R+', supportsTools: true },
@@ -287,7 +270,22 @@ export async function fetchOpenRouterModels(): Promise<ProcessedModel[]> {
       return FALLBACK_MODELS;
     }
 
-    return textModels;
+    const idsFromApi = new Set(textModels.map(m => m.id));
+    const merged = [...textModels];
+    for (const fallback of FALLBACK_MODELS) {
+      if (!idsFromApi.has(fallback.id)) {
+        merged.push(fallback);
+        idsFromApi.add(fallback.id);
+      }
+    }
+    merged.sort((a, b) => {
+      const aProvider = a.id.split('/')[0];
+      const bProvider = b.id.split('/')[0];
+      if (aProvider !== bProvider) return aProvider.localeCompare(bProvider);
+      return a.name.localeCompare(b.name);
+    });
+
+    return merged;
   } catch (error) {
     console.error('Failed to fetch OpenRouter models:', error);
     return FALLBACK_MODELS;

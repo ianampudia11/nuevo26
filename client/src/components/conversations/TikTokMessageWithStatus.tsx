@@ -102,8 +102,8 @@ export function TikTokMessageWithStatus({
         className={cn(
           'max-w-[70%] rounded-2xl px-4 py-2 shadow-sm',
           isOutgoing
-            ? 'bg-blue-500 text-white rounded-br-sm'
-            : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+            ? 'bg-primary text-primary-foreground rounded-br-sm'
+            : 'bg-muted text-foreground rounded-bl-sm'
         )}
       >
         {/* Message content */}
@@ -283,7 +283,7 @@ export function TikTokMessageListItem({
       className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors"
     >
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-900 truncate">{message.content}</p>
+        <p className="text-sm text-foreground truncate">{message.content}</p>
         <p className="text-xs text-gray-500">
           {new Date(message.createdAt).toLocaleString()}
         </p>

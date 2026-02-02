@@ -124,27 +124,121 @@ export default function Templates() {
 
   const syncFromMetaMutation = useMutation({
     mutationFn: async (connectionId: number) => {
-      const res = await apiRequest('POST', '/api/whatsapp-templates/sync-from-meta', {
-        connectionId
+
+      const res = await fetch('/api/whatsapp-templates/sync-from-meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionId }),
+        credentials: 'include',
       });
+      
+      if (!res.ok) {
+
+        let errorData: any = {};
+        try {
+          errorData = await res.json();
+        } catch {
+          errorData = { error: res.statusText || 'Failed to sync templates' };
+        }
+        
+        const error = new Error(errorData.error || errorData.details || 'Failed to sync templates');
+        (error as any).response = { data: errorData, status: res.status };
+        (error as any).connectionId = connectionId;
+        throw error;
+      }
+      
       return await res.json();
     },
     onSuccess: (data) => {
+      let description = t('templates.sync_summary', 'Created: {{created}}, Updated: {{updated}}, Skipped: {{skipped}}', {
+        created: data.summary.created,
+        updated: data.summary.updated,
+        skipped: data.summary.skipped
+      });
+
+
+      if (data.fetchMethod === 'business') {
+        description += ' (Business-level templates)';
+      } else if (data.fetchMethod === 'waba') {
+        description += ' (WABA-level templates)';
+      }
+
       toast({
         title: t('templates.synced_from_meta', 'Templates Synced'),
-        description: t('templates.sync_summary', 'Created: {{created}}, Updated: {{updated}}, Skipped: {{skipped}}', {
-          created: data.summary.created,
-          updated: data.summary.updated,
-          skipped: data.summary.skipped
-        }),
+        description,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/whatsapp-templates'] });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+
+      let errorMessage = error.message || 'Failed to sync templates';
+      let errorDetails = '';
+      let actionableGuidance = '';
+      
+
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.details) {
+          errorMessage = errorData.details;
+        }
+        
+
+        if (errorData.errorCode || errorData.errorType) {
+          errorDetails = `Error Code: ${errorData.errorCode || 'N/A'}, Type: ${errorData.errorType || 'N/A'}`;
+        }
+        
+
+        if (errorData.partnerManaged && errorData.fetchMethod === 'business') {
+          actionableGuidance = 'Business-level template fetch failed. This may indicate the business ID is invalid or the access token lacks permissions to access business-level templates. The system fell back to WABA-level templates.';
+        } else if (errorData.partnerManaged && errorData.fetchMethod === 'waba') {
+          actionableGuidance = 'Fetching WABA-level templates. If you expected to see all business templates, verify that the business ID was captured during signup.';
+        } else if (errorData.partnerManaged) {
+          actionableGuidance = 'This is an embedded signup connection. Please verify that the partner configuration has a valid system-level access token with template management permissions.';
+        } else if (error.response.status === 401) {
+          actionableGuidance = 'Access token may be invalid or expired. Try reconnecting the WhatsApp account.';
+        } else if (error.response.status === 403) {
+          actionableGuidance = 'Access token may lack template permissions. Verify the connection has whatsapp_business_management permission scope.';
+        } else if (error.response.status === 404) {
+          actionableGuidance = 'WhatsApp Business Account not found. Please verify the connection configuration.';
+        }
+      }
+      
+
+      const connectionName = connections.find((c: any) => c.id === error.connectionId)?.accountName 
+        || connections.find((c: any) => c.id === error.connectionId)?.phoneNumber
+        || `Connection ${error.connectionId || 'unknown'}`;
+      
+
+      const debugMode = localStorage.getItem('debug-mode') === 'true' || 
+                       new URLSearchParams(window.location.search).get('debug') === 'true';
+      if (debugMode) {
+        console.error('Template sync error details:', {
+          error,
+          response: error.response?.data,
+          status: error.response?.status,
+          connectionId: error.connectionId,
+          connectionName
+        });
+      }
+      
+
+      let fullErrorMessage = errorMessage;
+      if (errorDetails) {
+        fullErrorMessage += ` (${errorDetails})`;
+      }
+      if (actionableGuidance) {
+        fullErrorMessage += ` ${actionableGuidance}`;
+      }
+      
       toast({
         title: t('common.error', 'Error'),
-        description: t('templates.sync_from_meta_error', 'Failed to sync templates: {{error}}', { error: error.message }),
+        description: fullErrorMessage,
         variant: 'destructive',
+        duration: 8000, // Show longer for detailed errors
       });
     },
   });
@@ -184,7 +278,7 @@ export default function Templates() {
       case 'rejected':
         return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />{t('templates.status.rejected', 'Rejected')}</Badge>;
       case 'disabled':
-        return <Badge className="bg-gray-100 text-gray-800"><AlertTriangle className="h-3 w-3 mr-1" />{t('templates.status.disabled', 'Disabled')}</Badge>;
+        return <Badge className="bg-muted text-muted-foreground"><AlertTriangle className="h-3 w-3 mr-1" />{t('templates.status.disabled', 'Disabled')}</Badge>;
       default:
         return <Badge variant="outline">{t('templates.status.draft', 'Draft')}</Badge>;
     }
@@ -204,7 +298,7 @@ export default function Templates() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden font-sans text-gray-800">
+    <div className="h-screen flex flex-col overflow-hidden font-sans text-foreground">
       <Header />
       
       <div className="flex flex-1 overflow-hidden">
@@ -273,7 +367,7 @@ export default function Templates() {
                   </CardDescription>
                 </div>
                 <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder={t('templates.search', 'Search templates...')}
                     value={searchQuery}
@@ -290,7 +384,7 @@ export default function Templates() {
                 </div>
               ) : filteredTemplates.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500">
+                  <p className="text-muted-foreground">
                     {searchQuery 
                       ? t('templates.no_results', 'No templates found matching your search')
                       : t('templates.empty', 'No templates yet. Create your first template to get started.')}
@@ -316,7 +410,7 @@ export default function Templates() {
                             <div>
                               <div className="font-medium">{template.name}</div>
                               {template.description && (
-                                <div className="text-sm text-gray-500 truncate max-w-xs">
+                                <div className="text-sm text-muted-foreground truncate max-w-xs">
                                   {template.description}
                                 </div>
                               )}
@@ -334,7 +428,7 @@ export default function Templates() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-gray-600">
+                            <span className="text-sm text-foreground">
                               {template.usageCount || 0}
                             </span>
                           </TableCell>

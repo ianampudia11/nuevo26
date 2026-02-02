@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { storage } from '../../storage';
+import { getCachedCompanySetting, getCachedInitialPipelineStage } from '../../utils/pipeline-cache';
 import { InsertConversation, InsertMessage, InsertContact } from '@shared/schema';
 import { broadcastToCompany, broadcastToWebChatSession } from '../../utils/websocket';
 import { smartWebSocketBroadcaster } from '../../utils/smart-websocket-broadcaster';
@@ -126,6 +127,48 @@ async function ensureContactAndConversation(connectionId: number, companyId: num
       historySyncBatchId: undefined as any
     };
     contact = await storage.getOrCreateContact(insertContact);
+
+
+    try {
+      const autoAddEnabled = await getCachedCompanySetting(companyId, 'autoAddContactToPipeline');
+      if (autoAddEnabled) {
+
+        const initialStage = await getCachedInitialPipelineStage(companyId);
+        if (initialStage) {
+
+          const existingDeal = await storage.getActiveDealByContact(contact.id, companyId, initialStage.pipelineId);
+          if (!existingDeal) {
+            const connection = await storage.getChannelConnection(connectionId);
+            const deal = await storage.createDeal({
+              companyId: companyId,
+              contactId: contact.id,
+              title: `New Lead - ${contact.name}`,
+              pipelineId: initialStage.pipelineId,
+              stageId: initialStage.id,
+              stage: 'lead'
+            });
+            await storage.createDealActivity({
+              dealId: deal.id,
+              userId: connection?.userId || 1,
+              type: 'create',
+              content: 'Deal automatically created when contact was added'
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error auto-adding contact to pipeline:', error);
+
+    }
+  } else {
+
+    if (contact.identifierType === 'webchat' && (!contact.identifier || contact.identifier.trim() === '')) {
+      logger.warn('webchat', `Found webchat contact ${contact.id} with missing identifier, updating with sessionId: ${sessionId}`);
+      contact = await storage.updateContact(contact.id, {
+        identifier: sessionId,
+        identifierType: 'webchat'
+      });
+    }
   }
 
 
@@ -163,6 +206,35 @@ async function ensureContactAndConversation(connectionId: number, companyId: num
     broadcastToCompany({ type: 'newConversation', data: { ...conversation, contact } }, companyId);
   }
   return { contact, conversation };
+}
+
+async function processMessageThroughFlowExecutor(
+  message: any,
+  conversation: any,
+  contact: any,
+  channelConnection: any
+): Promise<void> {
+  try {
+    if (!contact || !contact.identifier) {
+      logger.debug('webchat', `Skipping flow executor: missing contact or identifier`);
+      return;
+    }
+
+    logger.debug('webchat', `Processing message through flow executor:`, {
+      contactIdentifier: contact.identifier,
+      messageId: message.id,
+      conversationId: conversation?.id
+    });
+
+    const flowExecutorModule = await import('../flow-executor');
+    const flowExecutor = flowExecutorModule.default;
+
+    if (contact) {
+      await flowExecutor.processIncomingMessage(message, conversation, contact, channelConnection);
+    }
+  } catch (error) {
+    logger.error('webchat', `Error in processMessageThroughFlowExecutor:`, error);
+  }
 }
 
 async function processWebhook(payload: any, companyId?: number): Promise<any> {
@@ -231,6 +303,12 @@ async function processWebhook(payload: any, companyId?: number): Promise<any> {
 
 
       broadcastToCompany({ type: 'newMessage', data: saved }, connection.companyId);
+
+
+      if (!conversation.botDisabled) {
+        await processMessageThroughFlowExecutor(saved, conversation, contact, connection);
+      }
+
       return saved;
     }
     case 'typing':

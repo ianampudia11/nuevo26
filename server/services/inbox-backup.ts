@@ -1,5 +1,6 @@
 import { db } from '../db';
 import { storage } from '../storage';
+import { getCachedCompanySetting, getCachedInitialPipelineStage } from '../utils/pipeline-cache';
 import { 
   inboxBackups, 
   backupSchedules, 
@@ -557,6 +558,38 @@ class InboxBackupService {
           });
           contactId = newContact.id;
           restored++;
+
+
+          try {
+            const autoAddEnabled = await getCachedCompanySetting(options.companyId, 'autoAddContactToPipeline');
+            if (autoAddEnabled) {
+
+              const initialStage = await getCachedInitialPipelineStage(options.companyId);
+              if (initialStage) {
+
+                const existingDeal = await storage.getActiveDealByContact(newContact.id, options.companyId, initialStage.pipelineId);
+                if (!existingDeal) {
+                  const deal = await storage.createDeal({
+                    companyId: options.companyId,
+                    contactId: newContact.id,
+                    title: `New Lead - ${newContact.name}`,
+                    pipelineId: initialStage.pipelineId,
+                    stageId: initialStage.id,
+                    stage: 'lead'
+                  });
+                  await storage.createDealActivity({
+                    dealId: deal.id,
+                    userId: options.restoredByUserId,
+                    type: 'create',
+                    content: 'Deal automatically created when contact was added'
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error auto-adding contact to pipeline:', error);
+
+          }
         }
 
 

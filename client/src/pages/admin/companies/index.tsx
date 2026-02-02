@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlans } from "@/hooks/use-plans";
 import useSocket from "@/hooks/useSocket";
+import { useTranslation } from "@/hooks/use-translation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, Search, Info, LogIn, Trash2, RefreshCw, Database, CheckSquare, Square } from "lucide-react";
@@ -66,6 +67,7 @@ export default function CompaniesPage() {
   const { plans, isLoading: isLoadingPlans } = usePlans();
   const { formatCurrency } = useCurrency();
   const { onMessage } = useSocket('/ws');
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [companyToImpersonate, setCompanyToImpersonate] = useState<Company | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
@@ -230,18 +232,21 @@ export default function CompaniesPage() {
         
 
         if (result.successCount > 0) {
-          alert(`Successfully deleted ${result.successCount} companies${result.failureCount > 0 ? `, ${result.failureCount} failed` : ''}`);
+          alert(t('admin.companies.bulk_delete_success', 'Successfully deleted {{successCount}} companies{{failures}}', { 
+            successCount: result.successCount, 
+            failures: result.failureCount > 0 ? `, ${result.failureCount} failed` : '' 
+          }));
         } else {
-          alert('No companies were deleted. Please check the server logs for details.');
+          alert(t('admin.companies.bulk_delete_no_deleted', 'No companies were deleted. Please check the server logs for details.'));
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to delete companies');
+        throw new Error(errorData.error || t('admin.companies.bulk_delete_error', 'Failed to delete companies'));
       }
     } catch (error) {
       console.error('Error deleting companies:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      alert(`Failed to delete companies: ${errorMessage}`);
+      const errorMessage = error instanceof Error ? error.message : t('common.unknown_error', 'Unknown error occurred');
+      alert(t('admin.companies.bulk_delete_failed', 'Failed to delete companies: {{error}}', { error: errorMessage }));
     }
   };
 
@@ -271,16 +276,16 @@ export default function CompaniesPage() {
     <AdminLayout>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl">Companies</h1>
+          <h1 className="text-2xl">{t('admin.companies.title', 'Companies')}</h1>
           <div className="flex gap-2">
             {selectedCompanies.size > 0 && (
               <Button
                 onClick={handleBulkDelete}
                 variant="destructive"
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete Selected ({selectedCompanies.size})
+                {t('admin.companies.delete_selected', 'Delete Selected ({{count}})', { count: selectedCompanies.size })}
               </Button>
             )}
             <Button
@@ -289,7 +294,7 @@ export default function CompaniesPage() {
               disabled={isLoadingCompanies}
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingCompanies ? 'animate-spin' : ''}`} />
-              Refresh
+              {t('admin.companies.refresh', 'Refresh')}
             </Button>
             <Button
               onClick={() => window.location.href = "/admin/companies/new"}
@@ -297,16 +302,16 @@ export default function CompaniesPage() {
               className="btn-brand-primary"
             >
               <Plus className="mr-2 h-4 w-4" />
-              New Company
+              {t('admin.companies.new_company', 'New Company')}
             </Button>
           </div>
         </div>
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Manage Companies</CardTitle>
+            <CardTitle>{t('admin.companies.manage_title', 'Manage Companies')}</CardTitle>
             <CardDescription>
-              View and manage all companies in the system
+              {t('admin.companies.manage_description', 'View and manage all companies in the system')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -314,7 +319,7 @@ export default function CompaniesPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search companies..."
+                  placeholder={t('admin.companies.search_placeholder', 'Search companies...')}
                   className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -328,7 +333,7 @@ export default function CompaniesPage() {
               </div>
             ) : filteredCompanies?.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? "No companies match your search" : "No companies found. Create your first company to get started."}
+                {searchTerm ? t('admin.companies.no_search_results', 'No companies match your search') : t('admin.companies.no_companies_found', 'No companies found. Create your first company to get started.')}
               </div>
             ) : (
               <div className="rounded-md border">
@@ -342,12 +347,12 @@ export default function CompaniesPage() {
                           className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                       </TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Slug</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Users</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('admin.companies.table.company', 'Company')}</TableHead>
+                      <TableHead>{t('admin.companies.table.slug', 'Slug')}</TableHead>
+                      <TableHead>{t('admin.companies.table.plan', 'Plan')}</TableHead>
+                      <TableHead>{t('admin.companies.table.users', 'Users')}</TableHead>
+                      <TableHead>{t('admin.companies.table.status', 'Status')}</TableHead>
+                      <TableHead>{t('admin.companies.table.actions', 'Actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -393,17 +398,17 @@ export default function CompaniesPage() {
                                   {isLoadingPlans ? (
                                     <div className="flex items-center">
                                       <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                                      Loading plan details...
+                                      {t('admin.companies.loading_plan_details', 'Loading plan details...')}
                                     </div>
                                   ) : (
                                     <div className="space-y-1 text-xs">
                                       <p className="font-semibold">{getPlanDetails(company)?.name || company.plan}</p>
-                                      <p>{getPlanDetails(company)?.description || "No description available"}</p>
+                                      <p>{getPlanDetails(company)?.description || t('admin.companies.no_description', 'No description available')}</p>
                                       <div className="mt-1 pt-1 border-t border-border">
-                                        <p><span className="font-medium">Price:</span> {formatCurrency(getPlanDetails(company)?.price || 0)}{getPlanBillingPeriod(getPlanDetails(company) || {})}</p>
-                                        <p><span className="font-medium">Max Users:</span> {getPlanDetails(company)?.maxUsers || company.maxUsers}</p>
-                                        <p><span className="font-medium">Max Contacts:</span> {getPlanDetails(company)?.maxContacts?.toLocaleString() || "N/A"}</p>
-                                        <p><span className="font-medium">Max Channels:</span> {getPlanDetails(company)?.maxChannels || "N/A"}</p>
+                                        <p><span className="font-medium">{t('admin.companies.plan_price', 'Price:')}</span> {formatCurrency(getPlanDetails(company)?.price || 0)}{getPlanBillingPeriod(getPlanDetails(company) || {})}</p>
+                                        <p><span className="font-medium">{t('admin.companies.plan_max_users', 'Max Users:')}</span> {getPlanDetails(company)?.maxUsers || company.maxUsers}</p>
+                                        <p><span className="font-medium">{t('admin.companies.plan_max_contacts', 'Max Contacts:')}</span> {getPlanDetails(company)?.maxContacts?.toLocaleString() || t('common.na', 'N/A')}</p>
+                                        <p><span className="font-medium">{t('admin.companies.plan_max_channels', 'Max Channels:')}</span> {getPlanDetails(company)?.maxChannels || t('common.na', 'N/A')}</p>
                                       </div>
                                     </div>
                                   )}
@@ -415,12 +420,12 @@ export default function CompaniesPage() {
                         <TableCell>{company.maxUsers}</TableCell>
                         <TableCell>
                           {company.active ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                              Active
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-900">
+                              {t('common.active', 'Active')}
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-100">
-                              Inactive
+                            <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">
+                              {t('common.inactive', 'Inactive')}
                             </Badge>
                           )}
                         </TableCell>
@@ -431,7 +436,7 @@ export default function CompaniesPage() {
                               size="sm"
                               onClick={() => window.location.href = `/admin/companies/${company.id}`}
                             >
-                              Manage
+                              {t('admin.companies.manage_button', 'Manage')}
                             </Button>
                             <Button
                               className="btn-brand-primary"
@@ -440,7 +445,7 @@ export default function CompaniesPage() {
                               onClick={() => handleImpersonateCompany(company)}
                             >
                               <LogIn className="h-3.5 w-3.5 mr-1" />
-                              Login As
+                              {t('admin.companies.login_as', 'Login As')}
                             </Button>
                             {company.slug !== 'system' && (
                               <>
@@ -448,19 +453,19 @@ export default function CompaniesPage() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleClearCompanyData(company)}
-                                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                                  className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950"
                                 >
                                   <Database className="h-3.5 w-3.5 mr-1" />
-                                  Clear Data
+                                  {t('admin.companies.clear_data', 'Clear Data')}
                                 </Button>
                                 <Button
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => handleDeleteCompany(company)}
-                                  className="bg-red-600 hover:bg-red-700"
+                                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
                                 >
                                   <Trash2 className="h-3.5 w-3.5 mr-1" />
-                                  Delete
+                                  {t('admin.companies.delete', 'Delete')}
                                 </Button>
                               </>
                             )}
@@ -481,24 +486,23 @@ export default function CompaniesPage() {
         >
           <AlertDialogContent className="max-w-md max-h-[90vh]">
             <AlertDialogHeader>
-              <AlertDialogTitle>Impersonate Company</AlertDialogTitle>
+              <AlertDialogTitle>{t('admin.companies.impersonate_title', 'Impersonate Company')}</AlertDialogTitle>
               <AlertDialogDescription>
-                You are about to log in as an admin user for {companyToImpersonate?.name}.
-                This will allow you to access the company dashboard and perform actions as a company admin.
+                {t('admin.companies.impersonate_description', 'You are about to log in as an admin user for {{name}}. This will allow you to access the company dashboard and perform actions as a company admin.', { name: companyToImpersonate?.name || '' })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-4">
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
               <AlertDialogAction className="btn-brand-primary" onClick={confirmImpersonation}>
                 {impersonateCompanyMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Impersonating...
+                    {t('admin.companies.impersonating', 'Impersonating...')}
                   </>
                 ) : (
                   <>
                     <LogIn className="h-4 w-4 mr-2" />
-                    Login as Company Admin
+                    {t('admin.companies.login_as_admin', 'Login as Company Admin')}
                   </>
                 )}
               </AlertDialogAction>
@@ -529,20 +533,19 @@ export default function CompaniesPage() {
         >
           <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Multiple Companies</AlertDialogTitle>
+              <AlertDialogTitle>{t('admin.companies.bulk_delete_title', 'Delete Multiple Companies')}</AlertDialogTitle>
               <AlertDialogDescription>
-                You are about to delete {selectedCompanies.size} companies and all their associated data. 
-                This action cannot be undone. Are you sure you want to continue?
+                {t('admin.companies.bulk_delete_description', 'You are about to delete {{count}} companies and all their associated data. This action cannot be undone. Are you sure you want to continue?', { count: selectedCompanies.size })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-4">
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
               <AlertDialogAction 
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
                 onClick={confirmBulkDelete}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Delete {selectedCompanies.size} Companies
+                {t('admin.companies.bulk_delete_action', 'Delete {{count}} Companies', { count: selectedCompanies.size })}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

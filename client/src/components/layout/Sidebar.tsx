@@ -1,7 +1,7 @@
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useConversations } from '@/context/ConversationContext';
-import { useState, useEffect } from 'react';
+import { useActiveChannel } from '@/contexts/ActiveChannelContext';
 import { useAuth } from '@/hooks/use-auth';
 import { usePermissions, PermissionGate } from '@/hooks/usePermissions';
 import { useTranslation } from '@/hooks/use-translation';
@@ -11,14 +11,18 @@ import useSocket from '@/hooks/useSocket';
 import TrialStatus from '@/components/TrialStatus';
 import { isLifetimePlan } from '@/utils/plan-duration';
 import { apiRequest } from '@/lib/queryClient';
+import { useTheme } from 'next-themes';
+import { TwilioIcon } from '@/components/icons/TwilioIcon';
 
 export default function Sidebar() {
   const [location, setLocation] = useLocation();
-  const { setActiveChannelId, activeChannelId } = useConversations();
+  const { setActiveChannelId, activeChannelId } = useActiveChannel();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [, setIsMobile] = useState(false);
   const { company } = useAuth();
   const { t } = useTranslation();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const { data: subscriptionStatus } = useSubscriptionStatus();
   const { requestManualRenewal } = useManualRenewal();
   
@@ -173,7 +177,14 @@ export default function Sidebar() {
     }
   };
 
-  const companyStyle = company ? {
+  const companyStyle = isDark ? {
+    sidebarBg: { backgroundColor: 'hsl(var(--card))' },
+    sidebarHover: { backgroundColor: 'hsl(var(--accent))' },
+    activeItem: { backgroundColor: 'hsl(var(--accent))' },
+    toggleButton: { backgroundColor: 'hsl(var(--accent))' },
+    toggleButtonHover: { backgroundColor: 'hsl(var(--accent))' },
+    toggleButtonBorder: { borderColor: 'hsl(var(--border))' }
+  } : company ? {
     sidebarBg: { backgroundColor: adjustColor(company.primaryColor ?? '#1f2937', -40) },
     sidebarHover: { backgroundColor: adjustColor(company.primaryColor ?? '#1f2937', -30) },
     activeItem: { backgroundColor: adjustColor(company.primaryColor ?? '#1f2937', -20) },
@@ -318,7 +329,7 @@ export default function Sidebar() {
   return (
     <nav
       className={`text-white ${isCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col relative`}
-      style={companyStyle.sidebarBg || { backgroundColor: '#1f2937' }}
+      style={isDark ? { backgroundColor: 'hsl(var(--card))' } : (companyStyle.sidebarBg || { backgroundColor: '#1f2937' })}
     >
       <button
         onClick={toggleSidebar}
@@ -336,7 +347,7 @@ export default function Sidebar() {
         <div className="flex flex-col space-y-1">
           <Link
             href="/inbox"
-            className={`flex items-center px-2 py-2 rounded-lg ${location === '/inbox' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`flex items-center px-2 py-2 rounded-lg ${location === '/inbox' ? 'text-white' : 'text-white/60 hover:text-white'}`}
             style={location === '/inbox' ? companyStyle.activeItem : {}}
           >
             <i className="ri-inbox-line text-xl"></i>
@@ -346,7 +357,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_FLOWS, PERMISSIONS.MANAGE_FLOWS]}>
             <Link
               href="/flows"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/flows' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/flows' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/flows' ? companyStyle.activeItem : {}}
             >
               <i className="ri-flow-chart text-xl"></i>
@@ -357,7 +368,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_CONTACTS, PERMISSIONS.MANAGE_CONTACTS]}>
             <Link
               href="/contacts"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/contacts' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/contacts' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/contacts' ? companyStyle.activeItem : {}}
             >
               <i className="ri-contacts-line text-xl"></i>
@@ -368,7 +379,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_PIPELINE, PERMISSIONS.MANAGE_PIPELINE]}>
             <Link
               href="/pipeline"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/pipeline' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/pipeline' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/pipeline' ? companyStyle.activeItem : {}}
             >
               <i className="ri-stack-line text-xl"></i>
@@ -379,7 +390,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_TASKS, PERMISSIONS.MANAGE_TASKS]}>
             <Link
               href="/tasks"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/tasks' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/tasks' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/tasks' ? companyStyle.activeItem : {}}
             >
               <i className="ri-task-line text-xl"></i>
@@ -390,7 +401,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_CALENDAR, PERMISSIONS.MANAGE_CALENDAR]}>
             <Link
               href="/calendar"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/calendar' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/calendar' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/calendar' ? companyStyle.activeItem : {}}
             >
               <i className="ri-calendar-line text-xl"></i>
@@ -411,7 +422,7 @@ export default function Sidebar() {
           ]}>
             <Link
               href="/campaigns"
-              className={`flex items-center px-2 py-2 rounded-lg ${location.startsWith('/campaigns') ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location.startsWith('/campaigns') ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location.startsWith('/campaigns') ? companyStyle.activeItem : {}}
             >
               <i className="ri-megaphone-line text-xl"></i>
@@ -419,10 +430,21 @@ export default function Sidebar() {
             </Link>
           </PermissionGate>
 
+          <PermissionGate permissions={[PERMISSIONS.VIEW_CALL_LOGS, PERMISSIONS.MANAGE_CALL_LOGS]}>
+            <Link
+              href="/call-logs"
+              className={`flex items-center px-2 py-2 rounded-lg ${location.startsWith('/call-logs') ? 'text-white' : 'text-white/60 hover:text-white'}`}
+              style={location.startsWith('/call-logs') ? companyStyle.activeItem : {}}
+            >
+              <i className="ri-phone-line text-xl"></i>
+              <span className={`ml-3 ${isCollapsed ? 'hidden' : 'block'}`}>{t('nav.call_logs', 'Call Logs')}</span>
+            </Link>
+          </PermissionGate>
+
           <PermissionGate permissions={[PERMISSIONS.MANAGE_TEMPLATES]}>
             <Link
               href="/templates"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/templates' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/templates' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/templates' ? companyStyle.activeItem : {}}
             >
               <i className="ri-file-list-3-line text-xl"></i>
@@ -433,7 +455,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_ANALYTICS, PERMISSIONS.VIEW_DETAILED_ANALYTICS]}>
             <Link
               href="/analytics"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/analytics' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/analytics' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/analytics' ? companyStyle.activeItem : {}}
             >
               <i className="ri-bar-chart-line text-xl"></i>
@@ -443,12 +465,13 @@ export default function Sidebar() {
         </div>
 
         <PermissionGate permissions={[PERMISSIONS.VIEW_CHANNELS, PERMISSIONS.MANAGE_CHANNELS]}>
-          <div className="mt-8 pt-4 border-t border-gray-700">
-            <h3 className={`text-xs uppercase tracking-wide text-gray-500 mb-2 ${isCollapsed ? 'hidden' : 'block'}`}>{t('nav.channels', 'Channels')}</h3>
+          <div className="mt-8 pt-4 border-t border-border/50">
+            <h3 className={`text-xs uppercase tracking-wide text-muted-foreground mb-2 ${isCollapsed ? 'hidden' : 'block'}`}>{t('nav.channels', 'Channels')}</h3>
             <div className="flex flex-col space-y-1">
               {channelConnections.map((connection: any) => {
-              let icon;
-              let color;
+              let icon: string | React.ComponentType<any>;
+              let color: string;
+              let isComponent = false;
 
               switch(connection.channelType) {
                 case 'whatsapp_official':
@@ -467,13 +490,19 @@ export default function Sidebar() {
                   icon = "ri-instagram-line";
                   color = "#E4405F";
                   break;
+                case 'tiktok':
+                  icon = "ri-tiktok-line";
+                  color = "#ffffff"; // Always white in sidebar to match sidebar text colors
+                  break;
                 case 'email':
                   icon = "ri-mail-line";
                   color = "#0078D4";
                   break;
                 case 'twilio_sms':
-                  icon = "ri-message-3-line";
-                  color = "#E4405F";
+                case 'twilio_voice':
+                  icon = TwilioIcon;
+                  isComponent = true;
+                  color = "#ffffff"; // Always white in sidebar to match sidebar text colors
                   break;
                 case 'webchat':
                   icon = "ri-message-3-line";
@@ -486,14 +515,19 @@ export default function Sidebar() {
               }
 
               const isActive = activeChannelId === connection.id;
+              const IconComponent = isComponent ? icon as React.ComponentType<any> : null;
 
               return (
                 <button
                   key={connection.id}
-                  className={`flex items-center px-2 py-2 rounded-lg w-full text-left ${isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                  className={`flex items-center px-2 py-2 rounded-lg w-full text-left ${isActive ? 'bg-background/20 text-white' : 'text-white/60 hover:bg-background/20 hover:text-white'}`}
                   onClick={() => handleChannelClick(connection.id)}
                 >
-                  <i className={icon + " text-xl"} style={{ color: isActive ? 'white' : color }}></i>
+                  {isComponent && IconComponent ? (
+                    <IconComponent className="w-5 h-5" />
+                  ) : (
+                    <i className={`${icon} text-xl`} style={{ color: isActive ? 'white' : color }}></i>
+                  )}
                   <span className={`ml-3 ${isCollapsed ? 'hidden' : 'block'} truncate`}>
                     {connection.accountName}
                   </span>
@@ -510,7 +544,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_PAGES, PERMISSIONS.MANAGE_PAGES]}>
             <Link
               href="/pages"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/pages' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/pages' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/pages' ? companyStyle.activeItem : {}}
             >
               <i className="ri-file-text-line text-xl"></i>
@@ -521,7 +555,7 @@ export default function Sidebar() {
           <PermissionGate permissions={[PERMISSIONS.VIEW_SETTINGS, PERMISSIONS.MANAGE_SETTINGS]}>
             <Link
               href="/settings"
-              className={`flex items-center px-2 py-2 rounded-lg ${location === '/settings' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`flex items-center px-2 py-2 rounded-lg ${location === '/settings' ? 'text-white' : 'text-white/60 hover:text-white'}`}
               style={location === '/settings' ? companyStyle.activeItem : {}}
             >
               <i className="ri-settings-line text-xl"></i>
@@ -532,7 +566,7 @@ export default function Sidebar() {
             href={getHelpSupportUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center px-2 py-2 rounded-lg w-full text-left text-gray-400 hover:text-white"
+            className="flex items-center px-2 py-2 rounded-lg w-full text-left text-white/60 hover:text-white"
             >
             <i className="ri-question-line text-xl"></i>
             <span className={`ml-3 ${isCollapsed ? 'hidden' : 'block'}`}>{t('nav.help_support', 'Help & Support')}</span>
@@ -540,14 +574,14 @@ export default function Sidebar() {
 
             <Link
               href="/settings?tab=billing"
-              className="flex items-center px-2 py-2 rounded-lg w-full text-left text-gray-400 hover:text-white"
+              className="flex items-center px-2 py-2 rounded-lg w-full text-left text-white/60 hover:text-white"
             >
               <i className="ri-bank-card-line text-xl"></i>
               <span className={`ml-3 ${isCollapsed ? 'hidden' : 'block'}`}>{t('nav.billing', 'Billing & Subscription')}</span>
             </Link>
 
           {company && (
-            <div className={`mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500 ${isCollapsed ? 'hidden' : 'block'}`}>
+            <div className={`mt-4 pt-4 border-t border-border/50 text-xs text-white/50 ${isCollapsed ? 'hidden' : 'block'}`}>
               <div className="px-2 space-y-1">
                 <div>{t('nav.company', 'Company')}: {company.name}</div>
                 <div>{t('nav.plan', 'Plan')}: <span className="capitalize">{company.plan}</span></div>

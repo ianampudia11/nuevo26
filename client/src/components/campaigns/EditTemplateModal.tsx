@@ -338,7 +338,7 @@ export function EditTemplateModal({ isOpen, onClose, templateId, onTemplateUpdat
       case 'audio':
         return <Music className="w-4 h-4 text-green-500" />;
       case 'document':
-        return <File className="w-4 h-4 text-gray-500" />;
+        return <File className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -483,7 +483,7 @@ export function EditTemplateModal({ isOpen, onClose, templateId, onTemplateUpdat
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{file.name}</p>
                             <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge variant="secondary" className="text-xs !bg-muted !text-muted-foreground">
                                 {file.type}
                               </Badge>
                               {file.size > 0 && (

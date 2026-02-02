@@ -9,6 +9,7 @@ import Pagination from '@/components/contacts/Pagination';
 import EditContactModal from '@/components/contacts/EditContactModal';
 import { ContactExportModal } from '@/components/contacts/ContactExportModal';
 import { CreateSegmentFromContactsModal } from '@/components/contacts/CreateSegmentFromContactsModal';
+import { AddToExistingSegmentModal } from '@/components/contacts/AddToExistingSegmentModal';
 import { WhatsAppScrapingModal } from '@/components/contacts/WhatsAppScrapingModal';
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow, parseISO, formatISO, addHours } from 'date-fns';
@@ -25,12 +26,18 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, Upload, Download, AlertCircle, CheckCircle, X, Trash2, Search, Filter, MoreHorizontal, Phone, Mail, MapPin, Calendar, FileText, Archive, Users, Eye, Edit, Clock, Flag, User, CheckSquare, Square, AlertTriangle, ChevronDown, SortAsc, SortDesc, Smartphone } from 'lucide-react';
+import { Loader2, Plus, Upload, Download, AlertCircle, CheckCircle, X, Trash2, Search, Filter, MoreHorizontal, Phone, Mail, MapPin, Calendar, FileText, Archive, Users, Eye, Edit, Clock, Flag, User, CheckSquare, Square, AlertTriangle, ChevronDown, SortAsc, SortDesc, Smartphone, UserPlus } from 'lucide-react';
 import AgentDisplay from '@/components/contacts/AgentDisplay';
 import { AuditLogTimeline } from '@/components/contacts/AuditLogTimeline';
+import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { useGoogleCalendarAuth } from '@/hooks/useGoogleCalendarAuth';
 import { useZohoCalendarAuth } from '@/hooks/useZohoCalendarAuth';
 import { useCalendlyCalendarAuth } from '@/hooks/useCalendlyCalendarAuth';
+import { useChannelConnections } from '@/hooks/useChannelConnections';
+import { CallTypeSelectionModal } from '@/components/conversations/CallTypeSelectionModal';
+import { CallScreenModal } from '@/components/conversations/CallScreenModal';
+import { requestMicrophoneAccess, checkMicrophonePermission, stopMicrophoneStream } from '@/utils/microphone-permissions';
+import { usePermissions } from '@/hooks/usePermissions';
 
 
 function normalizePhoneNumber(phone: string): string {
@@ -247,6 +254,7 @@ interface EventFormData {
 export default function Contacts() {
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { canViewContactPhone } = usePermissions();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
 
@@ -319,6 +327,7 @@ export default function Contacts() {
 
 
   const [isCreateSegmentModalOpen, setIsCreateSegmentModalOpen] = useState(false);
+  const [isAddToSegmentModalOpen, setIsAddToSegmentModalOpen] = useState(false);
 
 
   const [isWhatsAppScrapingModalOpen, setIsWhatsAppScrapingModalOpen] = useState(false);
@@ -365,6 +374,20 @@ export default function Contacts() {
     description: '',
     file: null as File | null
   });
+
+
+  const [isCallTypeModalOpen, setIsCallTypeModalOpen] = useState(false);
+  const [selectedContactForCall, setSelectedContactForCall] = useState<Contact | null>(null);
+  const [isCallScreenOpen, setIsCallScreenOpen] = useState(false);
+  const [activeCallData, setActiveCallData] = useState<{
+    callId: string;
+    contactName: string;
+    contactPhone: string;
+    contactAvatar?: string;
+    conferenceName?: string;
+    channelId?: number;
+    callType?: 'direct' | 'ai-powered';
+  } | null>(null);
 
 
   const handleDocumentUpload = async (file: File, category: string) => {
@@ -709,6 +732,9 @@ export default function Contacts() {
   const contactActivity = auditLogsData?.logs || [];
 
 
+  const { data: channelConnections = [] } = useChannelConnections();
+
+
   const archiveContactMutation = useMutation({
     mutationFn: async (contactId: number) => {
       const response = await apiRequest('POST', `/api/contacts/${contactId}/archive`);
@@ -729,6 +755,49 @@ export default function Contacts() {
       toast({
         title: "Archive Failed",
         description: error.message || "Failed to archive contact",
+        variant: "destructive",
+      });
+    }
+  });
+
+
+  const initiateContactCallMutation = useMutation({
+    mutationFn: async ({ contactId, callType }: { contactId: number; callType: 'direct' | 'ai-powered' }) => {
+      const response = await apiRequest('POST', `/api/contacts/${contactId}/initiate-call`, { callType });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to initiate call');
+      }
+      return response.json();
+    },
+    onMutate: () => {
+
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Call Initiated",
+        description: "Connecting you to the contact...",
+      });
+      
+
+      setActiveCallData({
+        callId: data.callId,
+        contactName: data.contactName,
+        contactPhone: data.contactPhone,
+        contactAvatar: data.contactAvatar,
+        conferenceName: data.conferenceName,
+        channelId: data.channelId,
+        callType: data.callType || data.metadata?.callType || 'direct'
+      });
+      setIsCallScreenOpen(true);
+      
+
+      queryClient.invalidateQueries({ queryKey: ['/api/call-logs'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Call Failed",
+        description: error.message || "Failed to initiate call. Please try again.",
         variant: "destructive",
       });
     }
@@ -759,14 +828,12 @@ export default function Contacts() {
     }
   });
 
-
   const bulkArchiveMutation = useMutation({
     mutationFn: async ({ contactIds, archive }: { contactIds: number[]; archive: boolean }) => {
       const promises = contactIds.map(id =>
         apiRequest(archive ? 'POST' : 'DELETE', `/api/contacts/${id}/archive`)
       );
       const responses = await Promise.all(promises);
-
 
       const failedRequests = responses.filter(response => !response.ok);
       if (failedRequests.length > 0) {
@@ -775,22 +842,21 @@ export default function Contacts() {
 
       return responses;
     },
-    onSuccess: (_, { contactIds, archive }) => {
+    onSuccess: (_, { archive }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/contacts/archived-count'] });
-      setSelectedContacts(new Set());
       toast({
-        title: archive ? "Contacts Archived" : "Contacts Unarchived",
-        description: `${contactIds.length} contact(s) have been successfully ${archive ? 'archived' : 'unarchived'}.`,
+        title: `Contacts ${archive ? 'archived' : 'unarchived'} successfully`,
+        description: `${selectedContacts.size} contact(s) have been ${archive ? 'archived' : 'unarchived'}.`,
+      });
+      setSelectedContacts(new Set());
+    },
+    onError: (error, { archive }) => {
+      toast({
+        title: `Failed to ${archive ? 'archive' : 'unarchive'} contacts`,
+        description: error.message,
+        variant: 'destructive',
       });
     },
-    onError: (error: any, { archive }) => {
-      toast({
-        title: archive ? "Archive Failed" : "Unarchive Failed",
-        description: error.message || `Failed to ${archive ? 'archive' : 'unarchive'} contacts`,
-        variant: "destructive",
-      });
-    }
   });
 
   const { data, isLoading } = useQuery({
@@ -1428,6 +1494,18 @@ export default function Contacts() {
 
   };
 
+  const handleContactsAddedToSegment = (segmentName: string, contactCount: number) => {
+    toast({
+      title: t('common.success', 'Success'),
+      description: t('segments.add_to_existing.success', 'Added {{count}} contact(s) to segment "{{name}}"', {
+        count: contactCount.toString(),
+        name: segmentName
+      })
+    });
+    setSelectedContacts(new Set());
+    queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+  };
+
   const confirmBulkDelete = () => {
     const contactIds = Array.from(selectedContacts);
 
@@ -1747,6 +1825,102 @@ export default function Contacts() {
   };
 
 
+  const handleCallClick = async (contact: Contact) => {
+
+    if (!contact.phone) {
+      toast({
+        title: "No Phone Number",
+        description: "This contact doesn't have a phone number to call.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+
+    const twilioVoiceConnections = channelConnections.filter(
+      conn => conn.channelType === 'twilio_voice' && conn.status === 'active'
+    );
+
+    if (twilioVoiceConnections.length === 0) {
+      toast({
+        title: "No Voice Connection",
+        description: "No active Twilio Voice connection found. Please configure a voice connection first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+
+    if ((contact as any).isArchived) {
+      toast({
+        title: "Contact Archived",
+        description: "Cannot call archived contacts. Please unarchive the contact first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const connection = twilioVoiceConnections[0];
+    setSelectedContactForCall(contact);
+
+
+    if ((connection.connectionData as any)?.callMode === 'ai-powered') {
+      setIsCallTypeModalOpen(true);
+    } else {
+
+      try {
+        const permissionStatus = await checkMicrophonePermission();
+        
+        if (permissionStatus !== 'granted') {
+
+          const result = await requestMicrophoneAccess();
+          if (result.success && result.stream) {
+
+            stopMicrophoneStream(result.stream);
+          }
+        }
+        
+
+        initiateContactCallMutation.mutate({
+          contactId: contact.id,
+          callType: 'direct'
+        });
+      } catch (error: any) {
+        console.error('[Contacts] Microphone permission error:', error);
+        
+
+        let errorMsg = 'Failed to access microphone. Please check your browser settings and try again.';
+        if (error.name === 'NotAllowedError') {
+          errorMsg = 'Microphone permission denied. Please allow access in your browser settings and try again.';
+        } else if (error.name === 'NotFoundError') {
+          errorMsg = 'No microphone found. Please connect a microphone and try again.';
+        } else if (error.name === 'NotReadableError') {
+          errorMsg = 'Microphone is being used by another application. Please close other apps and try again.';
+        }
+        
+        toast({
+          title: "Microphone Access Required",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+  };
+
+
+  const handleCallTypeSelected = (callType: 'direct' | 'ai-powered') => {
+    setIsCallTypeModalOpen(false);
+    
+    if (selectedContactForCall) {
+      initiateContactCallMutation.mutate({
+        contactId: selectedContactForCall.id,
+        callType
+      });
+    }
+  };
+
+
   const activeFiltersCount = [
     channelFilter !== 'all' ? 1 : 0,
     archivedFilter !== 'active' ? 1 : 0,
@@ -1755,7 +1929,7 @@ export default function Contacts() {
   ].reduce((a, b) => a + b, 0);
   
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
       <Header />
       
       <div className="flex flex-1 overflow-hidden">
@@ -1763,9 +1937,9 @@ export default function Contacts() {
         
         <div className="flex-1 flex overflow-hidden">
           {/* Left Panel - Contacts List */}
-          <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
+          <div className="w-96 bg-card border-r border-border flex flex-col">
             {/* Navigation Tabs */}
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-4 py-3 border-b border-border">
               <div className="flex space-x-6">
                 <button
                   onClick={() => {
@@ -1775,8 +1949,8 @@ export default function Contacts() {
                   }}
                   className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
                     activeTab === 'all'
-                      ? 'text-blue-600 border-blue-600'
-                      : 'text-gray-500 border-transparent hover:text-gray-700'
+                      ? 'text-primary border-primary'
+                      : 'text-muted-foreground border-transparent hover:text-foreground/90'
                   }`}
                 >
                   All
@@ -1789,11 +1963,11 @@ export default function Contacts() {
                   }}
                   className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
                     activeTab === 'contacts'
-                      ? 'text-blue-600 border-blue-600'
-                      : 'text-gray-500 border-transparent hover:text-gray-700'
+                      ? 'text-primary border-primary'
+                      : 'text-muted-foreground border-transparent hover:text-foreground/90'
                   }`}
                 >
-                  Contacts <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{totalContacts}</span>
+                  Contacts <span className="ml-1 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{totalContacts}</span>
                 </button>
 
                 <button
@@ -1804,18 +1978,18 @@ export default function Contacts() {
                   }}
                   className={`text-sm font-medium pb-2 border-b-2 transition-colors ${
                     activeTab === 'archives'
-                      ? 'text-blue-600 border-blue-600'
-                      : 'text-gray-500 border-transparent hover:text-gray-700'
+                      ? 'text-primary border-primary'
+                      : 'text-muted-foreground border-transparent hover:text-foreground/90'
                   }`}
                 >
                   <Archive className="h-4 w-4 inline mr-1" />
-                  Archives <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{archivedContactsCount}</span>
+                  Archives <span className="ml-1 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{archivedContactsCount}</span>
                 </button>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="px-4 py-3 border-b border-gray-200 flex justify-end space-x-2">
+            <div className="px-4 py-3 border-b border-border flex justify-end space-x-2">
               <Button
                 onClick={() => setIsAddContactDialogOpen(true)}
                 size="sm"
@@ -1843,7 +2017,7 @@ export default function Contacts() {
                 onClick={() => setIsWhatsAppScrapingModalOpen(true)}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-1 bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+                className="flex items-center gap-1 bg-green-500/10 dark:bg-green-500/20 border-green-500/30 dark:border-green-500/30 text-green-700 dark:text-green-400 hover:bg-green-500/20 dark:hover:bg-green-500/30"
                 title="Scrape WhatsApp Contacts"
               >
                 <Smartphone className="h-4 w-4" />
@@ -1854,14 +2028,14 @@ export default function Contacts() {
                 size="sm"
                 className={`flex items-center gap-1 relative ${
                   activeFiltersCount > 0
-                    ? 'bg-blue-50 border-blue-300 text-blue-700'
+                    ? 'bg-primary/10 dark:bg-primary/20 border-primary/30 text-primary dark:text-primary/90'
                     : ''
                 }`}
                 title={`Filters${activeFiltersCount > 0 ? ` (${activeFiltersCount} active)` : ''}`}
               >
                 <Filter className="h-4 w-4" />
                 {activeFiltersCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center font-medium">
                     {activeFiltersCount}
                   </span>
                 )}
@@ -1870,19 +2044,29 @@ export default function Contacts() {
 
             {/* Bulk Actions Toolbar */}
             {selectedContacts.size > 0 && (
-              <div className="mx-4 mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-blue-900">
-                    {selectedContacts.size} selected
+              <div className="mx-2 sm:mx-4 mb-3 p-2 bg-primary/10 dark:bg-primary/20 border border-primary/30 rounded-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm font-medium text-primary dark:text-primary/90 whitespace-nowrap">
+                    {selectedContacts.size} <span className="hidden xs:inline">selected</span>
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setIsCreateSegmentModalOpen(true)}
-                      className="text-xs"
+                      className="text-xs h-8 px-2 sm:px-3"
                     >
-                      Segment
+                      <Users className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Segment</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAddToSegmentModalOpen(true)}
+                      className="text-xs h-8 px-2 sm:px-3"
+                    >
+                      <UserPlus className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden md:inline">Add to Segment</span>
                     </Button>
                     {archivedFilter !== 'archived' ? (
                       <Button
@@ -1890,10 +2074,10 @@ export default function Contacts() {
                         size="sm"
                         onClick={() => handleBulkArchiveConfirm('archive')}
                         disabled={bulkArchiveMutation.isPending}
-                        className="text-xs"
+                        className="text-xs h-8 px-2 sm:px-3"
                       >
-                        {bulkArchiveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}
-                        Archive
+                        {bulkArchiveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3 sm:mr-1" />}
+                        <span className="hidden sm:inline">Archive</span>
                       </Button>
                     ) : (
                       <Button
@@ -1901,10 +2085,10 @@ export default function Contacts() {
                         size="sm"
                         onClick={() => handleBulkArchiveConfirm('unarchive')}
                         disabled={bulkArchiveMutation.isPending}
-                        className="text-xs"
+                        className="text-xs h-8 px-2 sm:px-3"
                       >
-                        {bulkArchiveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}
-                        Unarchive
+                        {bulkArchiveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3 sm:mr-1" />}
+                        <span className="hidden sm:inline">Unarchive</span>
                       </Button>
                     )}
                     <Button
@@ -1912,7 +2096,7 @@ export default function Contacts() {
                       size="sm"
                       onClick={handleBulkDelete}
                       disabled={isBulkDeleting}
-                      className="text-xs"
+                      className="text-xs h-8 px-2 sm:px-3"
                     >
                       {isBulkDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                     </Button>
@@ -1922,13 +2106,13 @@ export default function Contacts() {
             )}
 
             {/* Search Bar */}
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-4 py-3 border-b border-border">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <input
                   type="search"
                   placeholder="Search contacts..."
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1937,7 +2121,7 @@ export default function Contacts() {
 
             {/* Select All Checkbox */}
             {contacts.length > 0 && (
-              <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <div className="px-4 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -1948,7 +2132,7 @@ export default function Contacts() {
                     />
                     <label
                       htmlFor="select-all"
-                      className="text-sm font-medium text-gray-700 cursor-pointer select-none"
+                      className="text-sm font-medium text-foreground cursor-pointer select-none"
                     >
                       Select All ({contacts.length})
                     </label>
@@ -1958,7 +2142,7 @@ export default function Contacts() {
                       variant="ghost"
                       size="sm"
                       onClick={handleClearSelection}
-                      className="text-xs text-gray-600 hover:text-gray-900 h-auto py-1 px-2"
+                      className="text-xs text-muted-foreground hover:text-foreground h-auto py-1 px-2"
                     >
                       Clear Selection
                     </Button>
@@ -1978,10 +2162,10 @@ export default function Contacts() {
                   {[...Array(5)].map((_, i) => (
                     <div key={i} className="animate-pulse">
                       <div className="flex items-center space-x-3 p-3">
-                        <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
+                        <div className="h-10 w-10 bg-muted animate-pulse rounded-full"></div>
                         <div className="flex-1">
-                          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                          <div className="h-4 bg-muted animate-pulse rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-muted animate-pulse rounded w-1/2"></div>
                         </div>
                       </div>
                     </div>
@@ -1989,14 +2173,14 @@ export default function Contacts() {
                 </div>
               ) : contacts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                  <Users className="h-12 w-12 text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-700 mb-2">No contacts found</h3>
-                  <p className="text-gray-500 text-sm">
+                  <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">No contacts found</h3>
+                  <p className="text-muted-foreground text-sm">
                     {searchTerm ? 'Try adjusting your search' : 'Add your first contact to get started'}
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-border">
                   {contacts.map((contact) => {
                     const contactId = typeof contact.id === 'string' ? parseInt(contact.id, 10) : contact.id;
                     const isSelected = selectedContacts.has(contactId);
@@ -2005,10 +2189,10 @@ export default function Contacts() {
                     return (
                       <div
                         key={contact.id}
-                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                          isDetailSelected ? 'bg-blue-50 border-r-2 border-blue-500' : ''
-                        } ${isSelected ? 'bg-blue-25' : ''} ${
-                          (contact as any).isArchived ? 'opacity-60 bg-gray-50' : ''
+                        className={`p-4 hover:bg-accent cursor-pointer transition-colors ${
+                          isDetailSelected ? 'bg-primary/10 dark:bg-primary/20 border-r-2 border-primary' : ''
+                        } ${isSelected ? 'bg-primary/5 dark:bg-primary/10' : ''} ${
+                          (contact as any).isArchived ? 'opacity-60 bg-muted/30' : ''
                         }`}
                         onClick={() => setSelectedContactForDetail(contact)}
                       >
@@ -2020,28 +2204,26 @@ export default function Contacts() {
                               onClick={(e) => e.stopPropagation()}
                               className="absolute -top-1 -left-1 z-10"
                             />
-                            <img
-                              src={contact.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=random`}
-                              alt={contact.name}
-                              className="w-10 h-10 rounded-full ml-4"
+                            <ContactAvatar
+                              contact={contact}
+                              size="md"
+                              showRefreshButton={false}
+                              className="ml-4"
                             />
-                            <span className={`absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-white ${
-                              contact.isActive ? 'bg-green-400' : 'bg-gray-300'
+                            <span className={`absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-background ${
+                              contact.isActive ? 'bg-green-500 dark:bg-green-600' : 'bg-muted'
                             }`}></span>
                           </div>
                           
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2">
-                              <span className="text-xs font-medium text-gray-900 uppercase tracking-wide">
-                                {contact.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                              </span>
                               <h3 className={`text-sm font-medium truncate ${
-                                (contact as any).isArchived ? 'text-gray-500' : 'text-gray-900'
+                                (contact as any).isArchived ? 'text-muted-foreground' : 'text-foreground'
                               }`}>
                                 {contact.name}
                               </h3>
                               {(contact as any).isArchived && (
-                                <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-600">
+                                <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">
                                   Archived
                                 </Badge>
                               )}
@@ -2050,22 +2232,24 @@ export default function Contacts() {
                             <div className="mt-1 flex items-center space-x-2">
                               <div className="flex items-center space-x-1">
                                 {contact.identifierType === 'whatsapp' && (
-                                  <i className="ri-whatsapp-line text-green-500 text-xs"></i>
+                                  <i className="ri-whatsapp-line text-green-500 dark:text-green-400 text-xs"></i>
                                 )}
                                 {contact.identifierType === 'messenger' && (
-                                  <i className="ri-messenger-line text-blue-500 text-xs"></i>
+                                  <i className="ri-messenger-line text-blue-500 dark:text-blue-400 text-xs"></i>
                                 )}
                                 {contact.identifierType === 'instagram' && (
-                                  <i className="ri-instagram-line text-pink-500 text-xs"></i>
+                                  <i className="ri-instagram-line text-pink-500 dark:text-pink-400 text-xs"></i>
                                 )}
-                                <span className="text-xs text-gray-500">
-                                  {contact.phone || contact.email || 'No contact info'}
+                                <span className="text-xs text-muted-foreground">
+                                  {canViewContactPhone()
+                                    ? (contact.phone || contact.email || 'No contact info')
+                                    : (contact.phone ? '—' : (contact.email || 'No contact info'))}
                                 </span>
                               </div>
                             </div>
                             
                             {contact.company && (
-                              <p className="mt-1 text-xs text-gray-500 truncate">
+                              <p className="mt-1 text-xs text-muted-foreground truncate">
                                 {contact.company}
                               </p>
                             )}
@@ -2073,7 +2257,7 @@ export default function Contacts() {
                             {contact.tags && contact.tags.length > 0 && (
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {contact.tags.slice(0, 2).map((tag, idx) => (
-                                  <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0.5">
+                                  <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0.5 !bg-muted !text-muted-foreground">
                                     {tag}
                                   </Badge>
                                 ))}
@@ -2084,6 +2268,39 @@ export default function Contacts() {
                                 )}
                               </div>
                             )}
+                            
+                            {/* Action Buttons */}
+                            <div className="mt-3 flex items-center gap-2">
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMessageClick(contact);
+                                }}
+                                size="sm"
+                                variant="outline"
+                                className="flex items-center gap-1 h-7 px-2 text-xs"
+                              >
+                                <i className="ri-message-3-line h-3 w-3" />
+                                Message
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCallClick(contact);
+                                }}
+                                size="sm"
+                                variant="outline"
+                                className="flex items-center gap-1 h-7 px-2 text-xs"
+                                disabled={initiateContactCallMutation.isPending || !contact.phone || !canViewContactPhone()}
+                              >
+                                {initiateContactCallMutation.isPending ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Phone className="h-3 w-3" />
+                                )}
+                                Call
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2094,7 +2311,7 @@ export default function Contacts() {
               
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="p-4 border-t border-gray-200">
+                <div className="p-4 border-t border-border">
                   <Pagination 
                     currentPage={currentPage}
                     totalPages={totalPages}
@@ -2106,23 +2323,23 @@ export default function Contacts() {
           </div>
 
           {/* Right Panel - Contact Details */}
-          <div className="flex-1 bg-white overflow-y-auto">
+          <div className="flex-1 bg-background overflow-y-auto">
             {selectedContactForDetail ? (
               <div className="h-full">
                 {/* Contact Header */}
-                <div className="px-6 py-4 border-b border-gray-200">
+                <div className="px-6 py-4 border-b border-border">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                      <img
-                        src={selectedContactForDetail.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedContactForDetail.name)}&background=random`}
-                        alt={selectedContactForDetail.name}
-                        className="w-12 h-12 rounded-full"
+                      <ContactAvatar
+                        contact={selectedContactForDetail}
+                        size="lg"
+                        showRefreshButton={false}
                       />
                       <div>
                         <div className="flex items-center space-x-2">
-                          <h1 className="text-xl font-semibold text-gray-900">{selectedContactForDetail.name}</h1>
+                          <h1 className="text-xl font-semibold text-foreground">{selectedContactForDetail.name}</h1>
                           {(selectedContactForDetail as any).isArchived && (
-                            <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                            <Badge variant="secondary" className="bg-muted text-muted-foreground">
                               <Archive className="h-3 w-3 mr-1" />
                               Archived
                             </Badge>
@@ -2132,10 +2349,23 @@ export default function Contacts() {
                           <Button
                             onClick={() => handleMessageClick(selectedContactForDetail)}
                             size="sm"
-                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                            className="flex items-center gap-2 !bg-primary !text-primary-foreground hover:!bg-primary/90"
                           >
                             <i className="ri-message-3-line h-4 w-4" />
                             Message
+                          </Button>
+                          <Button
+                            onClick={() => handleCallClick(selectedContactForDetail)}
+                            size="sm"
+                            className="flex items-center gap-2"
+                            disabled={initiateContactCallMutation.isPending || !selectedContactForDetail.phone || !canViewContactPhone()}
+                          >
+                            {initiateContactCallMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Phone className="h-4 w-4" />
+                            )}
+                            Call
                           </Button>
                           <Button
                             onClick={() => handleScheduleAppointment(selectedContactForDetail)}
@@ -2213,32 +2443,34 @@ export default function Contacts() {
 
                   {/* Contact Information */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-gray-900">Contact</h3>
+                    <h3 className="text-lg font-medium text-foreground">Contact</h3>
                     <div className="grid grid-cols-1 gap-4">
-                      {selectedContactForDetail.phone && (
-                        <div className="flex items-center space-x-3">
-                          <Phone className="h-4 w-4 text-gray-400" />
-                          <div>
-                            <Label className="text-sm font-medium text-gray-700">Phone</Label>
-                            <p className="text-sm text-gray-900">{selectedContactForDetail.phone}</p>
-                          </div>
+                      <div className="flex items-center space-x-3">
+                        <Phone className="h-4 w-4 text-muted-foreground/70" />
+                        <div>
+                          <Label className="text-sm font-medium text-foreground">Phone</Label>
+                          <p className="text-sm text-foreground">
+                            {canViewContactPhone()
+                              ? (selectedContactForDetail.phone || '—')
+                              : '—'}
+                          </p>
                         </div>
-                      )}
+                      </div>
                       {selectedContactForDetail.email && (
                         <div className="flex items-center space-x-3">
-                          <Mail className="h-4 w-4 text-gray-400" />
+                          <Mail className="h-4 w-4 text-muted-foreground/70" />
                           <div>
-                            <Label className="text-sm font-medium text-gray-700">Email</Label>
-                            <p className="text-sm text-gray-900">{selectedContactForDetail.email}</p>
+                            <Label className="text-sm font-medium text-foreground">Email</Label>
+                            <p className="text-sm text-foreground">{selectedContactForDetail.email}</p>
                           </div>
                         </div>
                       )}
                       {selectedContactForDetail.company && (
                         <div className="flex items-center space-x-3">
-                          <MapPin className="h-4 w-4 text-gray-400" />
+                          <MapPin className="h-4 w-4 text-muted-foreground/70" />
                           <div>
-                            <Label className="text-sm font-medium text-gray-700">Company</Label>
-                            <p className="text-sm text-gray-900">{selectedContactForDetail.company}</p>
+                            <Label className="text-sm font-medium text-foreground">Company</Label>
+                            <p className="text-sm text-foreground">{selectedContactForDetail.company}</p>
                           </div>
                         </div>
                       )}
@@ -2247,7 +2479,7 @@ export default function Contacts() {
 
                   {/* Assigned Agent */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-gray-900">Agents</h3>
+                    <h3 className="text-lg font-medium text-foreground">Agents</h3>
                     <AgentDisplay
                       assignedAgent={assignedAgentData?.assignedAgent || null}
                       isLoading={isLoadingAssignedAgent}
@@ -2259,14 +2491,14 @@ export default function Contacts() {
                  
 
                   {/* Navigation Tabs */}
-                  <div className="border-t border-gray-200 pt-6">
-                    <div className="flex space-x-8 border-b border-gray-200">
+                  <div className="border-t border-border pt-6">
+                    <div className="flex space-x-8 border-b border-border">
                       <button 
                         onClick={() => setContactDetailTab('dossier')}
                         className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
                           contactDetailTab === 'dossier'
-                            ? 'text-blue-600 border-blue-600'
-                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                            ? 'text-primary border-primary'
+                            : 'text-muted-foreground border-transparent hover:text-foreground/90'
                         }`}
                       >
                         File
@@ -2275,8 +2507,8 @@ export default function Contacts() {
                         onClick={() => setContactDetailTab('historique')}
                         className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
                           contactDetailTab === 'historique'
-                            ? 'text-blue-600 border-blue-600'
-                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                            ? 'text-primary border-primary'
+                            : 'text-muted-foreground border-transparent hover:text-foreground/90'
                         }`}
                       >
                         History
@@ -2286,8 +2518,8 @@ export default function Contacts() {
                         onClick={() => setContactDetailTab('tasks')}
                         className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
                           contactDetailTab === 'tasks'
-                            ? 'text-blue-600 border-blue-600'
-                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                            ? 'text-primary border-primary'
+                            : 'text-muted-foreground border-transparent hover:text-foreground/90'
                         }`}
                       >
                         Tasks
@@ -2303,14 +2535,14 @@ export default function Contacts() {
                       <div className="space-y-6">
                         {/* Unified Document Upload */}
                         <div className="space-y-4">
-                          <div className="flex items-center justify-between p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors bg-gray-50">
+                          <div className="flex items-center justify-between p-6 border-2 border-dashed border-border rounded-lg hover:border-border/80 transition-colors bg-muted/30">
                             <div className="flex items-center space-x-4">
-                              <div className="p-3 bg-blue-100 rounded-full">
-                                <FileText className="h-6 w-6 text-blue-600" />
+                              <div className="p-3 bg-primary/10 dark:bg-primary/20 rounded-full">
+                                <FileText className="h-6 w-6 text-primary" />
                               </div>
                               <div>
-                                <h4 className="text-lg font-medium text-gray-900">Upload Document</h4>
-                                <p className="text-sm text-gray-500">Add documents with category and description</p>
+                                <h4 className="text-lg font-medium text-foreground">Upload Document</h4>
+                                <p className="text-sm text-muted-foreground">Add documents with category and description</p>
                               </div>
                             </div>
                             <Button
@@ -2329,24 +2561,24 @@ export default function Contacts() {
                         {/* Uploaded Documents */}
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900">Uploaded Documents</h4>
-                            <span className="text-xs text-gray-500">{contactDocuments.length} files</span>
+                            <h4 className="text-sm font-medium text-foreground">Uploaded Documents</h4>
+                            <span className="text-xs text-muted-foreground">{contactDocuments.length} files</span>
                           </div>
 
                           {contactDocuments.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">
-                              <FileText className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                            <div className="text-center py-8 text-muted-foreground">
+                              <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
                               <p className="text-sm">No documents uploaded yet</p>
                             </div>
                           ) : (
                             contactDocuments.map((document: any) => {
                               const getCategoryColor = (category: string) => {
                                 switch (category) {
-                                  case 'identity': return 'bg-blue-100 text-blue-600';
-                                  case 'address_proof': return 'bg-green-100 text-green-600';
-                                  case 'income': return 'bg-purple-100 text-purple-600';
-                                  case 'general': return 'bg-gray-100 text-gray-600';
-                                  default: return 'bg-orange-100 text-orange-600'; // For custom categories
+                                  case 'identity': return 'bg-primary/10 dark:bg-primary/20 text-primary';
+                                  case 'address_proof': return 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-500';
+                                  case 'income': return 'bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-500';
+                                  case 'general': return 'bg-muted text-muted-foreground';
+                                  default: return 'bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-500'; // For custom categories
                                 }
                               };
 
@@ -2375,16 +2607,16 @@ export default function Contacts() {
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center space-x-2 mb-1">
-                                          <p className="text-sm font-medium text-gray-900 truncate">{document.originalName}</p>
+                                          <p className="text-sm font-medium text-foreground truncate">{document.originalName}</p>
                                           <Badge variant="secondary" className={`${getCategoryColor(document.category)} text-xs shrink-0`}>
                                             {getCategoryLabel(document.category)}
                                           </Badge>
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-1">
+                                        <p className="text-xs text-muted-foreground mb-1">
                                           {formatDistanceToNow(new Date(document.createdAt), { addSuffix: true })} • {formatFileSize(document.fileSize)}
                                         </p>
                                         {document.description && (
-                                          <p className="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1 mt-2">
+                                          <p className="text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1 mt-2">
                                             {document.description}
                                           </p>
                                         )}
@@ -2414,7 +2646,7 @@ export default function Contacts() {
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-red-600 hover:text-red-700"
+                                        className="text-destructive hover:text-destructive/80"
                                         onClick={() => handleDocumentDelete(document.id.toString())}
                                         disabled={deleteDocumentMutation.isPending}
                                       >
@@ -2436,7 +2668,7 @@ export default function Contacts() {
                       <div className="space-y-6">
                         {/* Filter Options */}
                         <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium text-gray-900">Activity Timeline</h4>
+                          <h4 className="text-sm font-medium text-foreground">Activity Timeline</h4>
                           <div className="flex items-center space-x-2">
                             <Select defaultValue="all">
                               <SelectTrigger className="h-8 w-32 text-xs">
@@ -2466,8 +2698,8 @@ export default function Contacts() {
                         {/* Tasks Header */}
                         <div className="flex items-center justify-between">
                           <div>
-                            <h4 className="text-sm font-medium text-gray-900">Task Management</h4>
-                            <p className="text-xs text-gray-500 mt-1">Track and manage tasks for this contact</p>
+                            <h4 className="text-sm font-medium text-foreground">Task Management</h4>
+                            <p className="text-xs text-muted-foreground mt-1">Track and manage tasks for this contact</p>
                           </div>
                           <Button
                             size="sm"
@@ -2483,11 +2715,11 @@ export default function Contacts() {
                         <div className="flex items-center justify-between space-x-4">
                           <div className="flex items-center space-x-2 flex-1">
                             <div className="relative flex-1 max-w-sm">
-                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                               <input
                                 type="search"
                                 placeholder="Search tasks..."
-                                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                                 value={taskSearchTerm}
                                 onChange={(e) => setTaskSearchTerm(e.target.value)}
                               />
@@ -2534,9 +2766,9 @@ export default function Contacts() {
 
                         {/* Bulk Actions */}
                         {selectedTasks.size > 0 && (
-                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900 rounded-lg">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-blue-900">
+                              <span className="text-sm font-medium text-blue-800 dark:text-blue-400">
                                 {selectedTasks.size} task{selectedTasks.size > 1 ? 's' : ''} selected
                               </span>
                               <div className="flex items-center gap-2">
@@ -2578,13 +2810,13 @@ export default function Contacts() {
                         <div className="space-y-3">
                           {isLoadingTasks ? (
                             <div className="flex items-center justify-center py-8">
-                              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                             </div>
                           ) : contactTasks.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">
-                              <CheckSquare className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                            <div className="text-center py-8 text-muted-foreground">
+                              <CheckSquare className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
                               <p className="text-sm">No tasks found</p>
-                              <p className="text-xs text-gray-400 mt-1">Create a new task to get started</p>
+                              <p className="text-xs text-muted-foreground mt-1">Create a new task to get started</p>
                             </div>
                           ) : (
                             (() => {
@@ -2624,36 +2856,36 @@ export default function Contacts() {
 
                                 const getPriorityColor = (priority: string) => {
                                   switch (priority) {
-                                    case 'urgent': return 'bg-red-100 text-red-800 border-red-200';
-                                    case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-                                    case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-                                    case 'low': return 'bg-green-100 text-green-800 border-green-200';
-                                    default: return 'bg-gray-100 text-gray-800 border-gray-200';
+                                    case 'urgent': return 'bg-red-500/10 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30';
+                                    case 'high': return 'bg-orange-500/10 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30';
+                                    case 'medium': return 'bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
+                                    case 'low': return 'bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30';
+                                    default: return 'bg-muted text-foreground/90 border-border';
                                   }
                                 };
 
                                 const getStatusColor = (status: string) => {
                                   switch (status) {
-                                    case 'completed': return 'bg-green-100 text-green-800';
-                                    case 'in_progress': return 'bg-blue-100 text-blue-800';
-                                    case 'cancelled': return 'bg-gray-100 text-gray-800';
-                                    default: return 'bg-gray-100 text-gray-600';
+                                    case 'completed': return 'bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-400';
+                                    case 'in_progress': return 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary/90';
+                                    case 'cancelled': return 'bg-muted text-foreground/90';
+                                    default: return 'bg-muted text-muted-foreground';
                                   }
                                 };
 
                                 const getStatusIcon = (status: string) => {
                                   switch (status) {
-                                    case 'completed': return <CheckSquare className="h-4 w-4 text-green-600" />;
-                                    case 'in_progress': return <Clock className="h-4 w-4 text-blue-600" />;
-                                    case 'cancelled': return <X className="h-4 w-4 text-gray-600" />;
-                                    default: return <Square className="h-4 w-4 text-gray-400" />;
+                                    case 'completed': return <CheckSquare className="h-4 w-4 text-green-600 dark:text-green-400" />;
+                                    case 'in_progress': return <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+                                    case 'cancelled': return <X className="h-4 w-4 text-muted-foreground" />;
+                                    default: return <Square className="h-4 w-4 text-muted-foreground/70" />;
                                   }
                                 };
 
                                 return (
                                   <Card key={task.id} className={`p-4 transition-colors ${
-                                    isSelected ? 'bg-blue-50 border-blue-200' : ''
-                                  } ${isOverdue ? 'border-l-4 border-l-red-500' : ''}`}>
+                                    isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900' : ''
+                                  } ${isOverdue ? 'border-l-4 border-l-red-500 dark:border-l-red-400' : ''}`}>
                                     <div className="flex items-start space-x-3">
                                       <Checkbox
                                         checked={isSelected}
@@ -2673,7 +2905,7 @@ export default function Contacts() {
                                           <div className="flex-1">
                                             <div className="flex items-center space-x-2">
                                               {getStatusIcon(task.status)}
-                                              <h5 className="text-sm font-medium text-gray-900 truncate">
+                                              <h5 className="text-sm font-medium text-foreground truncate">
                                                 {task.title}
                                               </h5>
                                               {isOverdue && (
@@ -2683,13 +2915,13 @@ export default function Contacts() {
                                                 </Badge>
                                               )}
                                               {isDueToday && !isOverdue && (
-                                                <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs">
+                                                <Badge variant="secondary" className="bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400 text-xs">
                                                   Due Today
                                                 </Badge>
                                               )}
                                             </div>
                                             {task.description && (
-                                              <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                                 {task.description}
                                               </p>
                                             )}
@@ -2702,13 +2934,13 @@ export default function Contacts() {
                                                 {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
                                               </Badge>
                                               {task.dueDate && (
-                                                <span className="text-xs text-gray-500 flex items-center">
+                                                <span className="text-xs text-muted-foreground flex items-center">
                                                   <Calendar className="h-3 w-3 mr-1" />
                                                   {new Date(task.dueDate).toLocaleDateString()}
                                                 </span>
                                               )}
                                               {task.assignedTo && (
-                                                <span className="text-xs text-gray-500 flex items-center">
+                                                <span className="text-xs text-muted-foreground flex items-center">
                                                   <User className="h-3 w-3 mr-1" />
                                                   {task.assignedTo}
                                                 </span>
@@ -2763,40 +2995,40 @@ export default function Contacts() {
 
                         {/* Task Statistics */}
                         {contactTasks.length > 0 && (
-                          <Card className="p-4 bg-gray-50 border-gray-200">
+                          <Card className="p-4 bg-muted border-border">
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-sm font-medium text-gray-900">Task Summary</p>
+                                <p className="text-sm font-medium text-foreground">Task Summary</p>
                                 <div className="flex items-center space-x-6 mt-2">
                                   <div className="text-center">
-                                    <p className="text-lg font-bold text-gray-900">{contactTasks.length}</p>
-                                    <p className="text-xs text-gray-700">Total</p>
+                                    <p className="text-lg font-bold text-foreground">{contactTasks.length}</p>
+                                    <p className="text-xs text-muted-foreground">Total</p>
                                   </div>
                                   <div className="text-center">
-                                    <p className="text-lg font-bold text-green-900">
+                                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
                                       {contactTasks.filter((t: any) => t.status === 'completed').length}
                                     </p>
-                                    <p className="text-xs text-green-700">Completed</p>
+                                    <p className="text-xs text-green-600 dark:text-green-400">Completed</p>
                                   </div>
                                   <div className="text-center">
-                                    <p className="text-lg font-bold text-blue-900">
+                                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
                                       {contactTasks.filter((t: any) => t.status === 'in_progress').length}
                                     </p>
-                                    <p className="text-xs text-blue-700">In Progress</p>
+                                    <p className="text-xs text-blue-600 dark:text-blue-400">In Progress</p>
                                   </div>
                                   <div className="text-center">
-                                    <p className="text-lg font-bold text-red-900">
+                                    <p className="text-lg font-bold text-red-600 dark:text-red-400">
                                       {contactTasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed').length}
                                     </p>
-                                    <p className="text-xs text-red-700">Overdue</p>
+                                    <p className="text-xs text-red-600 dark:text-red-400">Overdue</p>
                                   </div>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-muted-foreground">
                                   Completion Rate
                                 </div>
-                                <div className="text-2xl font-bold text-gray-900">
+                                <div className="text-2xl font-bold text-foreground">
                                   {contactTasks.length > 0
                                     ? Math.round((contactTasks.filter((t: any) => t.status === 'completed').length / contactTasks.length) * 100)
                                     : 0}%
@@ -2814,9 +3046,9 @@ export default function Contacts() {
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-700 mb-2">Select a contact</h3>
-                  <p className="text-gray-500">Choose a contact from the list to view details</p>
+                  <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">Select a contact</h3>
+                  <p className="text-muted-foreground">Choose a contact from the list to view details</p>
                 </div>
               </div>
             )}
@@ -2838,7 +3070,7 @@ export default function Contacts() {
             <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-destructive hover:bg-destructive/90"
             >
               {t('common.delete', 'Delete')}
             </AlertDialogAction>
@@ -2864,7 +3096,7 @@ export default function Contacts() {
             <AlertDialogAction
               onClick={confirmBulkDelete}
               disabled={isBulkDeleting}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-destructive hover:bg-destructive/90"
             >
               {isBulkDeleting ? (
                 <>
@@ -2897,8 +3129,8 @@ export default function Contacts() {
 
           <div className="space-y-6 pt-4">
             {/* Contact Avatar Upload Section */}
-            <div className="flex flex-col items-center space-y-3 p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+            <div className="flex flex-col items-center space-y-3 p-4 border-2 border-dashed border-border rounded-lg hover:border-input transition-colors">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center overflow-hidden">
                 {addContactForm.avatarPreview ? (
                   <img
                     src={addContactForm.avatarPreview}
@@ -2906,12 +3138,12 @@ export default function Contacts() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <i className="ri-user-line text-2xl text-gray-400"></i>
+                  <i className="ri-user-line text-2xl text-muted-foreground"></i>
                 )}
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-600">{t('contacts.add.avatar_upload', 'Upload contact photo')}</p>
-                <p className="text-xs text-gray-400">{t('contacts.add.avatar_optional', 'Optional - JPG, PNG up to 5MB')}</p>
+                <p className="text-sm text-muted-foreground">{t('contacts.add.avatar_upload', 'Upload contact photo')}</p>
+                <p className="text-xs text-muted-foreground">{t('contacts.add.avatar_optional', 'Optional - JPG, PNG up to 5MB')}</p>
               </div>
               <div className="flex space-x-2">
                 <Button
@@ -2973,9 +3205,9 @@ export default function Contacts() {
                   {addContactForm.email && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                       {addContactForm.email.includes('@') && addContactForm.email.includes('.') ? (
-                        <i className="ri-check-line text-green-500"></i>
+                        <i className="ri-check-line text-green-500 dark:text-green-400"></i>
                       ) : (
-                        <i className="ri-error-warning-line text-orange-500"></i>
+                        <i className="ri-error-warning-line text-orange-500 dark:text-orange-400"></i>
                       )}
                     </div>
                   )}
@@ -3002,7 +3234,7 @@ export default function Contacts() {
                         : ''
                     }`}
                   />
-                  <i className="ri-phone-line absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                  <i className="ri-phone-line absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
                   {addContactForm.phone && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                       {validatePhoneNumber(addContactForm.phone).isValid ? (
@@ -3102,7 +3334,7 @@ export default function Contacts() {
                   disabled={isSubmittingContact}
                   className="focus:ring-2 focus:ring-primary-500"
                 />
-                <i className="ri-price-tag-3-line absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                <i className="ri-price-tag-3-line absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
               </div>
               <div className="flex flex-wrap gap-1 mt-2">
                 {['lead', 'customer', 'prospect', 'vip', 'partner'].map((tag) => (
@@ -3116,7 +3348,7 @@ export default function Contacts() {
                         setAddContactForm(prev => ({ ...prev, tags: newTags }));
                       }
                     }}
-                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
+                    className="px-2 py-1 text-xs bg-muted hover:bg-accent text-foreground rounded-full transition-colors"
                     disabled={isSubmittingContact}
                   >
                     + {tag}
@@ -3211,7 +3443,7 @@ export default function Contacts() {
                 <Label>{t('contacts.import.preview_label', 'Preview (first 5 rows)')}</Label>
                 <div className="border rounded-md overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-muted">
                       <tr>
                         {Object.keys(csvPreview[0] || {}).filter(header => !header.startsWith('_')).map((header) => (
                           <th key={header} className="px-3 py-2 text-left font-medium">
@@ -3291,7 +3523,7 @@ export default function Contacts() {
                   <span>{t('contacts.import.importing', 'Importing...')}</span>
                   <span>{importProgress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${importProgress}%` }}
@@ -3303,21 +3535,21 @@ export default function Contacts() {
             {importResults && (
               <div className="space-y-2">
                 <Label>{t('contacts.import.results_label', 'Import Results')}</Label>
-                <div className="p-4 border rounded-md bg-gray-50">
-                  <div className="flex items-center gap-2 text-green-600 mb-2">
+                <div className="p-4 border rounded-md bg-muted">
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
                     <CheckCircle className="h-4 w-4" />
                     <span>{t('contacts.import.successful', 'Successfully imported: {{count}}', { count: importResults?.successful || 0 })}</span>
                   </div>
                   {(importResults?.failed || 0) > 0 && (
-                    <div className="flex items-center gap-2 text-red-600 mb-2">
+                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-2">
                       <AlertCircle className="h-4 w-4" />
                       <span>{t('contacts.import.failed', 'Failed to import: {{count}}', { count: importResults?.failed || 0 })}</span>
                     </div>
                   )}
                   {(importResults?.errors?.length || 0) > 0 && (
                     <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-700 mb-1">{t('contacts.import.errors', 'Errors:')}</p>
-                      <ul className="text-xs text-gray-600 space-y-1">
+                      <p className="text-sm font-medium text-foreground mb-1">{t('contacts.import.errors', 'Errors:')}</p>
+                      <ul className="text-xs text-muted-foreground space-y-1">
                         {importResults?.errors?.slice(0, 5).map((error, index) => (
                           <li key={index}>• {error}</li>
                         ))}
@@ -3383,6 +3615,14 @@ export default function Contacts() {
         onSegmentCreated={handleSegmentCreated}
       />
 
+      {/* Add to Existing Segment Modal */}
+      <AddToExistingSegmentModal
+        isOpen={isAddToSegmentModalOpen}
+        onClose={() => setIsAddToSegmentModalOpen(false)}
+        selectedContactIds={Array.from(selectedContacts)}
+        onContactsAdded={handleContactsAddedToSegment}
+      />
+
       {/* WhatsApp Scraping Modal */}
       <WhatsAppScrapingModal
         isOpen={isWhatsAppScrapingModalOpen}
@@ -3405,7 +3645,7 @@ export default function Contacts() {
           <div className="space-y-4 py-4">
             {/* Channel Filter */}
             <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Channel</Label>
+              <Label className="text-sm font-medium text-foreground mb-2 block">Channel</Label>
               <Select value={channelFilter} onValueChange={(value) => {
                 setChannelFilter(value);
                 setCurrentPage(1);
@@ -3425,7 +3665,7 @@ export default function Contacts() {
 
             {/* Archived Filter */}
             <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Archived Status</Label>
+              <Label className="text-sm font-medium text-foreground mb-2 block">Archived Status</Label>
               <Select value={archivedFilter} onValueChange={(value) => {
                 setArchivedFilter(value);
                 setCurrentPage(1);
@@ -3443,7 +3683,7 @@ export default function Contacts() {
 
             {/* Date Filter */}
             <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Period</Label>
+              <Label className="text-sm font-medium text-foreground mb-2 block">Period</Label>
               <Select value={dateFilter} onValueChange={(value) => {
                 setDateFilter(value);
                 setCurrentPage(1);
@@ -3466,7 +3706,7 @@ export default function Contacts() {
 
             {/* Tags Filter */}
             <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Tags</Label>
+              <Label className="text-sm font-medium text-foreground mb-2 block">Tags</Label>
               <Select
                 value=""
                 onValueChange={(value) => {
@@ -3499,7 +3739,7 @@ export default function Contacts() {
                     <Badge
                       key={tag}
                       variant="secondary"
-                      className="text-xs px-2 py-0.5 flex items-center gap-1"
+                      className="text-xs px-2 py-0.5 flex items-center gap-1 !bg-muted !text-muted-foreground"
                     >
                       {tag}
                       <button
@@ -3507,7 +3747,7 @@ export default function Contacts() {
                           setTagsFilter(prev => prev.filter(t => t !== tag));
                           setCurrentPage(1);
                         }}
-                        className="ml-1 hover:text-red-600"
+                        className="ml-1 hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -3520,7 +3760,7 @@ export default function Contacts() {
                       setTagsFilter([]);
                       setCurrentPage(1);
                     }}
-                    className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
+                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
                   >
                     Clear all
                   </Button>
@@ -3545,7 +3785,7 @@ export default function Contacts() {
             </Button>
             <Button
               onClick={() => setIsFilterDialogOpen(false)}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="!bg-primary !text-primary-foreground hover:!bg-primary/90"
             >
               Apply Filters
             </Button>
@@ -3589,11 +3829,11 @@ export default function Contacts() {
                       setDocumentUploadForm(prev => ({ ...prev, file }));
                     }
                   }}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30"
                 />
               </div>
               {documentUploadForm.file && (
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Selected: {documentUploadForm.file.name} ({(documentUploadForm.file.size / 1024 / 1024).toFixed(2)} MB)
                 </p>
               )}
@@ -3640,7 +3880,7 @@ export default function Contacts() {
             {/* Description Field */}
             <div>
               <Label htmlFor="document-description" className="text-sm font-medium">
-                Description <span className="text-gray-400">(optional)</span>
+                Description <span className="text-muted-foreground">(optional)</span>
               </Label>
               <Textarea
                 id="document-description"
@@ -3659,7 +3899,7 @@ export default function Contacts() {
                   <span>Uploading...</span>
                   <span>{uploadProgress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
@@ -4087,8 +4327,8 @@ export default function Contacts() {
             <DialogTitle className="flex items-center space-x-2">
               <span>Schedule New Appointment</span>
               <div className="flex items-center space-x-1 text-sm font-normal">
-                <span className="text-gray-500">via</span>
-                <div className="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded-md">
+                <span className="text-muted-foreground">via</span>
+                <div className="flex items-center space-x-1 px-2 py-1 bg-muted rounded-md">
                   <div
                     className={`w-2 h-2 rounded-full ${
                       selectedProvider === 'google' ? 'bg-blue-500' :
@@ -4227,7 +4467,7 @@ export default function Contacts() {
                   </SelectItem>
                   <SelectItem value="8">
                     <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full bg-gray-500 mr-2"></div>
+                      <div className="w-3 h-3 rounded-full bg-muted-foreground mr-2"></div>
                       <span>Gray</span>
                     </div>
                   </SelectItem>
@@ -4310,6 +4550,26 @@ export default function Contacts() {
         </DialogContent>
         </DialogPortal>
       </Dialog>
+
+      {/* Call Type Selection Modal */}
+      <CallTypeSelectionModal
+        isOpen={isCallTypeModalOpen}
+        onClose={() => setIsCallTypeModalOpen(false)}
+        onSelectCallType={handleCallTypeSelected}
+      />
+
+      {/* Call Screen Modal */}
+      <CallScreenModal
+        isOpen={isCallScreenOpen}
+        onClose={() => setIsCallScreenOpen(false)}
+        callId={activeCallData?.callId || ''}
+        contactName={activeCallData?.contactName || ''}
+        contactPhone={activeCallData?.contactPhone || ''}
+        contactAvatar={activeCallData?.contactAvatar}
+        conferenceName={activeCallData?.conferenceName}
+        channelId={activeCallData?.channelId || channelConnections.find(conn => conn.channelType === 'twilio_voice' && conn.status === 'active')?.id}
+        callType={activeCallData?.callType}
+      />
     </div>
   );
 }

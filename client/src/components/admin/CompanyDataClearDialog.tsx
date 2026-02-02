@@ -200,9 +200,9 @@ export function CompanyDataClearDialog({
                 className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
                   canSelect 
                     ? isSelected 
-                      ? 'bg-blue-50 border-blue-200' 
-                      : 'bg-gray-50 hover:bg-gray-100 cursor-pointer'
-                    : 'bg-gray-25 border-gray-100 opacity-60'
+                      ? 'bg-blue-50 border-blue-200 dark:bg-blue-900 dark:border-blue-700' 
+                      : 'bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 cursor-pointer'
+                    : 'bg-gray-25 border-gray-100 dark:bg-gray-800 dark:border-gray-700 opacity-60'
                 }`}
                 onClick={() => canSelect && handleCategoryToggle(category.id)}
               >
@@ -227,15 +227,15 @@ export function CompanyDataClearDialog({
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-1">{category.description}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{category.description}</p>
                   {category.warning && (
                     <div className="flex items-start space-x-1 mt-2">
-                      <AlertTriangle className="h-3 w-3 text-amber-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-amber-700">{category.warning}</p>
+                      <AlertTriangle className="h-3 w-3 text-amber-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-amber-700 dark:text-amber-300">{category.warning}</p>
                     </div>
                   )}
                   {!canSelect && category.count === 0 && (
-                    <p className="text-xs text-gray-500 mt-1">No data to clear</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">No data to clear</p>
                   )}
                 </div>
               </div>
@@ -244,9 +244,9 @@ export function CompanyDataClearDialog({
         </div>
 
         {selectedCategories.length > 0 && (
-          <Alert className="border-blue-200 bg-blue-50">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
+          <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
               <strong>{selectedCategories.length}</strong> data type(s) selected for clearing.
               This will permanently remove the selected data from <strong>{companyName}</strong>.
             </AlertDescription>
@@ -260,7 +260,7 @@ export function CompanyDataClearDialog({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center text-orange-600">
+          <DialogTitle className="flex items-center text-orange-600 dark:text-orange-400">
             <Database className="h-5 w-5 mr-2" />
             {t('admin.company_data_clear.title', 'Clear Company Data')}: {companyName}
           </DialogTitle>
@@ -274,12 +274,12 @@ export function CompanyDataClearDialog({
         <div className="py-4">
           {step === 'preview' && (
             <div className="space-y-4">
-              <Alert className="border-orange-200 bg-orange-50">
-                <AlertTriangle className="h-4 w-4 text-orange-600" />
-                <AlertTitle className="text-orange-800">
+              <Alert className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <AlertTitle className="text-orange-800 dark:text-orange-300">
                   {t('admin.company_data_clear.preview.warning_title', 'Warning: Selective Data Removal')}
                 </AlertTitle>
-                <AlertDescription className="text-orange-700">
+                <AlertDescription className="text-orange-700 dark:text-orange-400">
                   {t('admin.company_data_clear.preview.warning_description', 'This will permanently delete the selected data types. This action cannot be undone.')}
                 </AlertDescription>
               </Alert>
@@ -294,12 +294,12 @@ export function CompanyDataClearDialog({
 
                   {preview.warnings.length > 0 && (
                     <div className="mt-4">
-                      <h4 className="font-medium mb-2 text-orange-800">
+                      <h4 className="font-medium mb-2 text-orange-800 dark:text-orange-300">
                         {t('admin.company_data_clear.preview.warnings_title', 'Important Warnings')}:
                       </h4>
                       <ul className="space-y-1">
                         {preview.warnings.map((warning, index) => (
-                          <li key={index} className="text-sm text-orange-700 flex items-start">
+                          <li key={index} className="text-sm text-orange-700 dark:text-orange-400 flex items-start">
                             <AlertTriangle className="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
                             {warning}
                           </li>
@@ -309,7 +309,7 @@ export function CompanyDataClearDialog({
                   )}
                 </div>
               ) : (
-                <div className="text-center py-4 text-orange-600">
+                <div className="text-center py-4 text-orange-600 dark:text-orange-400">
                   {t('admin.company_data_clear.preview.load_error', 'Failed to load data preview')}
                 </div>
               )}
@@ -318,24 +318,24 @@ export function CompanyDataClearDialog({
 
           {step === 'confirm' && (
             <div className="space-y-4">
-              <Alert className="border-orange-200 bg-orange-50">
-                <AlertTriangle className="h-4 w-4 text-orange-600" />
-                <AlertTitle className="text-orange-800">
+              <Alert className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <AlertTitle className="text-orange-800 dark:text-orange-300">
                   {t('admin.company_data_clear.confirm.title', 'Type Company Name to Continue')}
                 </AlertTitle>
-                <AlertDescription className="text-orange-700">
+                <AlertDescription className="text-orange-700 dark:text-orange-400">
                   {t('admin.company_data_clear.confirm.description', 'To confirm data clearing, type the exact company name')}: <strong>{companyName}</strong>
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                   <h4 className="font-medium mb-3">Selected data types to clear:</h4>
                   <div className="grid gap-2">
                     {getSelectedCategoriesData().map((category) => {
                       const Icon = category.icon;
                       return (
-                        <div key={category.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                        <div key={category.id} className="flex items-center justify-between p-2 bg-card rounded border">
                           <div className="flex items-center space-x-2">
                             <Icon className={`h-4 w-4 ${category.color}`} />
                             <span className="font-medium">{category.name}</span>
@@ -365,7 +365,7 @@ export function CompanyDataClearDialog({
                     value={confirmationName}
                     onChange={(e) => setConfirmationName(e.target.value)}
                     placeholder={t('admin.company_data_clear.confirm.placeholder', 'Type "{{name}}" to confirm', { name: companyName })}
-                    className="border-orange-300 focus:border-orange-500"
+                    className="border-orange-300 focus:border-orange-500 dark:border-orange-700 dark:focus:border-orange-500"
                   />
                 </div>
               </div>
@@ -374,21 +374,21 @@ export function CompanyDataClearDialog({
 
           {step === 'final' && (
             <div className="space-y-4">
-              <Alert className="border-red-200 bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <AlertTitle className="text-red-800">
+              <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertTitle className="text-red-800 dark:text-red-300">
                   {t('admin.company_data_clear.final.title', 'Final Confirmation')}
                 </AlertTitle>
-                <AlertDescription className="text-red-700">
+                <AlertDescription className="text-red-700 dark:text-red-400">
                   {t('admin.company_data_clear.final.description', 'You are about to permanently clear selected data from {{name}}. This action is irreversible.', { name: companyName })}
                 </AlertDescription>
               </Alert>
 
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">
                   {t('admin.company_data_clear.final.consequences_title', 'What will be cleared')}:
                 </h4>
-                <ul className="text-sm space-y-1 text-gray-700">
+                <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
                   {getSelectedCategoriesData().map((category) => (
                     <li key={category.id} className="flex items-center space-x-2">
                       <Trash2 className="h-3 w-3 text-red-500" />
@@ -401,9 +401,9 @@ export function CompanyDataClearDialog({
                 </ul>
               </div>
 
-              <Alert className="border-amber-200 bg-amber-50">
-                <Info className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800">
+              <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
                   <strong>Note:</strong> The company account and users will remain active. Only the selected data types will be cleared.
                 </AlertDescription>
               </Alert>
@@ -426,7 +426,7 @@ export function CompanyDataClearDialog({
                 variant="default"
                 onClick={() => setStep('confirm')}
                 disabled={!preview || selectedCategories.length === 0}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
+                className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800 text-white"
               >
                 {t('admin.company_data_clear.buttons.continue_to_confirmation', 'Continue to Confirmation')}
               </Button>
@@ -445,7 +445,7 @@ export function CompanyDataClearDialog({
                   variant="default"
                   onClick={() => setStep('final')}
                   disabled={confirmationName !== companyName}
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800 text-white"
                 >
                   {t('admin.company_data_clear.buttons.proceed_to_final', 'Proceed to Final Step')}
                 </Button>
@@ -465,7 +465,7 @@ export function CompanyDataClearDialog({
                   variant="destructive"
                   onClick={handleClearData}
                   disabled={isClearing}
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
                 >
                   {isClearing ? (
                     <>

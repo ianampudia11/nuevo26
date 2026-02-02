@@ -335,7 +335,7 @@ export function WysiwygEditor({ value, onChange, placeholder = "Start typing..."
   return (
     <div className={`wysiwyg-editor border rounded-lg ${className}`}>
       {/* Toolbar */}
-      <div className="flex items-center gap-1 p-2 border-b bg-gray-50">
+      <div className="flex items-center gap-1 p-2 border-b bg-muted">
         {/* Text Formatting */}
         <Button
           variant="ghost"

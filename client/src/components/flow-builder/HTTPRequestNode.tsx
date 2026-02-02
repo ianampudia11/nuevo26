@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useReactFlow } from 'reactflow';
-import { Trash2, Copy, Network, Settings, Plus, X, Play, CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Copy, Settings, Plus, X, Play, CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { useFlowContext } from '../../pages/flow-builder';
 import { Button } from "@/components/ui/button";
 import {
@@ -246,12 +246,12 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
 
   const getMethodColor = (method: string) => {
     switch (method) {
-      case 'GET': return 'text-blue-600';
-      case 'POST': return 'text-green-600';
-      case 'PUT': return 'text-orange-600';
-      case 'DELETE': return 'text-red-600';
-      case 'PATCH': return 'text-purple-600';
-      default: return 'text-gray-600';
+      case 'GET': return 'text-primary';
+      case 'POST': return 'text-primary';
+      case 'PUT': return 'text-secondary';
+      case 'DELETE': return 'text-destructive';
+      case 'PATCH': return 'text-primary';
+      default: return 'text-muted-foreground';
     }
   };
 
@@ -439,7 +439,7 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
   };
 
   return (
-    <div className="node-http-request rounded-lg bg-white border border-purple-200 shadow-sm max-w-[360px] group relative">
+    <div className="node-http-request rounded-lg bg-card border border-border shadow-sm max-w-[360px] group relative">
       <div className="absolute -top-8 -right-2 bg-background border rounded-md shadow-sm flex z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
           <Tooltip>
@@ -479,9 +479,13 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
       </div>
 
       {/* Fixed Header */}
-      <div className="p-3 border-b border-purple-100 bg-purple-50/30">
+      <div className="p-3 border-b border-primary/20 bg-primary/10">
         <div className="font-medium flex items-center gap-2">
-          <Network className="h-4 w-4 text-purple-600" />
+          <img 
+            src="https://cdn-icons-png.flaticon.com/128/1674/1674969.png" 
+            alt="HTTP Request" 
+            className="h-4 w-4"
+          />
           <span>{t('flow_builder.http_request', 'HTTP Request')}</span>
          <button
                 className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -507,7 +511,7 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
         <div className="p-3 space-y-3">
 
           {/* Configuration Summary */}
-          <div className="text-sm p-3 bg-secondary/40 rounded border border-border">
+          <div className="text-sm p-3  rounded border border-border">
             <div className="flex items-center gap-1 mb-2">
               <Settings className="h-3.5 w-3.5 text-muted-foreground" />
               <span className={cn("font-medium", getMethodColor(method))}>{method}</span>
@@ -526,27 +530,27 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
 
             <div className="flex flex-wrap gap-1">
               {authType !== 'none' && (
-                <span className="text-[10px] bg-purple-100 text-purple-800 px-1 py-0.5 rounded shrink-0">
+                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded shrink-0">
                   {t('flow_builder.http_auth', 'Auth')}: {AUTH_TYPES.find(t => t.id === authType)?.name}
                 </span>
               )}
               {headers.length > 0 && (
-                <span className="text-[10px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded shrink-0">
+                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded shrink-0">
                   {headers.length} {t('flow_builder.http_header', 'header')}{headers.length !== 1 ? 's' : ''}
                 </span>
               )}
               {body && (method === 'POST' || method === 'PUT' || method === 'PATCH') && (
-                <span className="text-[10px] bg-green-100 text-green-800 px-1 py-0.5 rounded shrink-0">
+                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded shrink-0">
                   {t('flow_builder.http_body_configured', 'Body configured')}
                 </span>
               )}
               {retryCount > 0 && (
-                <span className="text-[10px] bg-orange-100 text-orange-800 px-1 py-0.5 rounded shrink-0">
+                <span className="text-[10px] bg-secondary/10 text-secondary border border-secondary/20 px-1 py-0.5 rounded shrink-0">
                   {t('flow_builder.http_retry', 'Retry')}: {retryCount}x
                 </span>
               )}
               {variableMappings.length > 0 && (
-                <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded shrink-0">
+                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1 py-0.5 rounded shrink-0">
                   {variableMappings.length} {t('flow_builder.http_mapping', 'mapping')}{variableMappings.length !== 1 ? 's' : ''}
                 </span>
               )}
@@ -554,7 +558,7 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
           </div>
 
           {isEditing && (
-            <div className="text-xs space-y-3 border rounded p-2 bg-secondary/10">
+            <div className="text-xs space-y-3 border rounded p-2 ">
           <div>
             <Label className="block mb-1 font-medium">{t('flow_builder.http_quick_templates', 'Quick Templates')}</Label>
             <Select
@@ -883,7 +887,7 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
             </div>
 
             {variableMappings.length === 0 ? (
-              <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+              <div className="text-center py-4 border-2 border-dashed border-border rounded-lg bg-muted/50">
                 <div className="text-xs text-muted-foreground mb-2">
                   No variable mappings configured
                 </div>
@@ -894,29 +898,29 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
             ) : (
               <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
                 {variableMappings.map((mapping, index) => (
-                  <div key={index} className="group border rounded-lg p-2 bg-white hover:bg-gray-50/50 transition-colors">
+                  <div key={index} className="group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors">
                     <div className="flex gap-2 items-center">
                       <div className="flex-1">
-                        <Label className="text-[10px] font-medium text-gray-600 mb-1 block">Response Field</Label>
+                        <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Response Field</Label>
                         <Input
                           placeholder="response.data.id"
                           value={mapping.responseField}
                           onChange={(e) => updateVariableMapping(index, 'responseField', e.target.value)}
-                          className="text-xs h-6 border-gray-200"
+                          className="text-xs h-6 border-border"
                         />
                       </div>
                       <div className="flex items-center justify-center mt-4">
-                        <div className="bg-indigo-100 text-indigo-600 rounded-full p-1">
+                        <div className="bg-primary/10 text-primary rounded-full p-1">
                           <span className="text-xs font-medium">→</span>
                         </div>
                       </div>
                       <div className="flex-1">
-                        <Label className="text-[10px] font-medium text-gray-600 mb-1 block">Variable Name</Label>
+                        <Label className="text-[10px] font-medium text-muted-foreground mb-1 block">Variable Name</Label>
                         <Input
                           placeholder="http.user_id"
                           value={mapping.variableName}
                           onChange={(e) => updateVariableMapping(index, 'variableName', e.target.value)}
-                          className="text-xs h-6 border-gray-200"
+                          className="text-xs h-6 border-border"
                         />
                       </div>
                       <Button
@@ -929,8 +933,8 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
                       </Button>
                     </div>
                     {mapping.responseField && mapping.variableName && (
-                      <div className="mt-2 text-[9px] text-muted-foreground bg-gray-50 px-2 py-1 rounded">
-                        <code className="text-blue-600">&#123;&#123;{mapping.variableName}&#125;&#125;</code> will contain data from <code className="text-green-600">{mapping.responseField}</code>
+                      <div className="mt-2 text-[9px] text-muted-foreground bg-muted px-2 py-1 rounded">
+                        <code className="text-primary">&#123;&#123;{mapping.variableName}&#125;&#125;</code> will contain data from <code className="text-primary">{mapping.responseField}</code>
                       </div>
                     )}
                   </div>
@@ -938,8 +942,8 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
               </div>
             )}
 
-            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-[10px] text-blue-700">
+            <div className="mt-3 p-2 bg-primary/10 border border-primary/20 rounded-md">
+              <p className="text-[10px] text-primary">
                 💡 <strong>Tip:</strong> Use dot notation for nested fields (e.g., <code>response.data.user.id</code>) and create meaningful variable names for easy reference in subsequent nodes.
               </p>
             </div>
@@ -947,12 +951,12 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
 
           <div className="pt-3 border-t">
             <button
-              className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center justify-between w-full p-2 rounded hover:bg-gray-50 transition-colors"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center justify-between w-full p-2 rounded hover:bg-muted transition-colors"
               onClick={() => setShowVariablePreview(!showVariablePreview)}
             >
               <div className="flex items-center gap-2">
                 <span>Available Output Variables</span>
-                <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] bg-muted text-muted-foreground border border-border px-1.5 py-0.5 rounded-full">
                   {5 + variableMappings.filter(m => m.variableName).length} variables
                 </span>
               </div>
@@ -964,41 +968,41 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
             </button>
             {showVariablePreview && (
               <div className="mt-2 space-y-2">
-                <div className="text-[10px] bg-purple-50 border border-purple-200 p-2 rounded">
-                  <div className="font-medium text-purple-800 mb-2">Built-in Variables</div>
+                <div className="text-[10px] bg-primary/10 border border-primary/20 p-2 rounded">
+                  <div className="font-medium text-primary mb-2">Built-in Variables</div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <code className="text-purple-600 bg-white px-1 py-0.5 rounded">&#123;&#123;http.response.status&#125;&#125;</code>
-                      <span className="text-purple-700">HTTP status code</span>
+                      <code className="text-primary bg-card px-1 py-0.5 rounded">&#123;&#123;http.response.status&#125;&#125;</code>
+                      <span className="text-primary">HTTP status code</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <code className="text-purple-600 bg-white px-1 py-0.5 rounded">&#123;&#123;http.response.data&#125;&#125;</code>
-                      <span className="text-purple-700">Response body data</span>
+                      <code className="text-primary bg-card px-1 py-0.5 rounded">&#123;&#123;http.response.data&#125;&#125;</code>
+                      <span className="text-primary">Response body data</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <code className="text-purple-600 bg-white px-1 py-0.5 rounded">&#123;&#123;http.response.headers&#125;&#125;</code>
-                      <span className="text-purple-700">Response headers</span>
+                      <code className="text-primary bg-card px-1 py-0.5 rounded">&#123;&#123;http.response.headers&#125;&#125;</code>
+                      <span className="text-primary">Response headers</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <code className="text-purple-600 bg-white px-1 py-0.5 rounded">&#123;&#123;http.duration&#125;&#125;</code>
-                      <span className="text-purple-700">Request duration (ms)</span>
+                      <code className="text-primary bg-card px-1 py-0.5 rounded">&#123;&#123;http.duration&#125;&#125;</code>
+                      <span className="text-primary">Request duration (ms)</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <code className="text-purple-600 bg-white px-1 py-0.5 rounded">&#123;&#123;http.success&#125;&#125;</code>
-                      <span className="text-purple-700">Request success status</span>
+                      <code className="text-primary bg-card px-1 py-0.5 rounded">&#123;&#123;http.success&#125;&#125;</code>
+                      <span className="text-primary">Request success status</span>
                     </div>
                   </div>
                 </div>
 
                 {variableMappings.filter(m => m.variableName).length > 0 && (
-                  <div className="text-[10px] bg-indigo-50 border border-indigo-200 p-2 rounded">
-                    <div className="font-medium text-indigo-800 mb-2">Custom Mapped Variables</div>
+                  <div className="text-[10px] bg-primary/10 border border-primary/20 p-2 rounded">
+                    <div className="font-medium text-primary mb-2">Custom Mapped Variables</div>
                     <div className="space-y-1">
                       {variableMappings.map((mapping, index) => (
                         mapping.variableName && (
                           <div key={index} className="flex items-center justify-between">
-                            <code className="text-indigo-600 bg-white px-1 py-0.5 rounded">&#123;&#123;{mapping.variableName}&#125;&#125;</code>
-                            <span className="text-indigo-700 truncate ml-2">{mapping.responseField || 'Custom mapping'}</span>
+                            <code className="text-primary bg-card px-1 py-0.5 rounded">&#123;&#123;{mapping.variableName}&#125;&#125;</code>
+                            <span className="text-primary truncate ml-2">{mapping.responseField || 'Custom mapping'}</span>
                           </div>
                         )
                       ))}
@@ -1011,19 +1015,18 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
 
           <div className="text-[10px] text-muted-foreground mt-2">
             <p>
-              The HTTP Request node will fetch data from the specified URL.
-              Response data will be available as variables in subsequent nodes.
+              The HTTP request node makes an HTTP request when reached in the flow and continues immediately to the next node. Response data is stored in variables (http.lastResponse, http.status, http.data, etc.) for use in subsequent nodes. The HTTP request executes only once per flow execution.
             </p>
           </div>
 
           {showTestResult && testResult && (
-            <div className="mt-3 border rounded p-2 bg-secondary/5">
+            <div className="mt-3 border rounded p-2 ">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {testResult.success ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-primary" />
                   ) : (
-                    <XCircle className="h-4 w-4 text-red-600" />
+                    <XCircle className="h-4 w-4 text-destructive" />
                   )}
                   <span className="text-xs font-medium">
                     {testResult.success ? 'Request Successful' : 'Request Failed'}
@@ -1034,7 +1037,7 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
                     </span>
                   )}
                   {testResult.retryAttempts !== undefined && testResult.retryAttempts > 0 && (
-                    <span className="text-[10px] text-orange-600 flex items-center gap-1">
+                    <span className="text-[10px] text-secondary flex items-center gap-1">
                       <RotateCcw className="h-2.5 w-2.5" />
                       {testResult.retryAttempts} retries
                     </span>
@@ -1051,7 +1054,7 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
               </div>
 
               {testResult.error ? (
-                <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
                   {testResult.error}
                 </div>
               ) : (
@@ -1060,8 +1063,8 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
                     <span className="font-medium">Status:</span>
                     <span className={`px-1 py-0.5 rounded text-[10px] ${
                       testResult.success
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'bg-destructive/10 text-destructive border border-destructive/20'
                     }`}>
                       {testResult.status} {testResult.statusText}
                     </span>
@@ -1081,10 +1084,10 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
                         )}
                       </button>
                       {showResponseHeaders && (
-                        <div className="mt-1 text-[10px] bg-gray-50 p-2 rounded font-mono max-h-20 overflow-y-auto">
+                        <div className="mt-1 text-[10px] bg-muted p-2 rounded font-mono max-h-20 overflow-y-auto">
                           {Object.entries(testResult.headers).map(([key, value]) => (
                             <div key={key} className="break-words leading-tight">
-                              <span className="text-gray-600">{key}:</span> {
+                              <span className="text-foreground">{key}:</span> {
                                 typeof value === 'string' && value.length > 50
                                   ? `${value.substring(0, 50)}...`
                                   : value
@@ -1101,7 +1104,7 @@ export function HTTPRequestNode({ id, data, isConnectable }: HTTPRequestNodeProp
                       <div className="text-xs font-medium text-muted-foreground mb-1">
                         Response Data:
                       </div>
-                      <div className="text-[10px] bg-gray-50 p-2 rounded font-mono max-h-32 overflow-y-auto">
+                      <div className="text-[10px] bg-muted p-2 rounded font-mono max-h-32 overflow-y-auto">
                         {typeof testResult.data === 'string'
                           ? testResult.data
                           : JSON.stringify(testResult.data, null, 2)

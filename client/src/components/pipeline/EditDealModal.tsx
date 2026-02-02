@@ -7,6 +7,8 @@ import { Plus, X } from 'lucide-react';
 import { Deal } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { usePipeline } from '@/hooks/use-pipeline';
+import { useTranslation } from '@/hooks/use-translation';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -30,11 +32,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
-const editDealSchema = z.object({
-  title: z.string().min(2, 'Title must be at least 2 characters'),
-  stageId: z.string().min(1, 'Please select a pipeline stage'),
+const createEditDealSchema = (t: (key: string, fallback?: string) => string) => z.object({
+  title: z.string().min(2, t('pipeline.validation.title_min', 'Title must be at least 2 characters')),
+  stageId: z.string().min(1, t('pipeline.validation.stage_required', 'Please select a pipeline stage')),
   value: z.number().min(0).optional().nullable(),
-  contactId: z.number().min(1, 'Please select a contact'),
+  contactId: z.number().min(1, t('pipeline.validation.contact_required', 'Please select a contact')),
   priority: z.enum(['low', 'medium', 'high']).default('medium'),
   dueDate: z.date().optional().nullable(),
   assignedToUserId: z.number().optional().nullable(),
@@ -42,17 +44,22 @@ const editDealSchema = z.object({
   tags: z.array(z.string()).default([]),
 });
 
-type EditDealFormValues = z.infer<typeof editDealSchema>;
+type EditDealFormValues = z.infer<ReturnType<typeof createEditDealSchema>>;
 
 interface EditDealModalProps {
   deal: Deal | null;
   isOpen: boolean;
   onClose: () => void;
+  activePipelineId?: number | null;
 }
 
-export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalProps) {
+export default function EditDealModal({ deal, isOpen, onClose, activePipelineId }: EditDealModalProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { pipelines } = usePipeline();
+  const dealPipelineId = deal?.pipelineId || activePipelineId;
+  const currentPipeline = pipelines.find(p => p.id === dealPipelineId);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>('');
 
@@ -69,11 +76,20 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
   });
 
   const { data: pipelineStages = [] } = useQuery({
-    queryKey: ['/api/pipeline/stages'],
-    queryFn: () => apiRequest('GET', '/api/pipeline/stages')
-      .then(res => res.json()),
+    queryKey: ['/api/pipeline/stages', dealPipelineId],
+    queryFn: () => {
+      const queryParams = new URLSearchParams();
+      if (dealPipelineId) {
+        queryParams.append('pipelineId', dealPipelineId.toString());
+      }
+      const url = `/api/pipeline/stages${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      return apiRequest('GET', url)
+        .then(res => res.json());
+    },
+    enabled: !!dealPipelineId,
   });
 
+  const editDealSchema = createEditDealSchema(t);
   const form = useForm<EditDealFormValues>({
     resolver: zodResolver(editDealSchema),
     defaultValues: {
@@ -135,17 +151,19 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Deal has been updated",
+        title: t('common.success', 'Success'),
+        description: t('pipeline.deal_updated', 'Deal has been updated'),
       });
       queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
       resetForm();
       onClose();
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: `Failed to update deal: ${error.message}`,
+        title: t('common.error', 'Error'),
+        description: t('pipeline.deal_update_failed_edit', 'Failed to update deal: {{error}}', { error: error.message }),
         variant: "destructive",
       });
     },
@@ -172,8 +190,23 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
     }}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] md:max-h-[80vh] p-0 flex flex-col">
         <DialogHeader className="px-8 pt-6 pb-4">
-          <DialogTitle>Edit Deal</DialogTitle>
-          <DialogDescription>Update the deal information</DialogDescription>
+          <DialogTitle>{t('pipeline.edit_deal', 'Edit Deal')}</DialogTitle>
+          <DialogDescription>
+            {currentPipeline ? (
+              <div className="flex items-center gap-2 mt-1">
+                <span>{t('pipeline.deal_in', 'Deal in')}</span>
+                {currentPipeline.color && (
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: currentPipeline.color }}
+                  />
+                )}
+                <Badge variant="secondary">{currentPipeline.name}</Badge>
+              </div>
+            ) : (
+              t('pipeline.update_deal_information', 'Update the deal information')
+            )}
+          </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 px-4 py-6 overflow-auto">
           <Form {...form}>
@@ -184,9 +217,9 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                   name="title"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Deal Title</FormLabel>
+                      <FormLabel>{t('pipeline.deal_title', 'Deal Title')}</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter deal title" />
+                      <Input {...field} placeholder={t('pipeline.enter_deal_title', 'Enter deal title')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -198,11 +231,11 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                   name="contactId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Contact</FormLabel>
+                      <FormLabel>{t('pipeline.contact', 'Contact')}</FormLabel>
                       <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString() || undefined}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a contact" />
+                            <SelectValue placeholder={t('pipeline.select_contact', 'Select a contact')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -223,11 +256,11 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                   name="stageId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Pipeline Stage</FormLabel>
+                      <FormLabel>{t('pipeline.pipeline_stage_label', 'Pipeline Stage')}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a stage" />
+                            <SelectValue placeholder={t('pipeline.select_stage', 'Select a stage')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -254,7 +287,7 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                   name="value"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Deal Value ($)</FormLabel>
+                      <FormLabel>{t('pipeline.deal_value_dollar', 'Deal Value ($)')}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -274,17 +307,17 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                   name="priority"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Priority</FormLabel>
+                      <FormLabel>{t('pipeline.priority', 'Priority')}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select priority" />
+                            <SelectValue placeholder={t('pipeline.select_priority', 'Select priority')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="low">{t('pipeline.low', 'Low')}</SelectItem>
+                          <SelectItem value="medium">{t('pipeline.medium', 'Medium')}</SelectItem>
+                          <SelectItem value="high">{t('pipeline.high', 'High')}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -297,18 +330,18 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                   name="assignedToUserId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Assigned To</FormLabel>
+                      <FormLabel>{t('pipeline.assigned_to', 'Assigned To')}</FormLabel>
                       <Select
                         onValueChange={(value) => field.onChange(value === 'unassigned' ? null : parseInt(value))}
                         value={field.value?.toString() || 'unassigned'}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select assignee" />
+                            <SelectValue placeholder={t('pipeline.select_assignee', 'Select assignee')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">{t('pipeline.unassigned', 'Unassigned')}</SelectItem>
                           {teamMembers.map((member: any) => (
                             <SelectItem key={member.id} value={member.id.toString()}>
                               {member.fullName || member.username}
@@ -326,7 +359,7 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                   name="dueDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Due Date</FormLabel>
+                      <FormLabel>{t('pipeline.due_date', 'Due Date')}</FormLabel>
                       <FormControl>
                         <Input
                           type="date"
@@ -346,10 +379,10 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>{t('pipeline.description', 'Description')}</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Enter deal description..."
+                        placeholder={t('pipeline.enter_deal_description_placeholder', 'Enter deal description...')}
                         className="resize-none"
                         rows={3}
                         {...field}
@@ -362,10 +395,10 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
               />
 
               <div className="space-y-2">
-                <FormLabel>Tags</FormLabel>
+                <FormLabel>{t('pipeline.tags', 'Tags')}</FormLabel>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Add a tag..."
+                    placeholder={t('pipeline.add_tag_placeholder', 'Add a tag...')}
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyPress={(e) => {
@@ -382,10 +415,10 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
                 {selectedTags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selectedTags.map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1 !bg-muted !text-muted-foreground">
                         {tag}
                         <X
-                          className="h-3 w-3 cursor-pointer"
+                          className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-muted-foreground/80"
                           onClick={() => handleRemoveTag(tag)}
                         />
                       </Badge>
@@ -398,14 +431,14 @@ export default function EditDealModal({ deal, isOpen, onClose }: EditDealModalPr
         </ScrollArea>
         <DialogFooter className="px-8 py-4">
           <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
+            {t('common.cancel', 'Cancel')}
           </Button>
           <Button
             type="submit"
             onClick={form.handleSubmit(onSubmit)}
             disabled={updateDealMutation.isPending}
           >
-            {updateDealMutation.isPending ? 'Updating...' : 'Update Deal'}
+            {updateDealMutation.isPending ? t('pipeline.updating_deal', 'Updating...') : t('pipeline.update_deal', 'Update Deal')}
           </Button>
         </DialogFooter>
       </DialogContent>

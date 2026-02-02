@@ -197,7 +197,7 @@ export default function BusinessTemplatePanel({
   const getStatusBadge = (status?: string) => {
     if (status === 'approved') {
       return (
-        <Badge className="bg-green-100 text-green-800">
+        <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
           <CheckCircle2 className="h-3 w-3 mr-1" />
           {t('templates.status.approved', 'Approved')}
         </Badge>
@@ -226,7 +226,7 @@ export default function BusinessTemplatePanel({
           <Button
             variant="ghost"
             size="sm"
-            className={`flex items-center gap-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 ${className}`}
+            className={`flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-accent ${className}`}
             title={t('templates.use_business_template', 'Use WhatsApp Business Template')}
           >
             <MessageSquare className="h-4 w-4" />
@@ -237,7 +237,7 @@ export default function BusinessTemplatePanel({
         <PopoverContent className="w-80 p-0" align="start" side="top">
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-sm text-gray-900">
+              <h4 className="font-medium text-sm text-foreground">
                 {t('templates.select_template', 'Select Template')}
               </h4>
               <Button
@@ -251,7 +251,7 @@ export default function BusinessTemplatePanel({
             </div>
 
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder={t('templates.search', 'Search templates...')}
                 value={searchTerm}
@@ -262,11 +262,11 @@ export default function BusinessTemplatePanel({
 
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {isLoading ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
+                <div className="text-center py-4 text-muted-foreground text-sm">
                   {t('templates.loading', 'Loading templates...')}
                 </div>
               ) : searchFilteredTemplates.length === 0 ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
+                <div className="text-center py-4 text-muted-foreground text-sm">
                   {searchTerm
                     ? t('templates.no_results', 'No templates found')
                     : t('templates.no_templates_available', 'No approved templates available for this connection')
@@ -275,17 +275,17 @@ export default function BusinessTemplatePanel({
               ) : (
                 (Object.entries(groupedTemplates) as [string, WhatsAppTemplate[]][]).map(([category, categoryTemplates]) => (
                   <div key={category} className="mb-2">
-                    <div className="text-xs font-medium text-gray-500 px-2 py-1 mb-1">
+                    <div className="text-xs font-medium text-muted-foreground px-2 py-1 mb-1">
                       {t(`templates.category.${category}`, category)}
                     </div>
                     {categoryTemplates.map((template: WhatsAppTemplate) => (
                       <div
                         key={template.id}
-                        className="p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-colors"
+                        className="p-3 rounded-lg hover:bg-accent cursor-pointer border border-transparent hover:border-border transition-colors"
                         onClick={() => handleSelectTemplate(template)}
                       >
                         <div className="flex items-start justify-between mb-1">
-                          <h5 className="font-medium text-sm text-gray-900 truncate pr-2">
+                          <h5 className="font-medium text-sm text-foreground truncate pr-2">
                             {template.name}
                           </h5>
                           <div className="flex items-center gap-1 flex-shrink-0">
@@ -293,12 +293,12 @@ export default function BusinessTemplatePanel({
                             {getCategoryBadge(template.whatsappTemplateCategory)}
                           </div>
                         </div>
-                        <p className="text-xs text-gray-600 line-clamp-2">
+                        <p className="text-xs text-muted-foreground line-clamp-2">
                           {getTemplatePreview(template)}
                         </p>
                         {template.variables && template.variables.length > 0 && (
                           <div className="flex items-center mt-1">
-                            <span className="text-xs text-blue-600">
+                            <span className="text-xs text-primary">
                               {t('templates.variables_count', '{{count}} variables', { count: template.variables.length })}
                             </span>
                           </div>
@@ -326,9 +326,9 @@ export default function BusinessTemplatePanel({
           {selectedTemplate && (
             <div className="space-y-4">
               {/* Template Preview */}
-              <div className="border rounded-lg p-3 bg-gray-50">
-                <div className="text-xs text-gray-500 mb-1">{t('templates.preview', 'Preview')}</div>
-                <div className="text-sm text-gray-800 whitespace-pre-wrap">
+              <div className="border rounded-lg p-3 bg-muted">
+                <div className="text-xs text-muted-foreground mb-1">{t('templates.preview', 'Preview')}</div>
+                <div className="text-sm text-foreground whitespace-pre-wrap">
                   {getVariablePreview()}
                 </div>
               </div>
@@ -339,7 +339,7 @@ export default function BusinessTemplatePanel({
                   .sort((a, b) => parseInt(a) - parseInt(b))
                   .map((varIndex) => (
                     <div key={varIndex}>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">
+                      <label className="text-sm font-medium text-foreground mb-1 block">
                         {t('templates.variable_label', 'Variable {{index}}', { index: varIndex })}
                       </label>
                       <Input
