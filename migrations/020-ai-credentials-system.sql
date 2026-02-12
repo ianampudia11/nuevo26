@@ -101,17 +101,30 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_system_ai_credentials_updated_at 
-    BEFORE UPDATE ON system_ai_credentials 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- triggers for updated_at
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_system_ai_credentials_updated_at') THEN
+        CREATE TRIGGER update_system_ai_credentials_updated_at
+        BEFORE UPDATE ON system_ai_credentials
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+    END IF;
 
-CREATE TRIGGER update_company_ai_credentials_updated_at 
-    BEFORE UPDATE ON company_ai_credentials 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_company_ai_credentials_updated_at') THEN
+        CREATE TRIGGER update_company_ai_credentials_updated_at
+        BEFORE UPDATE ON company_ai_credentials
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+    END IF;
 
-CREATE TRIGGER update_company_ai_preferences_updated_at 
-    BEFORE UPDATE ON company_ai_preferences 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_company_ai_preferences_updated_at') THEN
+        CREATE TRIGGER update_company_ai_preferences_updated_at
+        BEFORE UPDATE ON company_ai_preferences
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 
 -- Insert default system preferences for existing companies
 INSERT INTO company_ai_preferences (company_id, credential_preference, fallback_enabled)
