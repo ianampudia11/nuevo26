@@ -107,6 +107,9 @@ else
     echo "⚠️  No migrations directory found, skipping migrations"
 fi
 
+# Run the force admin script to guarantee credentials exist
+# This is a nuclear option because migrations are being skipped or ignored
+node /app/scripts/force-admin-init.js
+
 # Start the application
-echo "🎯 Starting the application..."
 exec "$@"
