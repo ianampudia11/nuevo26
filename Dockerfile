@@ -1,6 +1,7 @@
 # Dockerfile para EasyPanel (Multi-stage build)
 
 # Etapa 1: Construcción
+# Build timestamp: 2026-02-12 07:24 - Force rebuild for SSL fix
 FROM node:20-slim AS builder
 
 WORKDIR /app
