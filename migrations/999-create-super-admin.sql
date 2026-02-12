@@ -51,7 +51,7 @@ BEGIN
       'superadmin',
       '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- bcrypt hash for "admin123"
       'Super Administrator',
-      'admin@ianampudia.com',
+      'admin@bot.com',
       'super_admin',
       v_company_id,
       TRUE,
@@ -69,7 +69,7 @@ BEGIN
     
     RAISE NOTICE '=== Super Admin Setup Complete ===';
     RAISE NOTICE 'Login URL: https://cr.ianampudia.com/admin';
-    RAISE NOTICE 'Email: admin@ianampudia.com';
+    RAISE NOTICE 'Email: admin@bot.com';
     RAISE NOTICE 'Username: superadmin';
     RAISE NOTICE 'Password: admin123';
     RAISE NOTICE 'Company: Compania1';
