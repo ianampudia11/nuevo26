@@ -59,11 +59,16 @@ COPY --from=builder /app/scripts ./scripts
 # Copiar archivo de licencia si existe
 COPY --from=builder /app/license ./license
 
+# Copiar script de entrypoint
+COPY --from=builder /app/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Crear directorios necesarios para persistencia
 RUN mkdir -p /app/uploads /app/whatsapp-sessions /app/backups
 
 # Exponer el puerto
 EXPOSE 9000
 
-# Script de inicio que maneja migraciones si es necesario
+# Configurar entrypoint y comando
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]
