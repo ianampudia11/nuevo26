@@ -44,11 +44,11 @@ ENV PGPASSWORD=postgres
 ENV PGHOST=postgres
 ENV PGDATABASE=powerchat
 
-# Copiar archivos de paquetes (incluyendo package-lock.json) - Updated 2026-02-11
-COPY package.json package-lock.json ./
+# Copiar package.json para referencia
+COPY package.json ./
 
-# Instalar solo dependencias de producción
-RUN npm install --production --no-optional
+# Copiar node_modules de producción desde la etapa de build
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copiar los artefactos construidos desde la etapa anterior
 COPY --from=builder /app/dist ./dist
