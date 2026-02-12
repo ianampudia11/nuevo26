@@ -81,6 +81,16 @@ import {
   type CompanySetting
 } from "@shared/schema";
 
+// Import stub definitions for missing tables
+import {
+  apiWebhooks, type ApiWebhook, type InsertApiWebhook,
+  calendarBookings, type CalendarBooking, type InsertCalendarBooking,
+  pipelines, type Pipeline, type InsertPipeline,
+  pipelineStageReverts, type PipelineStageRevert, type InsertPipelineStageRevert,
+  pipelineStageRevertLogs, type PipelineStageRevertLog, type InsertPipelineStageRevertLog,
+  companyCustomFields
+} from "@shared/schema-stubs";
+
 import session from "express-session";
 import { eq, and, desc, asc, or, sql, count, isNull, isNotNull, gt, gte, lt, lte, inArray, ne, not, SQL } from "drizzle-orm";
 import { filterGroupChatsFromConversations, isWhatsAppGroupChatId } from "./utils/whatsapp-group-filter";
