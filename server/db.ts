@@ -9,15 +9,24 @@ if (!secureEnv.validateIntegrity()) {
 }
 
 const sslConfig = () => {
-  const sslMode = process.env.PGSSLMODE || 'disable';
+  const databaseUrl = process.env.DATABASE_URL || '';
 
+  // Check if DATABASE_URL contains sslmode=disable
+  if (databaseUrl.includes('sslmode=disable')) {
+    return false;
+  }
+
+  // Check PGSSLMODE environment variable
+  const sslMode = process.env.PGSSLMODE || 'disable';
   if (sslMode === 'disable') {
     return false;
   }
 
-  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL?.includes('localhost')) {
+  // For production external databases, allow self-signed certificates
+  if (process.env.NODE_ENV === 'production' && !databaseUrl.includes('localhost')) {
     return { rejectUnauthorized: false };
   }
+
   return false;
 };
 
@@ -79,10 +88,10 @@ export let db = drizzle(poolInstance, { schema });
  * Used during maintenance operations like database restore
  */
 export async function drainPool(): Promise<void> {
-  
+
   isPoolDrained = true;
   await poolInstance.end();
-  
+
 }
 
 /**
@@ -90,7 +99,7 @@ export async function drainPool(): Promise<void> {
  * Used after maintenance operations like database restore
  */
 export function reinitializePool(): void {
-  
+
 
   poolInstance = new Pool({
     connectionString: secureEnv.getDatabaseUrl(),
@@ -110,5 +119,5 @@ export function reinitializePool(): void {
 
   isPoolDrained = false;
 
-  
+
 }
