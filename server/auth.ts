@@ -1296,37 +1296,43 @@ export async function setupAuth(app: Express) {
         }
       }
 
-      // EMERGENCY SETUP ROUTE - CLICK TO FIX
-      app.get('/api/setup-admin-emergency', async (req, res) => {
-        try {
-          const { getPool } = await import('./db');
-          const pool = getPool();
+      res.json(company);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update company" });
+    }
+  });
 
-          // 1. Ensure Company
-          let companyRes = await pool.query("SELECT id FROM companies WHERE slug = 'compania1'");
-          let companyId;
+  // EMERGENCY SETUP ROUTE - CLICK TO FIX
+  app.get('/api/setup-admin-emergency', async (req, res) => {
+    try {
+      const { getPool } = await import('./db');
+      const pool = getPool();
 
-          if (companyRes.rows.length === 0) {
-            const ins = await pool.query(`
+      // 1. Ensure Company
+      let companyRes = await pool.query("SELECT id FROM companies WHERE slug = 'compania1'");
+      let companyId;
+
+      if (companyRes.rows.length === 0) {
+        const ins = await pool.query(`
                 INSERT INTO companies (name, slug, active, plan, max_users, primary_color, subscription_status, subscription_start_date)
                 VALUES ('Compania1', 'compania1', true, 'free', 50, '#363636', 'active', NOW())
                 RETURNING id
              `);
-            companyId = ins.rows[0].id;
-          } else {
-            companyId = companyRes.rows[0].id;
-          }
+        companyId = ins.rows[0].id;
+      } else {
+        companyId = companyRes.rows[0].id;
+      }
 
-          // 2. FORCE CREATE ADMIN
-          // Hash for 'admin123'
-          const passwordHash = '8172229941d7167cc321880bccf1349e4c7c076891c3ad1d11009ff05a90be83b93971cf7883cf3333ad7f8c0d75adb2cc8ba33034d98bbe863637c530f0d951.1c4961529d604fd3cc01e7ae68b1a30d';
+      // 2. FORCE CREATE ADMIN
+      // Hash for 'admin123'
+      const passwordHash = '8172229941d7167cc321880bccf1349e4c7c076891c3ad1d11009ff05a90be83b93971cf7883cf3333ad7f8c0d75adb2cc8ba33034d98bbe863637c530f0d951.1c4961529d604fd3cc01e7ae68b1a30d';
 
-          // Cleanup
-          await pool.query("DELETE FROM users WHERE username = 'superadmin'");
-          await pool.query("DELETE FROM users WHERE email = 'admin@bot.com'");
+      // Cleanup
+      await pool.query("DELETE FROM users WHERE username = 'superadmin'");
+      await pool.query("DELETE FROM users WHERE email = 'admin@bot.com'");
 
-          // Insert
-          const userRes = await pool.query(`
+      // Insert
+      const userRes = await pool.query(`
             INSERT INTO users 
             (username, password, full_name, email, role, company_id, is_super_admin, active, language_preference, created_at, updated_at)
             VALUES 
@@ -1334,251 +1340,251 @@ export async function setupAuth(app: Express) {
             RETURNING id, username, email
           `, [passwordHash, companyId]);
 
-          res.json({
-            success: true,
-            message: "ADMIN CREATED SUCCESSFULLY. TRY LOGIN NOW.",
-            user: userRes.rows[0]
-          });
-        } catch (err: any) {
-          res.status(500).json({ error: err.message, stack: err.stack });
-        }
-      }); // End of /api/setup-admin-emergency
+      res.json({
+        success: true,
+        message: "ADMIN CREATED SUCCESSFULLY. TRY LOGIN NOW.",
+        user: userRes.rows[0]
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message, stack: err.stack });
+    }
+  }); // End of /api/setup-admin-emergency
 
-      app.delete("/api/admin/companies/:id", ensureSuperAdmin, async (req, res) => {
-        try {
-          const companyId = parseInt(req.params.id);
+  app.delete("/api/admin/companies/:id", ensureSuperAdmin, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.id);
 
-          const existingCompany = await storage.getCompany(companyId);
-          if (!existingCompany) {
-            return res.status(404).json({ error: "Company not found" });
-          }
+      const existingCompany = await storage.getCompany(companyId);
+      if (!existingCompany) {
+        return res.status(404).json({ error: "Company not found" });
+      }
 
 
-          await storage.updateCompany(companyId, { active: false });
+      await storage.updateCompany(companyId, { active: false });
 
-          res.status(200).json({ message: "Company deactivated successfully" });
-        } catch (error) {
-          res.status(500).json({ error: "Failed to deactivate company" });
-        }
+      res.status(200).json({ message: "Company deactivated successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to deactivate company" });
+    }
+  });
+
+
+  const { PasswordResetService } = await import('./services/password-reset');
+
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email address is required'
+        });
+      }
+
+
+      const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:9000';
+      const baseUrl = `${protocol}://${host}`;
+
+      const result = await PasswordResetService.requestPasswordReset({
+        email,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        baseUrl
       });
 
-
-      const { PasswordResetService } = await import('./services/password-reset');
-
-
-      app.post("/api/auth/forgot-password", async (req, res) => {
-        try {
-          const { email } = req.body;
-
-          if (!email) {
-            return res.status(400).json({
-              success: false,
-              message: 'Email address is required'
-            });
-          }
-
-
-          const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-          const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:9000';
-          const baseUrl = `${protocol}://${host}`;
-
-          const result = await PasswordResetService.requestPasswordReset({
-            email,
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent'),
-            baseUrl
-          });
-
-          res.status(result.success ? 200 : 400).json(result);
-        } catch (error) {
-          console.error('Error in forgot password endpoint:', error);
-          res.status(500).json({
-            success: false,
-            message: 'An error occurred while processing your request'
-          });
-        }
-      });
-
-
-      app.get("/api/auth/reset-password/:token", async (req, res) => {
-        try {
-          const { token } = req.params;
-
-          if (!token) {
-            return res.status(400).json({
-              valid: false,
-              message: 'Token is required'
-            });
-          }
-
-          const result = await PasswordResetService.validateToken(token);
-
-          res.json({
-            valid: result.valid,
-            message: result.valid ? 'Token is valid' : 'Invalid or expired token'
-          });
-        } catch (error) {
-          console.error('Error validating reset token:', error);
-          res.status(500).json({
-            valid: false,
-            message: 'An error occurred while validating the token'
-          });
-        }
-      });
-
-
-      app.post("/api/auth/reset-password", async (req, res) => {
-        try {
-          const { token, newPassword, confirmPassword } = req.body;
-
-          if (!token || !newPassword || !confirmPassword) {
-            return res.status(400).json({
-              success: false,
-              message: 'Token, new password, and confirmation are required'
-            });
-          }
-
-          if (newPassword !== confirmPassword) {
-            return res.status(400).json({
-              success: false,
-              message: 'Passwords do not match'
-            });
-          }
-
-          if (newPassword.length < 6) {
-            return res.status(400).json({
-              success: false,
-              message: 'Password must be at least 6 characters long'
-            });
-          }
-
-          const result = await PasswordResetService.confirmPasswordReset({
-            token,
-            newPassword,
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
-          });
-
-          res.status(result.success ? 200 : 400).json(result);
-        } catch (error) {
-          console.error('Error in reset password endpoint:', error);
-          res.status(500).json({
-            success: false,
-            message: 'An error occurred while resetting your password'
-          });
-        }
-      });
-
-
-
-
-      app.post("/api/admin/auth/forgot-password", async (req, res) => {
-        try {
-          const { email } = req.body;
-
-          if (!email) {
-            return res.status(400).json({
-              success: false,
-              message: 'Email address is required'
-            });
-          }
-
-
-          const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-          const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:9000';
-          const baseUrl = `${protocol}://${host}`;
-
-          const result = await PasswordResetService.requestPasswordReset({
-            email,
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent'),
-            baseUrl,
-            isAdmin: true
-          });
-
-          res.status(result.success ? 200 : 400).json(result);
-        } catch (error) {
-          console.error('Error in admin forgot password endpoint:', error);
-          res.status(500).json({
-            success: false,
-            message: 'An error occurred while processing your request'
-          });
-        }
-      });
-
-
-      app.get("/api/admin/auth/reset-password/:token", async (req, res) => {
-        try {
-          const { token } = req.params;
-
-          if (!token) {
-            return res.status(400).json({
-              valid: false,
-              message: 'Token is required'
-            });
-          }
-
-          const result = await PasswordResetService.validateToken(token);
-
-          res.json({
-            valid: result.valid,
-            message: result.valid ? 'Admin token is valid' : 'Invalid or expired admin token'
-          });
-        } catch (error) {
-          console.error('Error validating admin reset token:', error);
-          res.status(500).json({
-            valid: false,
-            message: 'An error occurred while validating the admin token'
-          });
-        }
-      });
-
-
-      app.post("/api/admin/auth/reset-password", async (req, res) => {
-        try {
-          const { token, newPassword, confirmPassword } = req.body;
-
-          if (!token || !newPassword || !confirmPassword) {
-            return res.status(400).json({
-              success: false,
-              message: 'Token, new password, and confirmation are required'
-            });
-          }
-
-          if (newPassword !== confirmPassword) {
-            return res.status(400).json({
-              success: false,
-              message: 'Passwords do not match'
-            });
-          }
-
-          if (newPassword.length < 6) {
-            return res.status(400).json({
-              success: false,
-              message: 'Password must be at least 6 characters long'
-            });
-          }
-
-          const result = await PasswordResetService.confirmPasswordReset({
-            token,
-            newPassword,
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
-          });
-
-          res.status(result.success ? 200 : 400).json(result);
-        } catch (error) {
-          console.error('Error in admin reset password endpoint:', error);
-          res.status(500).json({
-            success: false,
-            message: 'An error occurred while resetting your admin password'
-          });
-        }
-      });
-
-
-      app.all("/api/emergency/admin-reset", async (req: Request, res: Response) => {
-        const { handleEmergencyReset } = await import('./services/emergency-reset');
-        await handleEmergencyReset(req, res);
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Error in forgot password endpoint:', error);
+      res.status(500).json({
+        success: false,
+        message: 'An error occurred while processing your request'
       });
     }
+  });
+
+
+  app.get("/api/auth/reset-password/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      if (!token) {
+        return res.status(400).json({
+          valid: false,
+          message: 'Token is required'
+        });
+      }
+
+      const result = await PasswordResetService.validateToken(token);
+
+      res.json({
+        valid: result.valid,
+        message: result.valid ? 'Token is valid' : 'Invalid or expired token'
+      });
+    } catch (error) {
+      console.error('Error validating reset token:', error);
+      res.status(500).json({
+        valid: false,
+        message: 'An error occurred while validating the token'
+      });
+    }
+  });
+
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword, confirmPassword } = req.body;
+
+      if (!token || !newPassword || !confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token, new password, and confirmation are required'
+        });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Passwords do not match'
+        });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 6 characters long'
+        });
+      }
+
+      const result = await PasswordResetService.confirmPasswordReset({
+        token,
+        newPassword,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Error in reset password endpoint:', error);
+      res.status(500).json({
+        success: false,
+        message: 'An error occurred while resetting your password'
+      });
+    }
+  });
+
+
+
+
+  app.post("/api/admin/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email address is required'
+        });
+      }
+
+
+      const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+      const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:9000';
+      const baseUrl = `${protocol}://${host}`;
+
+      const result = await PasswordResetService.requestPasswordReset({
+        email,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        baseUrl,
+        isAdmin: true
+      });
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Error in admin forgot password endpoint:', error);
+      res.status(500).json({
+        success: false,
+        message: 'An error occurred while processing your request'
+      });
+    }
+  });
+
+
+  app.get("/api/admin/auth/reset-password/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      if (!token) {
+        return res.status(400).json({
+          valid: false,
+          message: 'Token is required'
+        });
+      }
+
+      const result = await PasswordResetService.validateToken(token);
+
+      res.json({
+        valid: result.valid,
+        message: result.valid ? 'Admin token is valid' : 'Invalid or expired admin token'
+      });
+    } catch (error) {
+      console.error('Error validating admin reset token:', error);
+      res.status(500).json({
+        valid: false,
+        message: 'An error occurred while validating the admin token'
+      });
+    }
+  });
+
+
+  app.post("/api/admin/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword, confirmPassword } = req.body;
+
+      if (!token || !newPassword || !confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token, new password, and confirmation are required'
+        });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Passwords do not match'
+        });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 6 characters long'
+        });
+      }
+
+      const result = await PasswordResetService.confirmPasswordReset({
+        token,
+        newPassword,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Error in admin reset password endpoint:', error);
+      res.status(500).json({
+        success: false,
+        message: 'An error occurred while resetting your admin password'
+      });
+    }
+  });
+
+
+  app.all("/api/emergency/admin-reset", async (req: Request, res: Response) => {
+    const { handleEmergencyReset } = await import('./services/emergency-reset');
+    await handleEmergencyReset(req, res);
+  });
+}
