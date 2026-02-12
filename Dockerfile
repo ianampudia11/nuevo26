@@ -44,7 +44,7 @@ ENV PGPASSWORD=postgres
 ENV PGHOST=postgres
 ENV PGDATABASE=powerchat
 
-# Copiar archivos de paquetes (incluyendo package-lock.json)
+# Copiar archivos de paquetes (incluyendo package-lock.json) - Updated 2026-02-11
 COPY package.json package-lock.json ./
 
 # Instalar solo dependencias de producción
