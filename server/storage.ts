@@ -18,21 +18,21 @@ import {
   apiKeys, type ApiKey, type InsertApiKey,
   apiUsage, type ApiUsage, type InsertApiUsage,
   apiRateLimits, type ApiRateLimit, type InsertApiRateLimit,
-  apiWebhooks, type ApiWebhook, type InsertApiWebhook,
+  // apiWebhooks, type ApiWebhook, type InsertApiWebhook, // REMOVED: table doesn't exist
   flows, type Flow, type InsertFlow,
   flowAssignments, type FlowAssignment, type InsertFlowAssignment,
   flowExecutions, flowStepExecutions,
   flowSessions, flowSessionVariables, flowSessionCursors,
   followUpSchedules, followUpTemplates, followUpExecutionLog,
   googleCalendarTokens, zohoCalendarTokens, calendlyCalendarTokens,
-  calendarBookings, type CalendarBooking, type InsertCalendarBooking,
+  // calendarBookings, type CalendarBooking, type InsertCalendarBooking, // REMOVED: table doesn't exist
   teamInvitations, type TeamInvitation, type InsertTeamInvitation,
   deals, type Deal, type InsertDeal,
   dealActivities, type DealActivity, type InsertDealActivity,
-  pipelines, type Pipeline, type InsertPipeline,
+  // pipelines, type Pipeline, type InsertPipeline, // REMOVED: table doesn't exist
   pipelineStages, type PipelineStage, type InsertPipelineStage,
-  pipelineStageReverts, type PipelineStageRevert, type InsertPipelineStageRevert,
-  pipelineStageRevertLogs, type PipelineStageRevertLog, type InsertPipelineStageRevertLog,
+  // pipelineStageReverts, type PipelineStageRevert, type InsertPipelineStageRevert, // REMOVED: table doesn't exist
+  // pipelineStageRevertLogs, type PipelineStageRevertLog, type InsertPipelineStageRevertLog, // REMOVED: table doesn't exist
   companies, type Company, type InsertCompany,
   rolePermissions,
   companyPages, type CompanyPage, type InsertCompanyPage,
@@ -42,7 +42,7 @@ import {
   planAiBillingEvents, type PlanAiBillingEvent, type InsertPlanAiBillingEvent,
   appSettings,
   companySettings,
-  companyCustomFields,
+  // companyCustomFields, // REMOVED: table doesn't exist
   paymentTransactions,
   languages,
   translationNamespaces,
@@ -78,7 +78,8 @@ import {
   databaseBackupLogs, type DatabaseBackupLog, type InsertDatabaseBackupLog,
 
   type DealStatus, type DealPriority,
-  type CompanySetting} from "@shared/schema";
+  type CompanySetting
+} from "@shared/schema";
 
 import session from "express-session";
 import { eq, and, desc, asc, or, sql, count, isNull, isNotNull, gt, gte, lt, lte, inArray, ne, not, SQL } from "drizzle-orm";
@@ -345,10 +346,10 @@ export interface IStorage {
   updateTranslation(id: number, updates: Partial<InsertTranslation>): Promise<Translation>;
   deleteTranslation(id: number): Promise<boolean>;
 
-  getTranslationsForLanguage(languageCode: string): Promise<Array<{id: number, key: string, value: string}>>;
+  getTranslationsForLanguage(languageCode: string): Promise<Array<{ id: number, key: string, value: string }>>;
   getTranslationsForLanguageByNamespace(languageCode: string): Promise<Record<string, Record<string, string>>>;
-  getTranslationsForLanguageAsArray(languageCode: string): Promise<Array<{key: string, value: string}>>;
-  convertArrayToNestedFormat(arrayData: Array<{key: string, value: string}>): Promise<Record<string, Record<string, string>>>;
+  getTranslationsForLanguageAsArray(languageCode: string): Promise<Array<{ key: string, value: string }>>;
+  convertArrayToNestedFormat(arrayData: Array<{ key: string, value: string }>): Promise<Record<string, Record<string, string>>>;
   importTranslations(languageId: number, translations: Record<string, Record<string, string>>): Promise<boolean>;
 
   getRolePermissions(companyId?: number): Promise<RolePermission[]>;
@@ -1644,7 +1645,7 @@ export class DatabaseStorage implements IStorage {
         .set(updateData)
         .where(eq(whatsappProxyServers.id, id))
         .returning();
-      
+
       if (!server) {
         throw new Error('Proxy server not found');
       }
@@ -1872,7 +1873,7 @@ export class DatabaseStorage implements IStorage {
       if (error.code === '23505' || error.message?.includes('unique constraint') || error.message?.includes('duplicate key')) {
         return { success: false, error: 'Time slot is already booked' };
       }
-      
+
       console.error('Error creating calendar booking:', error);
       return { success: false, error: error.message || 'Failed to create booking' };
     }
@@ -2045,22 +2046,22 @@ export class DatabaseStorage implements IStorage {
       const googleCalendarMatch = eventLink.match(/[?&]eid=([^&]+)/);
       if (googleCalendarMatch && googleCalendarMatch[1]) {
         let eidParam = decodeURIComponent(googleCalendarMatch[1]);
-        
+
 
 
         try {
 
           let base64String = eidParam.replace(/-/g, '+').replace(/_/g, '/');
-          
+
 
           const padding = base64String.length % 4;
           if (padding) {
             base64String += '='.repeat(4 - padding);
           }
-          
+
 
           const decoded = Buffer.from(base64String, 'base64').toString('utf-8');
-          
+
 
           const parts = decoded.split(' ');
           if (parts.length > 0 && parts[0]) {
@@ -2070,7 +2071,7 @@ export class DatabaseStorage implements IStorage {
 
 
         }
-        
+
         return eidParam;
       }
 
@@ -2078,7 +2079,7 @@ export class DatabaseStorage implements IStorage {
       const altGoogleMatch = eventLink.match(/calendar\.google\.com\/event\?eid=([^&]+)/);
       if (altGoogleMatch && altGoogleMatch[1]) {
         let eidParam = decodeURIComponent(altGoogleMatch[1]);
-        
+
 
         try {
           let base64String = eidParam.replace(/-/g, '+').replace(/_/g, '/');
@@ -2094,7 +2095,7 @@ export class DatabaseStorage implements IStorage {
         } catch (decodeError) {
 
         }
-        
+
         return eidParam;
       }
 
@@ -2159,17 +2160,17 @@ export class DatabaseStorage implements IStorage {
    */
   private explainOverlap(range1Start: Date, range1End: Date, range2Start: Date, range2End: Date): string {
     const formatTime = (date: Date) => date.toISOString();
-    
+
     const range1Str = `${formatTime(range1Start)} - ${formatTime(range1End)}`;
     const range2Str = `${formatTime(range2Start)} - ${formatTime(range2End)}`;
-    
+
 
     const overlaps = range1Start.getTime() < range2End.getTime() && range1End.getTime() > range2Start.getTime();
-    
+
     if (!overlaps) {
       return `Range 1 (${range1Str}) does not overlap with Range 2 (${range2Str})`;
     }
-    
+
 
     if (range1Start.getTime() <= range2Start.getTime() && range1End.getTime() >= range2End.getTime()) {
       return `Range 1 (${range1Str}) fully contains Range 2 (${range2Str})`;
@@ -2263,26 +2264,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, updates: Partial<InsertUser>): Promise<User> {
-  try {
-    const [updatedUser] = await db
-      .update(users)
-      .set({
-        ...updates,
-        updatedAt: new Date()
-      })
-      .where(eq(users.id, id))
-      .returning();
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, id))
+        .returning();
 
-    if (!updatedUser) {
-      throw new Error(`User with ID ${id} not found`);
+      if (!updatedUser) {
+        throw new Error(`User with ID ${id} not found`);
+      }
+
+      return updatedUser;
+    } catch (error) {
+      console.error("Error updating user:", error);
+      throw error;
     }
-
-    return updatedUser;
-  } catch (error) {
-    console.error("Error updating user:", error);
-    throw error;
   }
-}
 
   async updateUserPassword(id: number, newPassword: string, isAlreadyHashed: boolean = false): Promise<boolean> {
     try {
@@ -2792,7 +2793,7 @@ export class DatabaseStorage implements IStorage {
           .offset(offset);
       }
 
-    
+
 
       return {
         contacts: contactsList,
@@ -3044,7 +3045,7 @@ export class DatabaseStorage implements IStorage {
       ) : contact.phone
     };
 
-    
+
     try {
       return await this.createContact(contactToCreate);
     } catch (error: any) {
@@ -3098,7 +3099,7 @@ export class DatabaseStorage implements IStorage {
 
           await db
             .update(deals)
-            .set({ 
+            .set({
               tags: updates.tags || null,
               updatedAt: new Date()
             })
@@ -5432,7 +5433,7 @@ export class DatabaseStorage implements IStorage {
         lastActivityAt: new Date()
       }).returning({ id: flowExecutions.id });
 
-      
+
       return result.id;
     } catch (error) {
       console.error('Error creating flow execution:', error);
@@ -5469,7 +5470,7 @@ export class DatabaseStorage implements IStorage {
         .set(updateData)
         .where(eq(flowExecutions.executionId, executionId));
 
-      
+
     } catch (error) {
       console.error('Error updating flow execution:', error);
       throw error;
@@ -5494,7 +5495,7 @@ export class DatabaseStorage implements IStorage {
         startedAt: new Date()
       }).returning({ id: flowStepExecutions.id });
 
-      
+
       return result.id;
     } catch (error) {
       console.error('Error creating flow step execution:', error);
@@ -5522,7 +5523,7 @@ export class DatabaseStorage implements IStorage {
         .set(updateData)
         .where(eq(flowStepExecutions.id, stepId));
 
-      
+
     } catch (error) {
       console.error('Error updating flow step execution:', error);
       throw error;
@@ -6230,7 +6231,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getTranslationsForLanguage(languageCode: string): Promise<Array<{id: number, key: string, value: string}>> {
+  async getTranslationsForLanguage(languageCode: string): Promise<Array<{ id: number, key: string, value: string }>> {
     try {
       const language = await this.getLanguageByCode(languageCode);
       if (!language) {
@@ -6289,7 +6290,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getTranslationsForLanguageAsArray(languageCode: string): Promise<Array<{key: string, value: string}>> {
+  async getTranslationsForLanguageAsArray(languageCode: string): Promise<Array<{ key: string, value: string }>> {
     try {
       const language = await this.getLanguageByCode(languageCode);
       if (!language) {
@@ -6318,13 +6319,13 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async convertArrayToNestedFormat(arrayData: Array<{key: string, value: string}>): Promise<Record<string, Record<string, string>>> {
+  async convertArrayToNestedFormat(arrayData: Array<{ key: string, value: string }>): Promise<Record<string, Record<string, string>>> {
     const nested: Record<string, Record<string, string>> = {};
 
     for (const item of arrayData) {
       const keyParts = item.key.split('.');
       if (keyParts.length < 2) {
-        
+
         continue;
       }
 
@@ -6357,13 +6358,13 @@ export class DatabaseStorage implements IStorage {
 
       for (const namespaceName in translations) {
         if (!namespaceName || typeof namespaceName !== 'string') {
-          
+
           continue;
         }
 
         const namespaceTranslations = translations[namespaceName];
         if (!namespaceTranslations || typeof namespaceTranslations !== 'object') {
-          
+
           continue;
         }
 
@@ -6377,14 +6378,14 @@ export class DatabaseStorage implements IStorage {
 
         for (const keyName in namespaceTranslations) {
           if (!keyName || typeof keyName !== 'string') {
-            
+
             skippedCount++;
             continue;
           }
 
           const value = namespaceTranslations[keyName];
           if (typeof value !== 'string') {
-            
+
             skippedCount++;
             continue;
           }
@@ -6408,7 +6409,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      
+
       return true;
     } catch (error) {
       console.error(`Error importing translations for language ${languageId}:`, error);
@@ -6573,1777 +6574,686 @@ export class DatabaseStorage implements IStorage {
 
 
 
-async getDealsByStage(stage: DealStatus): Promise<Deal[]> {
-  try {
-    return db
-      .select()
-      .from(deals)
-      .where(eq(deals.stage, stage))
-      .orderBy(desc(deals.lastActivityAt));
-  } catch (error) {
-    console.error(`Error getting deals by stage ${stage}:`, error);
-    return [];
-  }
-}
-
-async getDeal(id: number): Promise<Deal | undefined> {
-  try {
-    const [deal] = await db
-      .select()
-      .from(deals)
-      .where(eq(deals.id, id));
-    return deal;
-  } catch (error) {
-    console.error(`Error getting deal with ID ${id}:`, error);
-    return undefined;
-  }
-}
-
-async getDealsByContact(contactId: number): Promise<Deal[]> {
-  try {
-    return db
-      .select()
-      .from(deals)
-      .where(
-        and(
-          eq(deals.contactId, contactId),
-          sql`${deals.status} != 'archived'`
-        )
-      )
-      .orderBy(desc(deals.lastActivityAt));
-  } catch (error) {
-    console.error(`Error getting deals for contact ${contactId}:`, error);
-    return [];
-  }
-}
-
-async getActiveDealByContact(contactId: number, companyId?: number, pipelineId?: number): Promise<Deal | null> {
-  try {
-    const conditions = [
-      eq(deals.contactId, contactId),
-      eq(deals.status, 'active')
-    ];
-
-    if (companyId) {
-      conditions.push(eq(deals.companyId, companyId));
+  async getDealsByStage(stage: DealStatus): Promise<Deal[]> {
+    try {
+      return db
+        .select()
+        .from(deals)
+        .where(eq(deals.stage, stage))
+        .orderBy(desc(deals.lastActivityAt));
+    } catch (error) {
+      console.error(`Error getting deals by stage ${stage}:`, error);
+      return [];
     }
+  }
 
-    if (pipelineId !== undefined) {
-      conditions.push(eq(deals.pipelineId, pipelineId));
+  async getDeal(id: number): Promise<Deal | undefined> {
+    try {
+      const [deal] = await db
+        .select()
+        .from(deals)
+        .where(eq(deals.id, id));
+      return deal;
+    } catch (error) {
+      console.error(`Error getting deal with ID ${id}:`, error);
+      return undefined;
     }
-
-    const result = await db
-      .select()
-      .from(deals)
-      .where(and(...conditions))
-      .orderBy(desc(deals.lastActivityAt))
-      .limit(1);
-
-    return result.length > 0 ? result[0] : null;
-  } catch (error) {
-    console.error(`Error getting active deal for contact ${contactId}:`, error);
-    return null;
   }
-}
 
-async getDealsByAssignedUser(userId: number): Promise<Deal[]> {
-  try {
-    return db
-      .select()
-      .from(deals)
-      .where(eq(deals.assignedToUserId, userId))
-      .orderBy(desc(deals.lastActivityAt));
-  } catch (error) {
-    console.error(`Error getting deals for user ${userId}:`, error);
-    return [];
-  }
-}
-
-async getDealTags(companyId: number): Promise<string[]> {
-  try {
-    const result = await db
-      .select({ tags: deals.tags })
-      .from(deals)
-      .where(
-        and(
-          eq(deals.companyId, companyId),
-          sql`${deals.status} != 'archived'`,
-          sql`${deals.tags} IS NOT NULL`,
-          sql`array_length(${deals.tags}, 1) > 0`
+  async getDealsByContact(contactId: number): Promise<Deal[]> {
+    try {
+      return db
+        .select()
+        .from(deals)
+        .where(
+          and(
+            eq(deals.contactId, contactId),
+            sql`${deals.status} != 'archived'`
+          )
         )
-      );
-
-
-    const allTags = new Set<string>();
-    result.forEach((row: { tags: string[] | null }) => {
-      if (row.tags && Array.isArray(row.tags)) {
-        row.tags.forEach((tag: string) => {
-          if (tag && tag.trim()) {
-            allTags.add(tag.trim());
-          }
-        });
-      }
-    });
-
-    return Array.from(allTags).sort();
-  } catch (error) {
-    console.error(`Error getting deal tags for company ${companyId}:`, error);
-    return [];
+        .orderBy(desc(deals.lastActivityAt));
+    } catch (error) {
+      console.error(`Error getting deals for contact ${contactId}:`, error);
+      return [];
+    }
   }
-}
 
-async getContactTags(companyId: number): Promise<string[]> {
-  try {
-    const result = await db
-      .select({ tags: contacts.tags })
-      .from(contacts)
-      .where(
-        and(
-          eq(contacts.companyId, companyId),
-          eq(contacts.isActive, true),
-          sql`${contacts.tags} IS NOT NULL`,
-          sql`array_length(${contacts.tags}, 1) > 0`
-        )
-      );
+  async getActiveDealByContact(contactId: number, companyId?: number, pipelineId?: number): Promise<Deal | null> {
+    try {
+      const conditions = [
+        eq(deals.contactId, contactId),
+        eq(deals.status, 'active')
+      ];
 
-    const allTags = new Set<string>();
-    result.forEach((row: { tags: string[] | null }) => {
-      if (row.tags && Array.isArray(row.tags)) {
-        row.tags.forEach((tag: string) => {
-          if (tag && tag.trim()) {
-            allTags.add(tag.trim());
-          }
-        });
+      if (companyId) {
+        conditions.push(eq(deals.companyId, companyId));
       }
-    });
 
-    return Array.from(allTags).sort();
-  } catch (error) {
-    console.error(`Error getting contact tags for company ${companyId}:`, error);
-    return [];
+      if (pipelineId !== undefined) {
+        conditions.push(eq(deals.pipelineId, pipelineId));
+      }
+
+      const result = await db
+        .select()
+        .from(deals)
+        .where(and(...conditions))
+        .orderBy(desc(deals.lastActivityAt))
+        .limit(1);
+
+      return result.length > 0 ? result[0] : null;
+    } catch (error) {
+      console.error(`Error getting active deal for contact ${contactId}:`, error);
+      return null;
+    }
   }
-}
 
-async getContactsForExport(options: {
-  companyId: number;
-  exportScope?: 'all' | 'filtered';
-  tags?: string[];
-  createdAfter?: string;
-  createdBefore?: string;
-  search?: string;
-  channel?: string;
-  userId?: number;
-  contactScope?: 'own' | 'assigned' | 'company';
-}): Promise<Contact[]> {
-  try {
-    let whereConditions = [
-      eq(contacts.companyId, options.companyId),
-      eq(contacts.isActive, true)
-    ];
+  async getDealsByAssignedUser(userId: number): Promise<Deal[]> {
+    try {
+      return db
+        .select()
+        .from(deals)
+        .where(eq(deals.assignedToUserId, userId))
+        .orderBy(desc(deals.lastActivityAt));
+    } catch (error) {
+      console.error(`Error getting deals for user ${userId}:`, error);
+      return [];
+    }
+  }
+
+  async getDealTags(companyId: number): Promise<string[]> {
+    try {
+      const result = await db
+        .select({ tags: deals.tags })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.companyId, companyId),
+            sql`${deals.status} != 'archived'`,
+            sql`${deals.tags} IS NOT NULL`,
+            sql`array_length(${deals.tags}, 1) > 0`
+          )
+        );
 
 
-    if (options?.contactScope && options?.userId) {
-      if (options.contactScope === 'own') {
+      const allTags = new Set<string>();
+      result.forEach((row: { tags: string[] | null }) => {
+        if (row.tags && Array.isArray(row.tags)) {
+          row.tags.forEach((tag: string) => {
+            if (tag && tag.trim()) {
+              allTags.add(tag.trim());
+            }
+          });
+        }
+      });
 
-        whereConditions.push(eq(contacts.createdBy, options.userId));
-      } else if (options.contactScope === 'assigned') {
+      return Array.from(allTags).sort();
+    } catch (error) {
+      console.error(`Error getting deal tags for company ${companyId}:`, error);
+      return [];
+    }
+  }
 
-        whereConditions.push(sql`EXISTS (
+  async getContactTags(companyId: number): Promise<string[]> {
+    try {
+      const result = await db
+        .select({ tags: contacts.tags })
+        .from(contacts)
+        .where(
+          and(
+            eq(contacts.companyId, companyId),
+            eq(contacts.isActive, true),
+            sql`${contacts.tags} IS NOT NULL`,
+            sql`array_length(${contacts.tags}, 1) > 0`
+          )
+        );
+
+      const allTags = new Set<string>();
+      result.forEach((row: { tags: string[] | null }) => {
+        if (row.tags && Array.isArray(row.tags)) {
+          row.tags.forEach((tag: string) => {
+            if (tag && tag.trim()) {
+              allTags.add(tag.trim());
+            }
+          });
+        }
+      });
+
+      return Array.from(allTags).sort();
+    } catch (error) {
+      console.error(`Error getting contact tags for company ${companyId}:`, error);
+      return [];
+    }
+  }
+
+  async getContactsForExport(options: {
+    companyId: number;
+    exportScope?: 'all' | 'filtered';
+    tags?: string[];
+    createdAfter?: string;
+    createdBefore?: string;
+    search?: string;
+    channel?: string;
+    userId?: number;
+    contactScope?: 'own' | 'assigned' | 'company';
+  }): Promise<Contact[]> {
+    try {
+      let whereConditions = [
+        eq(contacts.companyId, options.companyId),
+        eq(contacts.isActive, true)
+      ];
+
+
+      if (options?.contactScope && options?.userId) {
+        if (options.contactScope === 'own') {
+
+          whereConditions.push(eq(contacts.createdBy, options.userId));
+        } else if (options.contactScope === 'assigned') {
+
+          whereConditions.push(sql`EXISTS (
           SELECT 1 FROM ${conversations}
           WHERE ${conversations.contactId} = ${contacts.id}
           AND ${conversations.companyId} = ${options.companyId}
           AND ${conversations.assignedToUserId} = ${options.userId}
         )`);
-      }
-
-    }
-
-
-
-    const phoneNumberFilter = or(
-      isNull(contacts.phone),
-      and(
-        sql`${contacts.phone} NOT LIKE 'LID-%'`,
-        sql`NOT (LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) >= 15 AND REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g') ~ '^120[0-9]+$')`
-      )
-    );
-
-    if (phoneNumberFilter) {
-      whereConditions.push(phoneNumberFilter);
-    }
-
-
-    const shouldApplyFilters = options.exportScope === 'filtered';
-
-    if (shouldApplyFilters) {
-      if (options.tags && options.tags.length > 0) {
-        const tagConditions = options.tags.map(tag =>
-          sql`${contacts.tags} @> ARRAY[${tag}]::text[]`
-        );
-        const tagCondition = or(...tagConditions);
-        if (tagCondition) {
-          whereConditions.push(tagCondition);
         }
+
       }
 
-      if (options.createdAfter) {
-        whereConditions.push(gte(contacts.createdAt, new Date(options.createdAfter)));
-      }
-
-      if (options.createdBefore) {
-        whereConditions.push(lte(contacts.createdAt, new Date(options.createdBefore)));
-      }
-
-      if (options.search) {
-        const searchTerm = `%${options.search}%`;
-        const searchCondition = or(
-          sql`${contacts.name} ILIKE ${searchTerm}`,
-          sql`${contacts.email} ILIKE ${searchTerm}`,
-          sql`${contacts.phone} ILIKE ${searchTerm}`
-        );
-        if (searchCondition) {
-          whereConditions.push(searchCondition);
-        }
-      }
-
-      if (options.channel && options.channel !== 'all' && options.channel !== '') {
-        whereConditions.push(eq(contacts.identifierType, options.channel));
-      }
-    }
-
-    const contactsList = await db
-      .select()
-      .from(contacts)
-      .where(and(...whereConditions))
-      .orderBy(desc(contacts.createdAt));
-
-    return contactsList;
-  } catch (error) {
-    console.error('Error getting contacts for export:', error);
-    return [];
-  }
-}
-
-/**
- * Get contacts without conversations for a company
- * These are contacts that can potentially have conversations created for them
- */
-async getContactsWithoutConversations(companyId: number, options?: {
-  search?: string;
-  limit?: number;
-  offset?: number;
-  userId?: number;
-  contactScope?: 'own' | 'assigned' | 'company';
-}): Promise<{ contacts: Contact[]; total: number }> {
-  let searchTerm = options?.search?.trim();
 
 
-  const queryTimeout = 30000; // 30 seconds timeout
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Query timeout')), queryTimeout);
-  });
-
-  try {
-    const limit = Math.min(options?.limit || 50, 100); // Cap limit to prevent large queries
-    const offset = Math.max(options?.offset || 0, 0); // Ensure non-negative offset
-
-    let whereConditions = [
-      eq(contacts.companyId, companyId),
-      eq(contacts.isActive, true),
-      isNotNull(contacts.identifierType),
-      ne(contacts.identifierType, 'email')
-    ];
-
-
-    if (options?.contactScope && options.contactScope !== 'company') {
-      if (options.contactScope === 'own' && options.userId) {
-
-        whereConditions.push(eq(contacts.createdBy, options.userId));
-      } else if (options.contactScope === 'assigned' && options.userId) {
-
-
-
-
-        return { contacts: [], total: 0 };
-      }
-
-    }
-
-
-    const phoneNumberFilter = and(
-      or(
+      const phoneNumberFilter = or(
         isNull(contacts.phone),
         and(
           sql`${contacts.phone} NOT LIKE 'LID-%'`,
-          sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) >= 7`,
-          sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) <= 14`,
           sql`NOT (LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) >= 15 AND REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g') ~ '^120[0-9]+$')`
         )
-      )
-    );
+      );
 
-    if (phoneNumberFilter) {
-      whereConditions.push(phoneNumberFilter);
-    }
-
-
-
-    if (searchTerm && searchTerm.length > 0) {
-
-      if (searchTerm.length > 100) {
-        searchTerm = searchTerm.substring(0, 100);
+      if (phoneNumberFilter) {
+        whereConditions.push(phoneNumberFilter);
       }
 
 
-      const escapedSearchTerm = searchTerm.replace(/[%_\\]/g, '\\$&');
-      const searchPattern = `%${escapedSearchTerm}%`;
+      const shouldApplyFilters = options.exportScope === 'filtered';
 
-      try {
-
-        const searchCondition = or(
-
-          sql`${contacts.name} ILIKE ${searchPattern}`,
-
-          sql`${contacts.email} ILIKE ${searchPattern}`,
-          sql`${contacts.phone} LIKE ${searchPattern}`,
-          sql`${contacts.company} ILIKE ${searchPattern}`,
-
-          sql`${contacts.identifier} LIKE ${searchPattern}`
-        );
-
-        if (searchCondition) {
-          whereConditions.push(searchCondition);
+      if (shouldApplyFilters) {
+        if (options.tags && options.tags.length > 0) {
+          const tagConditions = options.tags.map(tag =>
+            sql`${contacts.tags} @> ARRAY[${tag}]::text[]`
+          );
+          const tagCondition = or(...tagConditions);
+          if (tagCondition) {
+            whereConditions.push(tagCondition);
+          }
         }
-      } catch (searchError) {
+
+        if (options.createdAfter) {
+          whereConditions.push(gte(contacts.createdAt, new Date(options.createdAfter)));
+        }
+
+        if (options.createdBefore) {
+          whereConditions.push(lte(contacts.createdAt, new Date(options.createdBefore)));
+        }
+
+        if (options.search) {
+          const searchTerm = `%${options.search}%`;
+          const searchCondition = or(
+            sql`${contacts.name} ILIKE ${searchTerm}`,
+            sql`${contacts.email} ILIKE ${searchTerm}`,
+            sql`${contacts.phone} ILIKE ${searchTerm}`
+          );
+          if (searchCondition) {
+            whereConditions.push(searchCondition);
+          }
+        }
+
+        if (options.channel && options.channel !== 'all' && options.channel !== '') {
+          whereConditions.push(eq(contacts.identifierType, options.channel));
+        }
+      }
+
+      const contactsList = await db
+        .select()
+        .from(contacts)
+        .where(and(...whereConditions))
+        .orderBy(desc(contacts.createdAt));
+
+      return contactsList;
+    } catch (error) {
+      console.error('Error getting contacts for export:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get contacts without conversations for a company
+   * These are contacts that can potentially have conversations created for them
+   */
+  async getContactsWithoutConversations(companyId: number, options?: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+    userId?: number;
+    contactScope?: 'own' | 'assigned' | 'company';
+  }): Promise<{ contacts: Contact[]; total: number }> {
+    let searchTerm = options?.search?.trim();
+
+
+    const queryTimeout = 30000; // 30 seconds timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Query timeout')), queryTimeout);
+    });
+
+    try {
+      const limit = Math.min(options?.limit || 50, 100); // Cap limit to prevent large queries
+      const offset = Math.max(options?.offset || 0, 0); // Ensure non-negative offset
+
+      let whereConditions = [
+        eq(contacts.companyId, companyId),
+        eq(contacts.isActive, true),
+        isNotNull(contacts.identifierType),
+        ne(contacts.identifierType, 'email')
+      ];
+
+
+      if (options?.contactScope && options.contactScope !== 'company') {
+        if (options.contactScope === 'own' && options.userId) {
+
+          whereConditions.push(eq(contacts.createdBy, options.userId));
+        } else if (options.contactScope === 'assigned' && options.userId) {
+
+
+
+
+          return { contacts: [], total: 0 };
+        }
 
       }
-    }
 
 
-    const contactsWithoutConversationsQuery = db
-      .select({
-        id: contacts.id,
-        companyId: contacts.companyId,
-        name: contacts.name,
-        avatarUrl: contacts.avatarUrl,
-        email: contacts.email,
-        phone: contacts.phone,
-        company: contacts.company,
-        tags: contacts.tags,
-        isActive: contacts.isActive,
-        identifier: contacts.identifier,
-        identifierType: contacts.identifierType,
-        source: contacts.source,
-        notes: contacts.notes,
-        isHistorySync: contacts.isHistorySync,
-        historySyncBatchId: contacts.historySyncBatchId,
-        isArchived: contacts.isArchived,
-        createdAt: contacts.createdAt,
-        updatedAt: contacts.updatedAt
-      })
-      .from(contacts)
-      .leftJoin(conversations, eq(conversations.contactId, contacts.id))
-      .where(
-        and(
-          ...whereConditions,
-          isNull(conversations.id) // No conversation exists for this contact
+      const phoneNumberFilter = and(
+        or(
+          isNull(contacts.phone),
+          and(
+            sql`${contacts.phone} NOT LIKE 'LID-%'`,
+            sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) >= 7`,
+            sql`LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) <= 14`,
+            sql`NOT (LENGTH(REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g')) >= 15 AND REGEXP_REPLACE(${contacts.phone}, '[^0-9]', '', 'g') ~ '^120[0-9]+$')`
+          )
         )
-      )
-      .orderBy(desc(contacts.createdAt))
-      .limit(limit)
-      .offset(offset);
+      );
+
+      if (phoneNumberFilter) {
+        whereConditions.push(phoneNumberFilter);
+      }
 
 
-    const contactsList = await Promise.race([
-      contactsWithoutConversationsQuery,
-      timeoutPromise
-    ]) as Contact[];
+
+      if (searchTerm && searchTerm.length > 0) {
+
+        if (searchTerm.length > 100) {
+          searchTerm = searchTerm.substring(0, 100);
+        }
 
 
-    let total = 0;
-    try {
-      const totalQuery = db
-        .select({ count: sql`COUNT(*)::int` })
+        const escapedSearchTerm = searchTerm.replace(/[%_\\]/g, '\\$&');
+        const searchPattern = `%${escapedSearchTerm}%`;
+
+        try {
+
+          const searchCondition = or(
+
+            sql`${contacts.name} ILIKE ${searchPattern}`,
+
+            sql`${contacts.email} ILIKE ${searchPattern}`,
+            sql`${contacts.phone} LIKE ${searchPattern}`,
+            sql`${contacts.company} ILIKE ${searchPattern}`,
+
+            sql`${contacts.identifier} LIKE ${searchPattern}`
+          );
+
+          if (searchCondition) {
+            whereConditions.push(searchCondition);
+          }
+        } catch (searchError) {
+
+        }
+      }
+
+
+      const contactsWithoutConversationsQuery = db
+        .select({
+          id: contacts.id,
+          companyId: contacts.companyId,
+          name: contacts.name,
+          avatarUrl: contacts.avatarUrl,
+          email: contacts.email,
+          phone: contacts.phone,
+          company: contacts.company,
+          tags: contacts.tags,
+          isActive: contacts.isActive,
+          identifier: contacts.identifier,
+          identifierType: contacts.identifierType,
+          source: contacts.source,
+          notes: contacts.notes,
+          isHistorySync: contacts.isHistorySync,
+          historySyncBatchId: contacts.historySyncBatchId,
+          isArchived: contacts.isArchived,
+          createdAt: contacts.createdAt,
+          updatedAt: contacts.updatedAt
+        })
         .from(contacts)
         .leftJoin(conversations, eq(conversations.contactId, contacts.id))
         .where(
           and(
             ...whereConditions,
-            isNull(conversations.id)
+            isNull(conversations.id) // No conversation exists for this contact
           )
+        )
+        .orderBy(desc(contacts.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+
+      const contactsList = await Promise.race([
+        contactsWithoutConversationsQuery,
+        timeoutPromise
+      ]) as Contact[];
+
+
+      let total = 0;
+      try {
+        const totalQuery = db
+          .select({ count: sql`COUNT(*)::int` })
+          .from(contacts)
+          .leftJoin(conversations, eq(conversations.contactId, contacts.id))
+          .where(
+            and(
+              ...whereConditions,
+              isNull(conversations.id)
+            )
+          );
+
+        const totalResult = await Promise.race([
+          totalQuery,
+          timeoutPromise
+        ]) as any[];
+        total = Number(totalResult[0]?.count || 0);
+      } catch (totalError) {
+        total = contactsList.length; // Fallback to result length
+      }
+
+      return {
+        contacts: contactsList,
+        total
+      };
+    } catch (error: any) {
+
+      return { contacts: [], total: 0 };
+    }
+  }
+
+  /**
+   * Create a conversation for a contact based on their identifier type
+   */
+  async createConversationForContact(contactId: number, userId: number): Promise<Conversation | null> {
+    try {
+      const contact = await this.getContact(contactId);
+      if (!contact) {
+        throw new Error('Contact not found');
+      }
+
+      const user = await this.getUser(userId);
+      if (!user || !user.companyId) {
+        throw new Error('User or company not found');
+      }
+
+
+      const existingConversations = await this.getConversationsByContact(contactId);
+      if (existingConversations.length > 0) {
+        return existingConversations[0]; // Return existing conversation
+      }
+
+
+      const channelConnections = await this.getChannelConnectionsByCompany(user.companyId);
+
+      let appropriateConnection = null;
+
+
+      if (contact.identifierType) {
+        appropriateConnection = channelConnections.find(conn =>
+          conn.channelType === contact.identifierType && conn.status === 'active'
         );
 
-      const totalResult = await Promise.race([
-        totalQuery,
-        timeoutPromise
-      ]) as any[];
-      total = Number(totalResult[0]?.count || 0);
-    } catch (totalError) {
-      total = contactsList.length; // Fallback to result length
-    }
 
-    return {
-      contacts: contactsList,
-      total
-    };
-  } catch (error: any) {
-
-    return { contacts: [], total: 0 };
-  }
-}
-
-/**
- * Create a conversation for a contact based on their identifier type
- */
-async createConversationForContact(contactId: number, userId: number): Promise<Conversation | null> {
-  try {
-    const contact = await this.getContact(contactId);
-    if (!contact) {
-      throw new Error('Contact not found');
-    }
-
-    const user = await this.getUser(userId);
-    if (!user || !user.companyId) {
-      throw new Error('User or company not found');
-    }
-
-
-    const existingConversations = await this.getConversationsByContact(contactId);
-    if (existingConversations.length > 0) {
-      return existingConversations[0]; // Return existing conversation
-    }
-
-
-    const channelConnections = await this.getChannelConnectionsByCompany(user.companyId);
-
-    let appropriateConnection = null;
-
-
-    if (contact.identifierType) {
-      appropriateConnection = channelConnections.find(conn =>
-        conn.channelType === contact.identifierType && conn.status === 'active'
-      );
-
+        if (!appropriateConnection) {
+          if (contact.identifierType === 'whatsapp_official') {
+            appropriateConnection = channelConnections.find(conn =>
+              conn.channelType === 'whatsapp_official' && conn.status === 'active'
+            );
+          } else if (contact.identifierType === 'whatsapp_unofficial' || contact.identifierType === 'whatsapp') {
+            appropriateConnection = channelConnections.find(conn =>
+              (conn.channelType === 'whatsapp_unofficial' || conn.channelType === 'whatsapp') && conn.status === 'active'
+            );
+          }
+        }
+      }
 
       if (!appropriateConnection) {
-        if (contact.identifierType === 'whatsapp_official') {
-          appropriateConnection = channelConnections.find(conn =>
-            conn.channelType === 'whatsapp_official' && conn.status === 'active'
-          );
-        } else if (contact.identifierType === 'whatsapp_unofficial' || contact.identifierType === 'whatsapp') {
-          appropriateConnection = channelConnections.find(conn =>
-            (conn.channelType === 'whatsapp_unofficial' || conn.channelType === 'whatsapp') && conn.status === 'active'
-          );
-        }
-      }
-    }
-
-    if (!appropriateConnection) {
-      throw new Error(`No active channel connection found for contact type: ${contact.identifierType}`);
-    }
-
-
-    const conversationData: InsertConversation = {
-      companyId: user.companyId,
-      contactId: contact.id,
-      channelId: appropriateConnection.id,
-      channelType: appropriateConnection.channelType,
-      status: 'open',
-      assignedToUserId: userId,
-      lastMessageAt: new Date()
-    };
-
-    const conversation = await this.createConversation(conversationData);
-    return conversation;
-  } catch (error) {
-    console.error('Error creating conversation for contact:', error);
-    return null;
-  }
-}
-
-async createDeal(deal: InsertDeal): Promise<Deal> {
-  try {
-    if (!deal.contactId) {
-      throw new Error('Contact ID is required');
-    }
-
-
-    let pipelineId = deal.pipelineId;
-    if (!pipelineId && deal.companyId) {
-      const defaultPipeline = await this.getDefaultPipelineForCompany(deal.companyId);
-      if (defaultPipeline) {
-        pipelineId = defaultPipeline.id;
-      }
-    }
-
-    const processedDeal = {
-      ...deal,
-      pipelineId,
-      dueDate: deal.dueDate ? new Date(deal.dueDate) : undefined,
-      lastActivityAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      stage: deal.stage || 'lead',
-      status: deal.status || 'active',
-      priority: deal.priority || 'medium'
-    };
-
-    const [newDeal] = await db
-      .insert(deals)
-      .values(processedDeal)
-      .returning();
-
-
-    if (deal.tags && deal.tags.length > 0 && deal.contactId) {
-      try {
-        await this.updateContact(deal.contactId, { tags: deal.tags });
-      } catch (error) {
-
-        console.error(`Error syncing deal tags to contact for new deal:`, error);
-      }
-    }
-
-    return newDeal;
-  } catch (error: any) {
-    console.error('Error creating deal:', error);
-    if (error.message === 'Contact ID is required') {
-      throw error;
-    }
-    throw new Error('Failed to create deal');
-  }
-}
-
-async updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal> {
-  try {
-
-    const [existingDeal] = await db.select().from(deals).where(eq(deals.id, id));
-    if (!existingDeal) {
-      throw new Error(`Deal with ID ${id} not found`);
-    }
-    
-
-    if (updates.pipelineId !== undefined || updates.stageId !== undefined) {
-      let pipelineId = updates.pipelineId ?? existingDeal.pipelineId;
-      let stageId = updates.stageId ?? existingDeal.stageId;
-      
-      if (stageId) {
-
-        const [stage] = await db
-          .select()
-          .from(pipelineStages)
-          .where(eq(pipelineStages.id, stageId));
-        
-        if (stage) {
-          if (pipelineId && stage.pipelineId !== pipelineId) {
-            pipelineId = stage.pipelineId;
-            updates.pipelineId = pipelineId;
-          } else if (!pipelineId) {
-
-            pipelineId = stage.pipelineId;
-            updates.pipelineId = pipelineId;
-          }
-        }
-      } else if (pipelineId && !updates.stageId) {
-
-        const [firstStage] = await db
-          .select()
-          .from(pipelineStages)
-          .where(eq(pipelineStages.pipelineId, pipelineId))
-          .orderBy(pipelineStages.order)
-          .limit(1);
-        
-        if (firstStage) {
-          updates.stageId = firstStage.id;
-        }
-      }
-    }
-
-    if (updates.stageId !== undefined) {
-      const stageId = updates.stageId;
-      const otherUpdates = { ...updates };
-      delete otherUpdates.stageId;
-
-      let dealWithNewStage = null;
-      if (stageId !== null) {
-        dealWithNewStage = await this.updateDealStageId(id, stageId);
+        throw new Error(`No active channel connection found for contact type: ${contact.identifierType}`);
       }
 
-      if (Object.keys(otherUpdates).length > 0) {
-        const processedUpdates = {
-          ...otherUpdates,
-          dueDate: otherUpdates.dueDate ? new Date(otherUpdates.dueDate) : undefined,
-          updatedAt: new Date()
-        };
 
-        const [finalUpdatedDeal] = await db
-          .update(deals)
-          .set(processedUpdates)
-          .where(eq(deals.id, id))
-          .returning();
+      const conversationData: InsertConversation = {
+        companyId: user.companyId,
+        contactId: contact.id,
+        channelId: appropriateConnection.id,
+        channelType: appropriateConnection.channelType,
+        status: 'open',
+        assignedToUserId: userId,
+        lastMessageAt: new Date()
+      };
 
-        const resultDeal = finalUpdatedDeal || dealWithNewStage;
-
-
-        if (otherUpdates.tags !== undefined && existingDeal.contactId) {
-          try {
-            await this.updateContact(existingDeal.contactId, { tags: otherUpdates.tags || null });
-          } catch (error) {
-
-            console.error(`Error syncing deal tags to contact for deal ${id}:`, error);
-          }
-        }
-
-        return resultDeal;
-      }
-
-      if (dealWithNewStage) {
-        return dealWithNewStage;
-      }
-
-      const [currentDeal] = await db
-        .select()
-        .from(deals)
-        .where(eq(deals.id, id));
-
-      if (!currentDeal) {
-        throw new Error(`Deal with ID ${id} not found`);
-      }
-
-      return currentDeal;
+      const conversation = await this.createConversation(conversationData);
+      return conversation;
+    } catch (error) {
+      console.error('Error creating conversation for contact:', error);
+      return null;
     }
-
-    const processedUpdates = {
-      ...updates,
-      dueDate: updates.dueDate ? new Date(updates.dueDate) : undefined,
-      updatedAt: new Date()
-    };
-
-    const [updatedDeal] = await db
-      .update(deals)
-      .set(processedUpdates)
-      .where(eq(deals.id, id))
-      .returning();
-
-    if (!updatedDeal) {
-      throw new Error(`Deal with ID ${id} not found`);
-    }
-
-
-    if (updates.tags !== undefined && existingDeal.contactId) {
-      try {
-        await this.updateContact(existingDeal.contactId, { tags: updates.tags || null });
-      } catch (error) {
-
-        console.error(`Error syncing deal tags to contact for deal ${id}:`, error);
-      }
-    }
-
-    return updatedDeal;
-  } catch (error) {
-    console.error(`Error updating deal with ID ${id}:`, error);
-    throw new Error('Failed to update deal');
   }
-}
 
-async updateDealStage(id: number, stage: DealStatus): Promise<Deal> {
-  try {
-    const [updatedDeal] = await db
-      .update(deals)
-      .set({
-        stage,
-        lastActivityAt: new Date(),
-        updatedAt: new Date()
-      })
-      .where(eq(deals.id, id))
-      .returning();
-
-    if (!updatedDeal) {
-      throw new Error(`Deal with ID ${id} not found`);
-    }
-
-    return updatedDeal;
-  } catch (error) {
-    console.error(`Error updating stage for deal with ID ${id}:`, error);
-    throw new Error('Failed to update deal stage');
-  }
-}
-
-async deleteDeal(id: number, companyId?: number): Promise<{ success: boolean; reason?: string }> {
-  try {
-
-    const whereConditions = companyId 
-      ? and(eq(deals.id, id), eq(deals.companyId, companyId))
-      : eq(deals.id, id);
-
-    const existingDeal = await db
-      .select({ id: deals.id, status: deals.status, companyId: deals.companyId })
-      .from(deals)
-      .where(whereConditions)
-      .limit(1);
-
-    if (existingDeal.length === 0) {
-      return { success: false, reason: 'Deal not found' };
-    }
-
-
-    if (existingDeal[0].status === 'archived') {
-      return { success: true, reason: 'Already deleted' };
-    }
-
-
-    const [updatedDeal] = await db
-      .update(deals)
-      .set({
-        status: 'archived',
-        updatedAt: new Date()
-      })
-      .where(whereConditions)
-      .returning();
-
-    return { success: !!updatedDeal };
-  } catch (error) {
-    console.error(`Error deleting deal with ID ${id}:`, error);
-    return { success: false, reason: 'Database error' };
-  }
-}
-
-async getDealActivities(dealId: number): Promise<DealActivity[]> {
-  try {
-    return db
-      .select()
-      .from(dealActivities)
-      .where(eq(dealActivities.dealId, dealId))
-      .orderBy(desc(dealActivities.createdAt));
-  } catch (error) {
-    console.error(`Error getting activities for deal ${dealId}:`, error);
-    return [];
-  }
-}
-
-async createDealActivity(activity: InsertDealActivity): Promise<DealActivity> {
-  try {
-    const [newActivity] = await db
-      .insert(dealActivities)
-      .values({
-        ...activity,
-        createdAt: new Date()
-      })
-      .returning();
-
-    await db
-      .update(deals)
-      .set({ lastActivityAt: new Date() })
-      .where(eq(deals.id, activity.dealId));
-
-    return newActivity;
-  } catch (error) {
-    console.error('Error creating deal activity:', error);
-    throw new Error('Failed to create deal activity');
-  }
-}
-
-async getPipelineStages(): Promise<PipelineStage[]> {
-
-  console.warn('[DEPRECATED] getPipelineStages() is deprecated. Use getPipelineStagesByCompany() or getPipelineStagesByPipeline() instead.');
-  try {
-    return db
-      .select()
-      .from(pipelineStages)
-      .orderBy(pipelineStages.order);
-  } catch (error) {
-    console.error('Error getting pipeline stages:', error);
-    return [];
-  }
-}
-
-async getPipelineStageById(id: number): Promise<PipelineStage | null> {
-  try {
-    const [stage] = await db
-      .select()
-      .from(pipelineStages)
-      .where(eq(pipelineStages.id, id));
-
-    return stage || null;
-  } catch (error) {
-    console.error(`Error getting pipeline stage with ID ${id}:`, error);
-    return null;
-  }
-}
-
-async getPipelineStagesByCompany(companyId: number, pipelineId?: number): Promise<PipelineStage[]> {
-  try {
-
-    if (!pipelineId) {
-      const defaultPipeline = await this.getDefaultPipelineForCompany(companyId);
-      if (defaultPipeline) {
-        pipelineId = defaultPipeline.id;
-      }
-    }
-    
-    const conditions = [eq(pipelineStages.companyId, companyId)];
-    if (pipelineId) {
-      conditions.push(eq(pipelineStages.pipelineId, pipelineId));
-    }
-    return db
-      .select()
-      .from(pipelineStages)
-      .where(and(...conditions))
-      .orderBy(pipelineStages.order);
-  } catch (error) {
-    console.error(`Error getting pipeline stages for company ${companyId}:`, error);
-    return [];
-  }
-}
-
-async getPipelineStage(id: number): Promise<PipelineStage | undefined> {
-  try {
-    const [stage] = await db
-      .select()
-      .from(pipelineStages)
-      .where(eq(pipelineStages.id, id));
-    return stage;
-  } catch (error) {
-    console.error(`Error getting pipeline stage with ID ${id}:`, error);
-    return undefined;
-  }
-}
-
-async createPipelineStage(stage: InsertPipelineStage): Promise<PipelineStage> {
-  try {
-    if (!stage.pipelineId) {
-      throw new Error('pipelineId is required to create a pipeline stage');
-    }
-
-
-    const maxOrderResult = await db
-      .select({ maxOrder: sql`MAX(${pipelineStages.order})` })
-      .from(pipelineStages)
-      .where(and(
-        eq(pipelineStages.pipelineId, stage.pipelineId),
-        stage.companyId ? eq(pipelineStages.companyId, stage.companyId) : isNull(pipelineStages.companyId)
-      ));
-
-    const maxOrder = maxOrderResult[0]?.maxOrder || 0;
-    const newOrder = stage.order || (maxOrder as number) + 1;
-
-    const [newStage] = await db
-      .insert(pipelineStages)
-      .values({
-        ...stage,
-        order: newOrder,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
-
-    return newStage;
-  } catch (error) {
-    console.error('Error creating pipeline stage:', error);
-    throw new Error('Failed to create pipeline stage');
-  }
-}
-
-async updatePipelineStage(id: number, updates: Partial<InsertPipelineStage>): Promise<PipelineStage> {
-  try {
-    const [updatedStage] = await db
-      .update(pipelineStages)
-      .set({
-        ...updates,
-        updatedAt: new Date()
-      })
-      .where(eq(pipelineStages.id, id))
-      .returning();
-
-    if (!updatedStage) {
-      throw new Error(`Pipeline stage with ID ${id} not found`);
-    }
-
-    return updatedStage;
-  } catch (error) {
-    console.error(`Error updating pipeline stage with ID ${id}:`, error);
-    throw new Error('Failed to update pipeline stage');
-  }
-}
-
-async deletePipelineStage(id: number, moveDealsToStageId?: number): Promise<boolean> {
-  try {
-    return await db.transaction(async (tx: any) => {
-
-      const [stageToDelete] = await tx
-        .select()
-        .from(pipelineStages)
-        .where(eq(pipelineStages.id, id));
-
-      if (!stageToDelete) {
-        throw new Error(`Pipeline stage with ID ${id} not found`);
-      }
-
-      if (moveDealsToStageId) {
-
-        const [targetStage] = await tx
-          .select()
-          .from(pipelineStages)
-          .where(eq(pipelineStages.id, moveDealsToStageId));
-
-        if (!targetStage) {
-          throw new Error('Target stage not found');
-        }
-
-        if (targetStage.pipelineId !== stageToDelete.pipelineId) {
-          throw new Error('Cannot move deals to a stage in a different pipeline');
-        }
-
-        await tx
-          .update(deals)
-          .set({
-            stageId: moveDealsToStageId,
-            updatedAt: new Date()
-          })
-          .where(eq(deals.stageId, id));
-      }
-
-      await tx
-        .delete(pipelineStages)
-        .where(eq(pipelineStages.id, id));
-
-
-      const remainingStages = await tx
-        .select()
-        .from(pipelineStages)
-        .where(eq(pipelineStages.pipelineId, stageToDelete.pipelineId))
-        .orderBy(pipelineStages.order);
-
-      for (let i = 0; i < remainingStages.length; i++) {
-        await tx
-          .update(pipelineStages)
-          .set({ order: i + 1 })
-          .where(eq(pipelineStages.id, remainingStages[i].id));
-      }
-
-      return true;
-    });
-  } catch (error) {
-    console.error(`Error deleting pipeline stage with ID ${id}:`, error);
-    return false;
-  }
-}
-
-async reorderPipelineStages(stageIds: number[]): Promise<boolean> {
-  try {
-    return await db.transaction(async (tx: any) => {
-      for (let i = 0; i < stageIds.length; i++) {
-        await tx
-          .update(pipelineStages)
-          .set({
-            order: i + 1,
-            updatedAt: new Date()
-          })
-          .where(eq(pipelineStages.id, stageIds[i]));
-      }
-      return true;
-    });
-  } catch (error) {
-    console.error('Error reordering pipeline stages:', error);
-    return false;
-  }
-}
-
-
-async getPipelines(): Promise<Pipeline[]> {
-  try {
-    return await db
-      .select()
-      .from(pipelines)
-      .orderBy(pipelines.orderNum);
-  } catch (error) {
-    console.error('Error getting all pipelines:', error);
-    return [];
-  }
-}
-
-async getPipelinesByCompany(companyId: number): Promise<Pipeline[]> {
-  try {
-    return await db
-      .select()
-      .from(pipelines)
-      .where(eq(pipelines.companyId, companyId))
-      .orderBy(pipelines.orderNum);
-  } catch (error) {
-    console.error(`Error getting pipelines for company ${companyId}:`, error);
-    return [];
-  }
-}
-
-
-async getDefaultPipelineForCompany(companyId: number): Promise<Pipeline | null> {
-  try {
-
-    const [defaultPipeline] = await db
-      .select()
-      .from(pipelines)
-      .where(and(
-        eq(pipelines.companyId, companyId),
-        eq(pipelines.isDefault, true)
-      ))
-      .limit(1);
-    
-    if (defaultPipeline) {
-      return defaultPipeline;
-    }
-    
-
-    const [firstPipeline] = await db
-      .select()
-      .from(pipelines)
-      .where(eq(pipelines.companyId, companyId))
-      .orderBy(pipelines.orderNum)
-      .limit(1);
-    
-    if (firstPipeline) {
-      return firstPipeline;
-    }
-    
-
-    console.warn(`Company ${companyId} has no pipelines. Creating default pipeline.`);
+  async createDeal(deal: InsertDeal): Promise<Deal> {
     try {
-      const newPipeline = await this.createPipeline({
-        companyId,
-        name: 'Sales Pipeline',
-        description: 'Default sales pipeline',
-        icon: 'trending-up',
-        color: '#3a86ff',
-        isDefault: true,
-        isTemplate: false,
-        orderNum: 1
-      });
-      
-
-      const defaultStages = [
-        { name: 'Lead', color: '#94a3b8', order: 1 },
-        { name: 'Qualified', color: '#3b82f6', order: 2 },
-        { name: 'Proposal', color: '#8b5cf6', order: 3 },
-        { name: 'Negotiation', color: '#f59e0b', order: 4 },
-        { name: 'Closed Won', color: '#10b981', order: 5 },
-        { name: 'Closed Lost', color: '#ef4444', order: 6 }
-      ];
-      
-      for (const stageData of defaultStages) {
-        await this.createPipelineStage({
-          pipelineId: newPipeline.id,
-          companyId,
-          name: stageData.name,
-          color: stageData.color,
-          order: stageData.order
-        });
-      }
-      
-      return newPipeline;
-    } catch (createError) {
-      console.error(`Error creating default pipeline for company ${companyId}:`, createError);
-      return null;
-    }
-  } catch (error) {
-    console.error(`Error getting default pipeline for company ${companyId}:`, error);
-    return null;
-  }
-}
-
-async getPipeline(id: number): Promise<Pipeline | undefined> {
-  try {
-    const [pipeline] = await db
-      .select()
-      .from(pipelines)
-      .where(eq(pipelines.id, id));
-    return pipeline;
-  } catch (error) {
-    console.error(`Error getting pipeline with ID ${id}:`, error);
-    return undefined;
-  }
-}
-
-async createPipeline(pipeline: InsertPipeline): Promise<Pipeline> {
-  try {
-
-    const maxOrderResult = await db
-      .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
-      .from(pipelines)
-      .where(pipeline.companyId ? eq(pipelines.companyId, pipeline.companyId) : isNull(pipelines.companyId));
-
-    const maxOrder = maxOrderResult[0]?.maxOrder || 0;
-    const newOrderNum = pipeline.orderNum || (maxOrder as number) + 1;
-
-    const [newPipeline] = await db
-      .insert(pipelines)
-      .values({
-        ...pipeline,
-        orderNum: newOrderNum,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
-
-    return newPipeline;
-  } catch (error: any) {
-    console.error('Error creating pipeline:', error);
-
-    if (error.code === '23505' && (
-      error.constraint === 'idx_pipelines_company_name_unique' ||
-      error.message?.includes('idx_pipelines_company_name_unique')
-    )) {
-      const duplicateError = new Error('Pipeline name already exists');
-      (duplicateError as any).isDuplicateName = true;
-      throw duplicateError;
-    }
-    throw new Error('Failed to create pipeline');
-  }
-}
-
-async updatePipeline(id: number, updates: Partial<InsertPipeline>): Promise<Pipeline> {
-  try {
-
-
-    if (updates.isDefault === true) {
-      return await db.transaction(async (tx: any) => {
-
-        const [existingPipeline] = await tx
-          .select()
-          .from(pipelines)
-          .where(eq(pipelines.id, id));
-
-        if (!existingPipeline) {
-          throw new Error(`Pipeline with ID ${id} not found`);
-        }
-
-        const companyId = existingPipeline.companyId;
-
-
-        if (companyId !== null) {
-          await tx
-            .update(pipelines)
-            .set({
-              isDefault: false,
-              updatedAt: new Date()
-            })
-            .where(
-              and(
-                eq(pipelines.companyId, companyId),
-                ne(pipelines.id, id)
-              )
-            );
-        }
-
-
-        const [updatedPipeline] = await tx
-          .update(pipelines)
-          .set({
-            ...updates,
-            updatedAt: new Date()
-          })
-          .where(eq(pipelines.id, id))
-          .returning();
-
-        if (!updatedPipeline) {
-          throw new Error(`Pipeline with ID ${id} not found`);
-        }
-
-        return updatedPipeline;
-      });
-    }
-
-
-    const [updatedPipeline] = await db
-      .update(pipelines)
-      .set({
-        ...updates,
-        updatedAt: new Date()
-      })
-      .where(eq(pipelines.id, id))
-      .returning();
-
-    if (!updatedPipeline) {
-      throw new Error(`Pipeline with ID ${id} not found`);
-    }
-
-    return updatedPipeline;
-  } catch (error: any) {
-    console.error(`Error updating pipeline with ID ${id}:`, error);
-
-    if (error.code === '23505' && (
-      error.constraint === 'idx_pipelines_company_name_unique' ||
-      error.message?.includes('idx_pipelines_company_name_unique')
-    )) {
-      const duplicateError = new Error('Pipeline name already exists');
-      (duplicateError as any).isDuplicateName = true;
-      throw duplicateError;
-    }
-    throw new Error('Failed to update pipeline');
-  }
-}
-
-async reorderPipelines(companyId: number, pipelineIds: number[]): Promise<boolean> {
-  try {
-
-    const companyPipelines = await this.getPipelinesByCompany(companyId);
-    const companyPipelineIds = new Set(companyPipelines.map(p => p.id));
-
-
-    const invalidIds = pipelineIds.filter(id => !companyPipelineIds.has(id));
-    if (invalidIds.length > 0) {
-      throw new Error(`Invalid pipeline IDs: ${invalidIds.join(', ')}. These pipelines do not belong to your company.`);
-    }
-
-
-    const uniqueIds = new Set(pipelineIds);
-    if (uniqueIds.size !== pipelineIds.length) {
-      throw new Error('Duplicate pipeline IDs found in reorder request');
-    }
-
-
-    const providedIds = new Set(pipelineIds);
-    const missingIds = companyPipelines.filter(p => !providedIds.has(p.id)).map(p => p.id);
-    if (missingIds.length > 0) {
-      throw new Error(`Missing pipeline IDs: ${missingIds.join(', ')}. All pipelines must be included in the reorder.`);
-    }
-
-
-    return await db.transaction(async (tx: any) => {
-      for (let i = 0; i < pipelineIds.length; i++) {
-        await tx
-          .update(pipelines)
-          .set({
-            orderNum: i + 1,
-            updatedAt: new Date()
-          })
-          .where(eq(pipelines.id, pipelineIds[i]));
-      }
-      return true;
-    });
-  } catch (error) {
-    console.error('Error reordering pipelines:', error);
-    throw error;
-  }
-}
-
-async deletePipeline(id: number, moveDealsToStageId?: number): Promise<boolean> {
-  try {
-    return await db.transaction(async (tx: any) => {
-
-      const [pipelineToDelete] = await tx
-        .select()
-        .from(pipelines)
-        .where(eq(pipelines.id, id));
-
-      if (!pipelineToDelete) {
-        throw new Error(`Pipeline with ID ${id} not found`);
-      }
-
-      const companyId = pipelineToDelete.companyId;
-
-
-      if (moveDealsToStageId) {
-
-        const targetStage = await tx
-          .select()
-          .from(pipelineStages)
-          .where(eq(pipelineStages.id, moveDealsToStageId));
-
-        if (targetStage.length === 0) {
-          throw new Error('Target stage not found');
-        }
-
-        if (targetStage[0].pipelineId === id) {
-          throw new Error('Cannot move deals to a stage in the same pipeline');
-        }
-
-
-
-        await tx
-          .update(deals)
-          .set({
-            stageId: moveDealsToStageId,
-            pipelineId: targetStage[0].pipelineId,
-            updatedAt: new Date()
-          })
-          .where(eq(deals.pipelineId, id));
+      if (!deal.contactId) {
+        throw new Error('Contact ID is required');
       }
 
 
-      await tx
-        .delete(pipelineStages)
-        .where(eq(pipelineStages.pipelineId, id));
-
-
-      await tx
-        .delete(pipelines)
-        .where(eq(pipelines.id, id));
-
-
-      if (companyId) {
-        const remainingPipelines = await tx
-          .select()
-          .from(pipelines)
-          .where(eq(pipelines.companyId, companyId))
-          .orderBy(pipelines.orderNum);
-
-        for (let i = 0; i < remainingPipelines.length; i++) {
-          await tx
-            .update(pipelines)
-            .set({ orderNum: i + 1 })
-            .where(eq(pipelines.id, remainingPipelines[i].id));
-        }
-      }
-
-      return true;
-    });
-  } catch (error) {
-    console.error(`Error deleting pipeline with ID ${id}:`, error);
-    return false;
-  }
-}
-
-async duplicatePipeline(id: number, newName: string): Promise<Pipeline> {
-  try {
-    return await db.transaction(async (tx: any) => {
-
-      const sourcePipeline = await tx
-        .select()
-        .from(pipelines)
-        .where(eq(pipelines.id, id));
-
-      if (sourcePipeline.length === 0) {
-        throw new Error(`Pipeline with ID ${id} not found`);
-      }
-
-      const pipeline = sourcePipeline[0];
-
-
-      const maxOrderResult = await tx
-        .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
-        .from(pipelines)
-        .where(pipeline.companyId ? eq(pipelines.companyId, pipeline.companyId) : isNull(pipelines.companyId));
-
-      const maxOrder = maxOrderResult[0]?.maxOrder || 0;
-      const newOrderNum = (maxOrder as number) + 1;
-
-
-      const [newPipeline] = await tx
-        .insert(pipelines)
-        .values({
-          companyId: pipeline.companyId,
-          name: newName,
-          description: pipeline.description,
-          icon: pipeline.icon,
-          color: pipeline.color,
-          isDefault: false, // Duplicated pipelines should not be default
-          isTemplate: pipeline.isTemplate,
-          templateCategory: pipeline.templateCategory,
-          orderNum: newOrderNum,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-        .returning();
-
-
-      const sourceStages = await tx
-        .select()
-        .from(pipelineStages)
-        .where(eq(pipelineStages.pipelineId, id))
-        .orderBy(pipelineStages.order);
-
-
-      for (const stage of sourceStages) {
-        await tx
-          .insert(pipelineStages)
-          .values({
-            pipelineId: newPipeline.id,
-            companyId: stage.companyId,
-            name: stage.name,
-            color: stage.color,
-            order: stage.order,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-      }
-
-      return newPipeline;
-    });
-  } catch (error: any) {
-    console.error(`Error duplicating pipeline with ID ${id}:`, error);
-
-    if (error.code === '23505' && (
-      error.constraint === 'idx_pipelines_company_name_unique' ||
-      error.message?.includes('idx_pipelines_company_name_unique')
-    )) {
-      const duplicateError = new Error('Pipeline name already exists');
-      (duplicateError as any).isDuplicateName = true;
-      throw duplicateError;
-    }
-    throw new Error('Failed to duplicate pipeline');
-  }
-}
-
-async createPipelineFromTemplate(templateId: string, companyId: number, customName?: string, description?: string, icon?: string, color?: string): Promise<{ pipeline: Pipeline; stages: PipelineStage[] }> {
-  try {
-
-    if (!companyId) {
-      throw new Error('Company ID is required for pipeline creation');
-    }
-
-    const { getTemplateById } = await import('@shared/pipeline-templates');
-    const template = getTemplateById(templateId);
-
-    if (!template) {
-      throw new Error('Template not found');
-    }
-
-    return await db.transaction(async (tx: any) => {
-
-      const maxOrderResult = await tx
-        .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
-        .from(pipelines)
-        .where(eq(pipelines.companyId, companyId));
-
-      const maxOrder = maxOrderResult[0]?.maxOrder || 0;
-      const newOrderNum = (maxOrder as number) + 1;
-
-
-      const [newPipeline] = await tx
-        .insert(pipelines)
-        .values({
-          companyId,
-          name: customName || template.name,
-          description: description !== undefined ? description : template.description,
-          icon: icon !== undefined ? icon : template.icon,
-          color: color !== undefined ? color : template.color,
-          isDefault: false,
-          isTemplate: false,
-          templateCategory: template.category,
-          orderNum: newOrderNum,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-        .returning();
-
-
-      const createdStages: PipelineStage[] = [];
-      for (const stageData of template.stages) {
-        const [stage] = await tx
-          .insert(pipelineStages)
-          .values({
-            pipelineId: newPipeline.id,
-            companyId,
-            name: stageData.name,
-            color: stageData.color,
-            order: stageData.order,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          })
-          .returning();
-        createdStages.push(stage);
-      }
-
-      return { pipeline: newPipeline, stages: createdStages };
-    });
-  } catch (error: any) {
-    console.error(`Error creating pipeline from template ${templateId}:`, error);
-
-    if (error.code === '23505' && (
-      error.constraint === 'idx_pipelines_company_name_unique' ||
-      error.message?.includes('idx_pipelines_company_name_unique')
-    )) {
-      const duplicateError = new Error('Pipeline name already exists');
-      (duplicateError as any).isDuplicateName = true;
-      throw duplicateError;
-    }
-    throw error;
-  }
-}
-
-async getPipelineWithStages(id: number): Promise<{ pipeline: Pipeline; stages: PipelineStage[] } | null> {
-  try {
-    const pipeline = await this.getPipeline(id);
-    if (!pipeline) {
-      return null;
-    }
-
-    const stages = await this.getPipelineStagesByPipeline(id);
-    return { pipeline, stages };
-  } catch (error) {
-    console.error(`Error getting pipeline with stages for ID ${id}:`, error);
-    return null;
-  }
-}
-
-async getPipelineStagesByPipeline(pipelineId: number): Promise<PipelineStage[]> {
-  try {
-    return await db
-      .select()
-      .from(pipelineStages)
-      .where(eq(pipelineStages.pipelineId, pipelineId))
-      .orderBy(pipelineStages.order);
-  } catch (error) {
-    console.error(`Error getting pipeline stages for pipeline ${pipelineId}:`, error);
-    return [];
-  }
-}
-
-async getDeals(filter?: {
-  companyId?: number;
-  generalSearch?: string;
-  pipelineId?: number;
-  stageIds?: number[];
-  priorities?: ('low' | 'medium' | 'high')[];
-  minValue?: number;
-  maxValue?: number;
-  dueDateFrom?: string;
-  dueDateTo?: string;
-  assignedUserIds?: number[];
-  includeUnassigned?: boolean;
-  tags?: string[];
-  status?: string;
-  createdFrom?: string;
-  createdTo?: string;
-  customFields?: Record<string, {operator: 'equals' | 'contains' | 'gt' | 'lt' | 'inArray'; value: string | number | string[]}>;
-}): Promise<Deal[]> {
-  try {
-    const conditions = [sql`${deals.status} != 'archived'`];
-
-    if (filter) {
-      if (filter.companyId) {
-        conditions.push(eq(deals.companyId, filter.companyId));
-      }
-
-
-      if (!filter.pipelineId && filter.companyId) {
-        const defaultPipeline = await this.getDefaultPipelineForCompany(filter.companyId);
+      let pipelineId = deal.pipelineId;
+      if (!pipelineId && deal.companyId) {
+        const defaultPipeline = await this.getDefaultPipelineForCompany(deal.companyId);
         if (defaultPipeline) {
-          conditions.push(eq(deals.pipelineId, defaultPipeline.id));
-        }
-      } else if (filter.pipelineId) {
-        conditions.push(eq(deals.pipelineId, filter.pipelineId));
-      }
-
-      if (filter.stageIds && filter.stageIds.length > 0) {
-        conditions.push(inArray(deals.stageId, filter.stageIds));
-      }
-
-      if (filter.priorities && filter.priorities.length > 0) {
-        conditions.push(inArray(deals.priority, filter.priorities));
-      }
-
-      if (filter.minValue !== undefined) {
-        conditions.push(gte(deals.value, filter.minValue));
-      }
-
-      if (filter.maxValue !== undefined) {
-        conditions.push(lte(deals.value, filter.maxValue));
-      }
-
-      if (filter.dueDateFrom) {
-        conditions.push(gte(deals.dueDate, new Date(filter.dueDateFrom)));
-      }
-
-      if (filter.dueDateTo) {
-        conditions.push(lte(deals.dueDate, new Date(filter.dueDateTo)));
-      }
-
-      if (filter.assignedUserIds && filter.assignedUserIds.length > 0) {
-        if (filter.includeUnassigned) {
-          conditions.push(
-            or(
-              inArray(deals.assignedToUserId, filter.assignedUserIds),
-              isNull(deals.assignedToUserId)
-            )!
-          );
-        } else {
-          conditions.push(inArray(deals.assignedToUserId, filter.assignedUserIds));
-        }
-      } else if (filter.includeUnassigned) {
-        conditions.push(isNull(deals.assignedToUserId));
-      }
-
-      if (filter.tags && filter.tags.length > 0) {
-        const tagConditions = filter.tags.map(tag => 
-          sql`EXISTS (
-            SELECT 1 FROM unnest(${deals.tags}) AS deal_tag 
-            WHERE deal_tag = ${tag}
-          )`
-        );
-        conditions.push(or(...tagConditions)!);
-      }
-
-      if (filter.status) {
-        conditions.push(eq(deals.status, filter.status));
-      }
-
-      if (filter.createdFrom) {
-        conditions.push(gte(deals.createdAt, new Date(filter.createdFrom)));
-      }
-
-      if (filter.createdTo) {
-        conditions.push(lte(deals.createdAt, new Date(filter.createdTo)));
-      }
-
-      if (filter.generalSearch) {
-        const searchTerm = '%' + filter.generalSearch + '%';
-        conditions.push(
-          or(
-            sql`${deals.title} ILIKE ${searchTerm}`,
-            sql`${deals.description} ILIKE ${searchTerm}`,
-            sql`${contacts.name} ILIKE ${searchTerm}`,
-            sql`${contacts.phone} ILIKE ${searchTerm}`,
-            sql`${contacts.email} ILIKE ${searchTerm}`,
-            sql`EXISTS (
-              SELECT 1 FROM unnest(${deals.tags}) AS tag 
-              WHERE tag ILIKE ${searchTerm}
-            )`
-          )!
-        );
-      }
-
-
-      if (filter.customFields && Object.keys(filter.customFields).length > 0) {
-        const customFieldConditions = Object.entries(filter.customFields).map(([fieldName, filterConfig]) => {
-          const { operator, value } = filterConfig;
-
-          const escapedFieldName = fieldName.replace(/'/g, "''");
-          const fieldPath = sql`${deals.customFields}->>${sql.raw(`'${escapedFieldName}'`)}`;
-
-          switch (operator) {
-            case 'equals':
-              if (typeof value === 'number') {
-                return sql`(${fieldPath})::numeric = ${value}`;
-              } else {
-                const escapedValue = String(value).replace(/'/g, "''");
-                return sql`${fieldPath} = ${sql.raw(`'${escapedValue}'`)}`;
-              }
-            case 'contains':
-              const escapedContainsValue = String(value).replace(/'/g, "''");
-              return sql`${fieldPath} ILIKE ${sql.raw(`'%${escapedContainsValue}%'`)}`;
-            case 'gt':
-              if (typeof value === 'number') {
-                return sql`(${fieldPath})::numeric > ${value}`;
-              } else {
-                const escapedGtValue = String(value).replace(/'/g, "''");
-                return sql`${fieldPath} > ${sql.raw(`'${escapedGtValue}'`)}`;
-              }
-            case 'lt':
-              if (typeof value === 'number') {
-                return sql`(${fieldPath})::numeric < ${value}`;
-              } else {
-                const escapedLtValue = String(value).replace(/'/g, "''");
-                return sql`${fieldPath} < ${sql.raw(`'${escapedLtValue}'`)}`;
-              }
-            case 'inArray':
-              if (Array.isArray(value) && value.length > 0) {
-
-                const valueList = value.map(v => {
-                  const escaped = String(v).replace(/'/g, "''");
-                  return `'${escaped}'`;
-                }).join(',');
-                return sql`${fieldPath} IN (${sql.raw(valueList)})`;
-              }
-              return sql`1=0`; // No match if empty array
-            default:
-              return sql`1=1`; // No filter
-          }
-        });
-
-        if (customFieldConditions.length > 0) {
-          conditions.push(and(...customFieldConditions)!);
+          pipelineId = defaultPipeline.id;
         }
       }
+
+      const processedDeal = {
+        ...deal,
+        pipelineId,
+        dueDate: deal.dueDate ? new Date(deal.dueDate) : undefined,
+        lastActivityAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        stage: deal.stage || 'lead',
+        status: deal.status || 'active',
+        priority: deal.priority || 'medium'
+      };
+
+      const [newDeal] = await db
+        .insert(deals)
+        .values(processedDeal)
+        .returning();
+
+
+      if (deal.tags && deal.tags.length > 0 && deal.contactId) {
+        try {
+          await this.updateContact(deal.contactId, { tags: deal.tags });
+        } catch (error) {
+
+          console.error(`Error syncing deal tags to contact for new deal:`, error);
+        }
+      }
+
+      return newDeal;
+    } catch (error: any) {
+      console.error('Error creating deal:', error);
+      if (error.message === 'Contact ID is required') {
+        throw error;
+      }
+      throw new Error('Failed to create deal');
     }
-
-    const result = await db
-      .select({
-        id: deals.id,
-        companyId: deals.companyId,
-        contactId: deals.contactId,
-        pipelineId: deals.pipelineId,
-        title: deals.title,
-        stageId: deals.stageId,
-        stage: deals.stage,
-        value: deals.value,
-        priority: deals.priority,
-        dueDate: deals.dueDate,
-        assignedToUserId: deals.assignedToUserId,
-        description: deals.description,
-        tags: deals.tags,
-        customFields: deals.customFields,
-        status: deals.status,
-        lastActivityAt: deals.lastActivityAt,
-        createdAt: deals.createdAt,
-        updatedAt: deals.updatedAt,
-        contactName: contacts.name,
-        contactPhone: contacts.phone,
-        contactEmail: contacts.email
-      })
-      .from(deals)
-      .leftJoin(contacts, eq(deals.contactId, contacts.id))
-      .where(and(...conditions))
-      .orderBy(desc(deals.lastActivityAt));
-
-    return result.map(({ contactName, contactPhone, ...deal }: { contactName: string | null; contactPhone: string | null; [key: string]: any }) => deal);
-  } catch (error) {
-    console.error('Error getting deals with filter:', error);
-    return [];
   }
-}
 
-async getDealsByStageId(stageId: number): Promise<Deal[]> {
-  try {
-    return db
-      .select()
-      .from(deals)
-      .where(
-        and(
-          eq(deals.stageId, stageId),
-          sql`${deals.status} != 'archived'`
-        )
-      )
-      .orderBy(desc(deals.lastActivityAt));
-  } catch (error) {
-    console.error(`Error getting deals for stage ID ${stageId}:`, error);
-    return [];
-  }
-}
+  async updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal> {
+    try {
 
-async updateDealStageId(id: number, stageId: number): Promise<Deal> {
-  try {
-    return await db.transaction(async (tx: any) => {
-      const [pipelineStage] = await tx
-        .select()
-        .from(pipelineStages)
-        .where(eq(pipelineStages.id, stageId));
-
-      if (!pipelineStage) {
-        throw new Error(`Pipeline stage with ID ${stageId} not found`);
-      }
-
-
-      const [deal] = await tx.select().from(deals).where(eq(deals.id, id));
-      if (!deal) {
+      const [existingDeal] = await db.select().from(deals).where(eq(deals.id, id));
+      if (!existingDeal) {
         throw new Error(`Deal with ID ${id} not found`);
       }
 
 
-      const previousStageId = deal.stageId;
+      if (updates.pipelineId !== undefined || updates.stageId !== undefined) {
+        let pipelineId = updates.pipelineId ?? existingDeal.pipelineId;
+        let stageId = updates.stageId ?? existingDeal.stageId;
 
+        if (stageId) {
 
-      if (pipelineStage.pipelineId !== deal.pipelineId) {
-        throw new Error(`Pipeline stage ${stageId} does not belong to deal's pipeline ${deal.pipelineId}`);
+          const [stage] = await db
+            .select()
+            .from(pipelineStages)
+            .where(eq(pipelineStages.id, stageId));
+
+          if (stage) {
+            if (pipelineId && stage.pipelineId !== pipelineId) {
+              pipelineId = stage.pipelineId;
+              updates.pipelineId = pipelineId;
+            } else if (!pipelineId) {
+
+              pipelineId = stage.pipelineId;
+              updates.pipelineId = pipelineId;
+            }
+          }
+        } else if (pipelineId && !updates.stageId) {
+
+          const [firstStage] = await db
+            .select()
+            .from(pipelineStages)
+            .where(eq(pipelineStages.pipelineId, pipelineId))
+            .orderBy(pipelineStages.order)
+            .limit(1);
+
+          if (firstStage) {
+            updates.stageId = firstStage.id;
+          }
+        }
       }
 
-      const stageEnumValue = this.mapPipelineStageToEnum(pipelineStage.name);
+      if (updates.stageId !== undefined) {
+        const stageId = updates.stageId;
+        const otherUpdates = { ...updates };
+        delete otherUpdates.stageId;
 
-      const [updatedDeal] = await tx
+        let dealWithNewStage = null;
+        if (stageId !== null) {
+          dealWithNewStage = await this.updateDealStageId(id, stageId);
+        }
+
+        if (Object.keys(otherUpdates).length > 0) {
+          const processedUpdates = {
+            ...otherUpdates,
+            dueDate: otherUpdates.dueDate ? new Date(otherUpdates.dueDate) : undefined,
+            updatedAt: new Date()
+          };
+
+          const [finalUpdatedDeal] = await db
+            .update(deals)
+            .set(processedUpdates)
+            .where(eq(deals.id, id))
+            .returning();
+
+          const resultDeal = finalUpdatedDeal || dealWithNewStage;
+
+
+          if (otherUpdates.tags !== undefined && existingDeal.contactId) {
+            try {
+              await this.updateContact(existingDeal.contactId, { tags: otherUpdates.tags || null });
+            } catch (error) {
+
+              console.error(`Error syncing deal tags to contact for deal ${id}:`, error);
+            }
+          }
+
+          return resultDeal;
+        }
+
+        if (dealWithNewStage) {
+          return dealWithNewStage;
+        }
+
+        const [currentDeal] = await db
+          .select()
+          .from(deals)
+          .where(eq(deals.id, id));
+
+        if (!currentDeal) {
+          throw new Error(`Deal with ID ${id} not found`);
+        }
+
+        return currentDeal;
+      }
+
+      const processedUpdates = {
+        ...updates,
+        dueDate: updates.dueDate ? new Date(updates.dueDate) : undefined,
+        updatedAt: new Date()
+      };
+
+      const [updatedDeal] = await db
+        .update(deals)
+        .set(processedUpdates)
+        .where(eq(deals.id, id))
+        .returning();
+
+      if (!updatedDeal) {
+        throw new Error(`Deal with ID ${id} not found`);
+      }
+
+
+      if (updates.tags !== undefined && existingDeal.contactId) {
+        try {
+          await this.updateContact(existingDeal.contactId, { tags: updates.tags || null });
+        } catch (error) {
+
+          console.error(`Error syncing deal tags to contact for deal ${id}:`, error);
+        }
+      }
+
+      return updatedDeal;
+    } catch (error) {
+      console.error(`Error updating deal with ID ${id}:`, error);
+      throw new Error('Failed to update deal');
+    }
+  }
+
+  async updateDealStage(id: number, stage: DealStatus): Promise<Deal> {
+    try {
+      const [updatedDeal] = await db
         .update(deals)
         .set({
-          stageId,
-          stage: stageEnumValue as any,
-          updatedAt: new Date(),
-          lastActivityAt: new Date()
+          stage,
+          lastActivityAt: new Date(),
+          updatedAt: new Date()
         })
         .where(eq(deals.id, id))
         .returning();
@@ -8352,30 +7262,1121 @@ async updateDealStageId(id: number, stageId: number): Promise<Deal> {
         throw new Error(`Deal with ID ${id} not found`);
       }
 
-      const stageName = pipelineStage.name;
+      return updatedDeal;
+    } catch (error) {
+      console.error(`Error updating stage for deal with ID ${id}:`, error);
+      throw new Error('Failed to update deal stage');
+    }
+  }
 
-      await tx
+  async deleteDeal(id: number, companyId?: number): Promise<{ success: boolean; reason?: string }> {
+    try {
+
+      const whereConditions = companyId
+        ? and(eq(deals.id, id), eq(deals.companyId, companyId))
+        : eq(deals.id, id);
+
+      const existingDeal = await db
+        .select({ id: deals.id, status: deals.status, companyId: deals.companyId })
+        .from(deals)
+        .where(whereConditions)
+        .limit(1);
+
+      if (existingDeal.length === 0) {
+        return { success: false, reason: 'Deal not found' };
+      }
+
+
+      if (existingDeal[0].status === 'archived') {
+        return { success: true, reason: 'Already deleted' };
+      }
+
+
+      const [updatedDeal] = await db
+        .update(deals)
+        .set({
+          status: 'archived',
+          updatedAt: new Date()
+        })
+        .where(whereConditions)
+        .returning();
+
+      return { success: !!updatedDeal };
+    } catch (error) {
+      console.error(`Error deleting deal with ID ${id}:`, error);
+      return { success: false, reason: 'Database error' };
+    }
+  }
+
+  async getDealActivities(dealId: number): Promise<DealActivity[]> {
+    try {
+      return db
+        .select()
+        .from(dealActivities)
+        .where(eq(dealActivities.dealId, dealId))
+        .orderBy(desc(dealActivities.createdAt));
+    } catch (error) {
+      console.error(`Error getting activities for deal ${dealId}:`, error);
+      return [];
+    }
+  }
+
+  async createDealActivity(activity: InsertDealActivity): Promise<DealActivity> {
+    try {
+      const [newActivity] = await db
         .insert(dealActivities)
         .values({
-          dealId: id,
-          userId: updatedDeal.assignedToUserId || 1,
-          type: 'stage_change',
-          content: `Deal moved to ${stageName} stage`,
-          metadata: {
-            previousStageId: previousStageId,
-            newStageId: stageId,
-            pipelineId: deal.pipelineId
-          },
+          ...activity,
           createdAt: new Date()
+        })
+        .returning();
+
+      await db
+        .update(deals)
+        .set({ lastActivityAt: new Date() })
+        .where(eq(deals.id, activity.dealId));
+
+      return newActivity;
+    } catch (error) {
+      console.error('Error creating deal activity:', error);
+      throw new Error('Failed to create deal activity');
+    }
+  }
+
+  async getPipelineStages(): Promise<PipelineStage[]> {
+
+    console.warn('[DEPRECATED] getPipelineStages() is deprecated. Use getPipelineStagesByCompany() or getPipelineStagesByPipeline() instead.');
+    try {
+      return db
+        .select()
+        .from(pipelineStages)
+        .orderBy(pipelineStages.order);
+    } catch (error) {
+      console.error('Error getting pipeline stages:', error);
+      return [];
+    }
+  }
+
+  async getPipelineStageById(id: number): Promise<PipelineStage | null> {
+    try {
+      const [stage] = await db
+        .select()
+        .from(pipelineStages)
+        .where(eq(pipelineStages.id, id));
+
+      return stage || null;
+    } catch (error) {
+      console.error(`Error getting pipeline stage with ID ${id}:`, error);
+      return null;
+    }
+  }
+
+  async getPipelineStagesByCompany(companyId: number, pipelineId?: number): Promise<PipelineStage[]> {
+    try {
+
+      if (!pipelineId) {
+        const defaultPipeline = await this.getDefaultPipelineForCompany(companyId);
+        if (defaultPipeline) {
+          pipelineId = defaultPipeline.id;
+        }
+      }
+
+      const conditions = [eq(pipelineStages.companyId, companyId)];
+      if (pipelineId) {
+        conditions.push(eq(pipelineStages.pipelineId, pipelineId));
+      }
+      return db
+        .select()
+        .from(pipelineStages)
+        .where(and(...conditions))
+        .orderBy(pipelineStages.order);
+    } catch (error) {
+      console.error(`Error getting pipeline stages for company ${companyId}:`, error);
+      return [];
+    }
+  }
+
+  async getPipelineStage(id: number): Promise<PipelineStage | undefined> {
+    try {
+      const [stage] = await db
+        .select()
+        .from(pipelineStages)
+        .where(eq(pipelineStages.id, id));
+      return stage;
+    } catch (error) {
+      console.error(`Error getting pipeline stage with ID ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async createPipelineStage(stage: InsertPipelineStage): Promise<PipelineStage> {
+    try {
+      if (!stage.pipelineId) {
+        throw new Error('pipelineId is required to create a pipeline stage');
+      }
+
+
+      const maxOrderResult = await db
+        .select({ maxOrder: sql`MAX(${pipelineStages.order})` })
+        .from(pipelineStages)
+        .where(and(
+          eq(pipelineStages.pipelineId, stage.pipelineId),
+          stage.companyId ? eq(pipelineStages.companyId, stage.companyId) : isNull(pipelineStages.companyId)
+        ));
+
+      const maxOrder = maxOrderResult[0]?.maxOrder || 0;
+      const newOrder = stage.order || (maxOrder as number) + 1;
+
+      const [newStage] = await db
+        .insert(pipelineStages)
+        .values({
+          ...stage,
+          order: newOrder,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      return newStage;
+    } catch (error) {
+      console.error('Error creating pipeline stage:', error);
+      throw new Error('Failed to create pipeline stage');
+    }
+  }
+
+  async updatePipelineStage(id: number, updates: Partial<InsertPipelineStage>): Promise<PipelineStage> {
+    try {
+      const [updatedStage] = await db
+        .update(pipelineStages)
+        .set({
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(pipelineStages.id, id))
+        .returning();
+
+      if (!updatedStage) {
+        throw new Error(`Pipeline stage with ID ${id} not found`);
+      }
+
+      return updatedStage;
+    } catch (error) {
+      console.error(`Error updating pipeline stage with ID ${id}:`, error);
+      throw new Error('Failed to update pipeline stage');
+    }
+  }
+
+  async deletePipelineStage(id: number, moveDealsToStageId?: number): Promise<boolean> {
+    try {
+      return await db.transaction(async (tx: any) => {
+
+        const [stageToDelete] = await tx
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.id, id));
+
+        if (!stageToDelete) {
+          throw new Error(`Pipeline stage with ID ${id} not found`);
+        }
+
+        if (moveDealsToStageId) {
+
+          const [targetStage] = await tx
+            .select()
+            .from(pipelineStages)
+            .where(eq(pipelineStages.id, moveDealsToStageId));
+
+          if (!targetStage) {
+            throw new Error('Target stage not found');
+          }
+
+          if (targetStage.pipelineId !== stageToDelete.pipelineId) {
+            throw new Error('Cannot move deals to a stage in a different pipeline');
+          }
+
+          await tx
+            .update(deals)
+            .set({
+              stageId: moveDealsToStageId,
+              updatedAt: new Date()
+            })
+            .where(eq(deals.stageId, id));
+        }
+
+        await tx
+          .delete(pipelineStages)
+          .where(eq(pipelineStages.id, id));
+
+
+        const remainingStages = await tx
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.pipelineId, stageToDelete.pipelineId))
+          .orderBy(pipelineStages.order);
+
+        for (let i = 0; i < remainingStages.length; i++) {
+          await tx
+            .update(pipelineStages)
+            .set({ order: i + 1 })
+            .where(eq(pipelineStages.id, remainingStages[i].id));
+        }
+
+        return true;
+      });
+    } catch (error) {
+      console.error(`Error deleting pipeline stage with ID ${id}:`, error);
+      return false;
+    }
+  }
+
+  async reorderPipelineStages(stageIds: number[]): Promise<boolean> {
+    try {
+      return await db.transaction(async (tx: any) => {
+        for (let i = 0; i < stageIds.length; i++) {
+          await tx
+            .update(pipelineStages)
+            .set({
+              order: i + 1,
+              updatedAt: new Date()
+            })
+            .where(eq(pipelineStages.id, stageIds[i]));
+        }
+        return true;
+      });
+    } catch (error) {
+      console.error('Error reordering pipeline stages:', error);
+      return false;
+    }
+  }
+
+
+  async getPipelines(): Promise<Pipeline[]> {
+    try {
+      return await db
+        .select()
+        .from(pipelines)
+        .orderBy(pipelines.orderNum);
+    } catch (error) {
+      console.error('Error getting all pipelines:', error);
+      return [];
+    }
+  }
+
+  async getPipelinesByCompany(companyId: number): Promise<Pipeline[]> {
+    try {
+      return await db
+        .select()
+        .from(pipelines)
+        .where(eq(pipelines.companyId, companyId))
+        .orderBy(pipelines.orderNum);
+    } catch (error) {
+      console.error(`Error getting pipelines for company ${companyId}:`, error);
+      return [];
+    }
+  }
+
+
+  async getDefaultPipelineForCompany(companyId: number): Promise<Pipeline | null> {
+    try {
+
+      const [defaultPipeline] = await db
+        .select()
+        .from(pipelines)
+        .where(and(
+          eq(pipelines.companyId, companyId),
+          eq(pipelines.isDefault, true)
+        ))
+        .limit(1);
+
+      if (defaultPipeline) {
+        return defaultPipeline;
+      }
+
+
+      const [firstPipeline] = await db
+        .select()
+        .from(pipelines)
+        .where(eq(pipelines.companyId, companyId))
+        .orderBy(pipelines.orderNum)
+        .limit(1);
+
+      if (firstPipeline) {
+        return firstPipeline;
+      }
+
+
+      console.warn(`Company ${companyId} has no pipelines. Creating default pipeline.`);
+      try {
+        const newPipeline = await this.createPipeline({
+          companyId,
+          name: 'Sales Pipeline',
+          description: 'Default sales pipeline',
+          icon: 'trending-up',
+          color: '#3a86ff',
+          isDefault: true,
+          isTemplate: false,
+          orderNum: 1
         });
 
-      return updatedDeal;
-    });
-  } catch (error) {
-    console.error(`Error updating stage for deal ${id}:`, error);
-    throw new Error(`Failed to update deal stage: ${error instanceof Error ? error.message : String(error)}`);
+
+        const defaultStages = [
+          { name: 'Lead', color: '#94a3b8', order: 1 },
+          { name: 'Qualified', color: '#3b82f6', order: 2 },
+          { name: 'Proposal', color: '#8b5cf6', order: 3 },
+          { name: 'Negotiation', color: '#f59e0b', order: 4 },
+          { name: 'Closed Won', color: '#10b981', order: 5 },
+          { name: 'Closed Lost', color: '#ef4444', order: 6 }
+        ];
+
+        for (const stageData of defaultStages) {
+          await this.createPipelineStage({
+            pipelineId: newPipeline.id,
+            companyId,
+            name: stageData.name,
+            color: stageData.color,
+            order: stageData.order
+          });
+        }
+
+        return newPipeline;
+      } catch (createError) {
+        console.error(`Error creating default pipeline for company ${companyId}:`, createError);
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error getting default pipeline for company ${companyId}:`, error);
+      return null;
+    }
   }
-}
+
+  async getPipeline(id: number): Promise<Pipeline | undefined> {
+    try {
+      const [pipeline] = await db
+        .select()
+        .from(pipelines)
+        .where(eq(pipelines.id, id));
+      return pipeline;
+    } catch (error) {
+      console.error(`Error getting pipeline with ID ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async createPipeline(pipeline: InsertPipeline): Promise<Pipeline> {
+    try {
+
+      const maxOrderResult = await db
+        .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
+        .from(pipelines)
+        .where(pipeline.companyId ? eq(pipelines.companyId, pipeline.companyId) : isNull(pipelines.companyId));
+
+      const maxOrder = maxOrderResult[0]?.maxOrder || 0;
+      const newOrderNum = pipeline.orderNum || (maxOrder as number) + 1;
+
+      const [newPipeline] = await db
+        .insert(pipelines)
+        .values({
+          ...pipeline,
+          orderNum: newOrderNum,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      return newPipeline;
+    } catch (error: any) {
+      console.error('Error creating pipeline:', error);
+
+      if (error.code === '23505' && (
+        error.constraint === 'idx_pipelines_company_name_unique' ||
+        error.message?.includes('idx_pipelines_company_name_unique')
+      )) {
+        const duplicateError = new Error('Pipeline name already exists');
+        (duplicateError as any).isDuplicateName = true;
+        throw duplicateError;
+      }
+      throw new Error('Failed to create pipeline');
+    }
+  }
+
+  async updatePipeline(id: number, updates: Partial<InsertPipeline>): Promise<Pipeline> {
+    try {
+
+
+      if (updates.isDefault === true) {
+        return await db.transaction(async (tx: any) => {
+
+          const [existingPipeline] = await tx
+            .select()
+            .from(pipelines)
+            .where(eq(pipelines.id, id));
+
+          if (!existingPipeline) {
+            throw new Error(`Pipeline with ID ${id} not found`);
+          }
+
+          const companyId = existingPipeline.companyId;
+
+
+          if (companyId !== null) {
+            await tx
+              .update(pipelines)
+              .set({
+                isDefault: false,
+                updatedAt: new Date()
+              })
+              .where(
+                and(
+                  eq(pipelines.companyId, companyId),
+                  ne(pipelines.id, id)
+                )
+              );
+          }
+
+
+          const [updatedPipeline] = await tx
+            .update(pipelines)
+            .set({
+              ...updates,
+              updatedAt: new Date()
+            })
+            .where(eq(pipelines.id, id))
+            .returning();
+
+          if (!updatedPipeline) {
+            throw new Error(`Pipeline with ID ${id} not found`);
+          }
+
+          return updatedPipeline;
+        });
+      }
+
+
+      const [updatedPipeline] = await db
+        .update(pipelines)
+        .set({
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(pipelines.id, id))
+        .returning();
+
+      if (!updatedPipeline) {
+        throw new Error(`Pipeline with ID ${id} not found`);
+      }
+
+      return updatedPipeline;
+    } catch (error: any) {
+      console.error(`Error updating pipeline with ID ${id}:`, error);
+
+      if (error.code === '23505' && (
+        error.constraint === 'idx_pipelines_company_name_unique' ||
+        error.message?.includes('idx_pipelines_company_name_unique')
+      )) {
+        const duplicateError = new Error('Pipeline name already exists');
+        (duplicateError as any).isDuplicateName = true;
+        throw duplicateError;
+      }
+      throw new Error('Failed to update pipeline');
+    }
+  }
+
+  async reorderPipelines(companyId: number, pipelineIds: number[]): Promise<boolean> {
+    try {
+
+      const companyPipelines = await this.getPipelinesByCompany(companyId);
+      const companyPipelineIds = new Set(companyPipelines.map(p => p.id));
+
+
+      const invalidIds = pipelineIds.filter(id => !companyPipelineIds.has(id));
+      if (invalidIds.length > 0) {
+        throw new Error(`Invalid pipeline IDs: ${invalidIds.join(', ')}. These pipelines do not belong to your company.`);
+      }
+
+
+      const uniqueIds = new Set(pipelineIds);
+      if (uniqueIds.size !== pipelineIds.length) {
+        throw new Error('Duplicate pipeline IDs found in reorder request');
+      }
+
+
+      const providedIds = new Set(pipelineIds);
+      const missingIds = companyPipelines.filter(p => !providedIds.has(p.id)).map(p => p.id);
+      if (missingIds.length > 0) {
+        throw new Error(`Missing pipeline IDs: ${missingIds.join(', ')}. All pipelines must be included in the reorder.`);
+      }
+
+
+      return await db.transaction(async (tx: any) => {
+        for (let i = 0; i < pipelineIds.length; i++) {
+          await tx
+            .update(pipelines)
+            .set({
+              orderNum: i + 1,
+              updatedAt: new Date()
+            })
+            .where(eq(pipelines.id, pipelineIds[i]));
+        }
+        return true;
+      });
+    } catch (error) {
+      console.error('Error reordering pipelines:', error);
+      throw error;
+    }
+  }
+
+  async deletePipeline(id: number, moveDealsToStageId?: number): Promise<boolean> {
+    try {
+      return await db.transaction(async (tx: any) => {
+
+        const [pipelineToDelete] = await tx
+          .select()
+          .from(pipelines)
+          .where(eq(pipelines.id, id));
+
+        if (!pipelineToDelete) {
+          throw new Error(`Pipeline with ID ${id} not found`);
+        }
+
+        const companyId = pipelineToDelete.companyId;
+
+
+        if (moveDealsToStageId) {
+
+          const targetStage = await tx
+            .select()
+            .from(pipelineStages)
+            .where(eq(pipelineStages.id, moveDealsToStageId));
+
+          if (targetStage.length === 0) {
+            throw new Error('Target stage not found');
+          }
+
+          if (targetStage[0].pipelineId === id) {
+            throw new Error('Cannot move deals to a stage in the same pipeline');
+          }
+
+
+
+          await tx
+            .update(deals)
+            .set({
+              stageId: moveDealsToStageId,
+              pipelineId: targetStage[0].pipelineId,
+              updatedAt: new Date()
+            })
+            .where(eq(deals.pipelineId, id));
+        }
+
+
+        await tx
+          .delete(pipelineStages)
+          .where(eq(pipelineStages.pipelineId, id));
+
+
+        await tx
+          .delete(pipelines)
+          .where(eq(pipelines.id, id));
+
+
+        if (companyId) {
+          const remainingPipelines = await tx
+            .select()
+            .from(pipelines)
+            .where(eq(pipelines.companyId, companyId))
+            .orderBy(pipelines.orderNum);
+
+          for (let i = 0; i < remainingPipelines.length; i++) {
+            await tx
+              .update(pipelines)
+              .set({ orderNum: i + 1 })
+              .where(eq(pipelines.id, remainingPipelines[i].id));
+          }
+        }
+
+        return true;
+      });
+    } catch (error) {
+      console.error(`Error deleting pipeline with ID ${id}:`, error);
+      return false;
+    }
+  }
+
+  async duplicatePipeline(id: number, newName: string): Promise<Pipeline> {
+    try {
+      return await db.transaction(async (tx: any) => {
+
+        const sourcePipeline = await tx
+          .select()
+          .from(pipelines)
+          .where(eq(pipelines.id, id));
+
+        if (sourcePipeline.length === 0) {
+          throw new Error(`Pipeline with ID ${id} not found`);
+        }
+
+        const pipeline = sourcePipeline[0];
+
+
+        const maxOrderResult = await tx
+          .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
+          .from(pipelines)
+          .where(pipeline.companyId ? eq(pipelines.companyId, pipeline.companyId) : isNull(pipelines.companyId));
+
+        const maxOrder = maxOrderResult[0]?.maxOrder || 0;
+        const newOrderNum = (maxOrder as number) + 1;
+
+
+        const [newPipeline] = await tx
+          .insert(pipelines)
+          .values({
+            companyId: pipeline.companyId,
+            name: newName,
+            description: pipeline.description,
+            icon: pipeline.icon,
+            color: pipeline.color,
+            isDefault: false, // Duplicated pipelines should not be default
+            isTemplate: pipeline.isTemplate,
+            templateCategory: pipeline.templateCategory,
+            orderNum: newOrderNum,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+          .returning();
+
+
+        const sourceStages = await tx
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.pipelineId, id))
+          .orderBy(pipelineStages.order);
+
+
+        for (const stage of sourceStages) {
+          await tx
+            .insert(pipelineStages)
+            .values({
+              pipelineId: newPipeline.id,
+              companyId: stage.companyId,
+              name: stage.name,
+              color: stage.color,
+              order: stage.order,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+        }
+
+        return newPipeline;
+      });
+    } catch (error: any) {
+      console.error(`Error duplicating pipeline with ID ${id}:`, error);
+
+      if (error.code === '23505' && (
+        error.constraint === 'idx_pipelines_company_name_unique' ||
+        error.message?.includes('idx_pipelines_company_name_unique')
+      )) {
+        const duplicateError = new Error('Pipeline name already exists');
+        (duplicateError as any).isDuplicateName = true;
+        throw duplicateError;
+      }
+      throw new Error('Failed to duplicate pipeline');
+    }
+  }
+
+  async createPipelineFromTemplate(templateId: string, companyId: number, customName?: string, description?: string, icon?: string, color?: string): Promise<{ pipeline: Pipeline; stages: PipelineStage[] }> {
+    try {
+
+      if (!companyId) {
+        throw new Error('Company ID is required for pipeline creation');
+      }
+
+      const { getTemplateById } = await import('@shared/pipeline-templates');
+      const template = getTemplateById(templateId);
+
+      if (!template) {
+        throw new Error('Template not found');
+      }
+
+      return await db.transaction(async (tx: any) => {
+
+        const maxOrderResult = await tx
+          .select({ maxOrder: sql`MAX(${pipelines.orderNum})` })
+          .from(pipelines)
+          .where(eq(pipelines.companyId, companyId));
+
+        const maxOrder = maxOrderResult[0]?.maxOrder || 0;
+        const newOrderNum = (maxOrder as number) + 1;
+
+
+        const [newPipeline] = await tx
+          .insert(pipelines)
+          .values({
+            companyId,
+            name: customName || template.name,
+            description: description !== undefined ? description : template.description,
+            icon: icon !== undefined ? icon : template.icon,
+            color: color !== undefined ? color : template.color,
+            isDefault: false,
+            isTemplate: false,
+            templateCategory: template.category,
+            orderNum: newOrderNum,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+          .returning();
+
+
+        const createdStages: PipelineStage[] = [];
+        for (const stageData of template.stages) {
+          const [stage] = await tx
+            .insert(pipelineStages)
+            .values({
+              pipelineId: newPipeline.id,
+              companyId,
+              name: stageData.name,
+              color: stageData.color,
+              order: stageData.order,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            })
+            .returning();
+          createdStages.push(stage);
+        }
+
+        return { pipeline: newPipeline, stages: createdStages };
+      });
+    } catch (error: any) {
+      console.error(`Error creating pipeline from template ${templateId}:`, error);
+
+      if (error.code === '23505' && (
+        error.constraint === 'idx_pipelines_company_name_unique' ||
+        error.message?.includes('idx_pipelines_company_name_unique')
+      )) {
+        const duplicateError = new Error('Pipeline name already exists');
+        (duplicateError as any).isDuplicateName = true;
+        throw duplicateError;
+      }
+      throw error;
+    }
+  }
+
+  async getPipelineWithStages(id: number): Promise<{ pipeline: Pipeline; stages: PipelineStage[] } | null> {
+    try {
+      const pipeline = await this.getPipeline(id);
+      if (!pipeline) {
+        return null;
+      }
+
+      const stages = await this.getPipelineStagesByPipeline(id);
+      return { pipeline, stages };
+    } catch (error) {
+      console.error(`Error getting pipeline with stages for ID ${id}:`, error);
+      return null;
+    }
+  }
+
+  async getPipelineStagesByPipeline(pipelineId: number): Promise<PipelineStage[]> {
+    try {
+      return await db
+        .select()
+        .from(pipelineStages)
+        .where(eq(pipelineStages.pipelineId, pipelineId))
+        .orderBy(pipelineStages.order);
+    } catch (error) {
+      console.error(`Error getting pipeline stages for pipeline ${pipelineId}:`, error);
+      return [];
+    }
+  }
+
+  async getDeals(filter?: {
+    companyId?: number;
+    generalSearch?: string;
+    pipelineId?: number;
+    stageIds?: number[];
+    priorities?: ('low' | 'medium' | 'high')[];
+    minValue?: number;
+    maxValue?: number;
+    dueDateFrom?: string;
+    dueDateTo?: string;
+    assignedUserIds?: number[];
+    includeUnassigned?: boolean;
+    tags?: string[];
+    status?: string;
+    createdFrom?: string;
+    createdTo?: string;
+    customFields?: Record<string, { operator: 'equals' | 'contains' | 'gt' | 'lt' | 'inArray'; value: string | number | string[] }>;
+  }): Promise<Deal[]> {
+    try {
+      const conditions = [sql`${deals.status} != 'archived'`];
+
+      if (filter) {
+        if (filter.companyId) {
+          conditions.push(eq(deals.companyId, filter.companyId));
+        }
+
+
+        if (!filter.pipelineId && filter.companyId) {
+          const defaultPipeline = await this.getDefaultPipelineForCompany(filter.companyId);
+          if (defaultPipeline) {
+            conditions.push(eq(deals.pipelineId, defaultPipeline.id));
+          }
+        } else if (filter.pipelineId) {
+          conditions.push(eq(deals.pipelineId, filter.pipelineId));
+        }
+
+        if (filter.stageIds && filter.stageIds.length > 0) {
+          conditions.push(inArray(deals.stageId, filter.stageIds));
+        }
+
+        if (filter.priorities && filter.priorities.length > 0) {
+          conditions.push(inArray(deals.priority, filter.priorities));
+        }
+
+        if (filter.minValue !== undefined) {
+          conditions.push(gte(deals.value, filter.minValue));
+        }
+
+        if (filter.maxValue !== undefined) {
+          conditions.push(lte(deals.value, filter.maxValue));
+        }
+
+        if (filter.dueDateFrom) {
+          conditions.push(gte(deals.dueDate, new Date(filter.dueDateFrom)));
+        }
+
+        if (filter.dueDateTo) {
+          conditions.push(lte(deals.dueDate, new Date(filter.dueDateTo)));
+        }
+
+        if (filter.assignedUserIds && filter.assignedUserIds.length > 0) {
+          if (filter.includeUnassigned) {
+            conditions.push(
+              or(
+                inArray(deals.assignedToUserId, filter.assignedUserIds),
+                isNull(deals.assignedToUserId)
+              )!
+            );
+          } else {
+            conditions.push(inArray(deals.assignedToUserId, filter.assignedUserIds));
+          }
+        } else if (filter.includeUnassigned) {
+          conditions.push(isNull(deals.assignedToUserId));
+        }
+
+        if (filter.tags && filter.tags.length > 0) {
+          const tagConditions = filter.tags.map(tag =>
+            sql`EXISTS (
+            SELECT 1 FROM unnest(${deals.tags}) AS deal_tag 
+            WHERE deal_tag = ${tag}
+          )`
+          );
+          conditions.push(or(...tagConditions)!);
+        }
+
+        if (filter.status) {
+          conditions.push(eq(deals.status, filter.status));
+        }
+
+        if (filter.createdFrom) {
+          conditions.push(gte(deals.createdAt, new Date(filter.createdFrom)));
+        }
+
+        if (filter.createdTo) {
+          conditions.push(lte(deals.createdAt, new Date(filter.createdTo)));
+        }
+
+        if (filter.generalSearch) {
+          const searchTerm = '%' + filter.generalSearch + '%';
+          conditions.push(
+            or(
+              sql`${deals.title} ILIKE ${searchTerm}`,
+              sql`${deals.description} ILIKE ${searchTerm}`,
+              sql`${contacts.name} ILIKE ${searchTerm}`,
+              sql`${contacts.phone} ILIKE ${searchTerm}`,
+              sql`${contacts.email} ILIKE ${searchTerm}`,
+              sql`EXISTS (
+              SELECT 1 FROM unnest(${deals.tags}) AS tag 
+              WHERE tag ILIKE ${searchTerm}
+            )`
+            )!
+          );
+        }
+
+
+        if (filter.customFields && Object.keys(filter.customFields).length > 0) {
+          const customFieldConditions = Object.entries(filter.customFields).map(([fieldName, filterConfig]) => {
+            const { operator, value } = filterConfig;
+
+            const escapedFieldName = fieldName.replace(/'/g, "''");
+            const fieldPath = sql`${deals.customFields}->>${sql.raw(`'${escapedFieldName}'`)}`;
+
+            switch (operator) {
+              case 'equals':
+                if (typeof value === 'number') {
+                  return sql`(${fieldPath})::numeric = ${value}`;
+                } else {
+                  const escapedValue = String(value).replace(/'/g, "''");
+                  return sql`${fieldPath} = ${sql.raw(`'${escapedValue}'`)}`;
+                }
+              case 'contains':
+                const escapedContainsValue = String(value).replace(/'/g, "''");
+                return sql`${fieldPath} ILIKE ${sql.raw(`'%${escapedContainsValue}%'`)}`;
+              case 'gt':
+                if (typeof value === 'number') {
+                  return sql`(${fieldPath})::numeric > ${value}`;
+                } else {
+                  const escapedGtValue = String(value).replace(/'/g, "''");
+                  return sql`${fieldPath} > ${sql.raw(`'${escapedGtValue}'`)}`;
+                }
+              case 'lt':
+                if (typeof value === 'number') {
+                  return sql`(${fieldPath})::numeric < ${value}`;
+                } else {
+                  const escapedLtValue = String(value).replace(/'/g, "''");
+                  return sql`${fieldPath} < ${sql.raw(`'${escapedLtValue}'`)}`;
+                }
+              case 'inArray':
+                if (Array.isArray(value) && value.length > 0) {
+
+                  const valueList = value.map(v => {
+                    const escaped = String(v).replace(/'/g, "''");
+                    return `'${escaped}'`;
+                  }).join(',');
+                  return sql`${fieldPath} IN (${sql.raw(valueList)})`;
+                }
+                return sql`1=0`; // No match if empty array
+              default:
+                return sql`1=1`; // No filter
+            }
+          });
+
+          if (customFieldConditions.length > 0) {
+            conditions.push(and(...customFieldConditions)!);
+          }
+        }
+      }
+
+      const result = await db
+        .select({
+          id: deals.id,
+          companyId: deals.companyId,
+          contactId: deals.contactId,
+          pipelineId: deals.pipelineId,
+          title: deals.title,
+          stageId: deals.stageId,
+          stage: deals.stage,
+          value: deals.value,
+          priority: deals.priority,
+          dueDate: deals.dueDate,
+          assignedToUserId: deals.assignedToUserId,
+          description: deals.description,
+          tags: deals.tags,
+          customFields: deals.customFields,
+          status: deals.status,
+          lastActivityAt: deals.lastActivityAt,
+          createdAt: deals.createdAt,
+          updatedAt: deals.updatedAt,
+          contactName: contacts.name,
+          contactPhone: contacts.phone,
+          contactEmail: contacts.email
+        })
+        .from(deals)
+        .leftJoin(contacts, eq(deals.contactId, contacts.id))
+        .where(and(...conditions))
+        .orderBy(desc(deals.lastActivityAt));
+
+      return result.map(({ contactName, contactPhone, ...deal }: { contactName: string | null; contactPhone: string | null;[key: string]: any }) => deal);
+    } catch (error) {
+      console.error('Error getting deals with filter:', error);
+      return [];
+    }
+  }
+
+  async getDealsByStageId(stageId: number): Promise<Deal[]> {
+    try {
+      return db
+        .select()
+        .from(deals)
+        .where(
+          and(
+            eq(deals.stageId, stageId),
+            sql`${deals.status} != 'archived'`
+          )
+        )
+        .orderBy(desc(deals.lastActivityAt));
+    } catch (error) {
+      console.error(`Error getting deals for stage ID ${stageId}:`, error);
+      return [];
+    }
+  }
+
+  async updateDealStageId(id: number, stageId: number): Promise<Deal> {
+    try {
+      return await db.transaction(async (tx: any) => {
+        const [pipelineStage] = await tx
+          .select()
+          .from(pipelineStages)
+          .where(eq(pipelineStages.id, stageId));
+
+        if (!pipelineStage) {
+          throw new Error(`Pipeline stage with ID ${stageId} not found`);
+        }
+
+
+        const [deal] = await tx.select().from(deals).where(eq(deals.id, id));
+        if (!deal) {
+          throw new Error(`Deal with ID ${id} not found`);
+        }
+
+
+        const previousStageId = deal.stageId;
+
+
+        if (pipelineStage.pipelineId !== deal.pipelineId) {
+          throw new Error(`Pipeline stage ${stageId} does not belong to deal's pipeline ${deal.pipelineId}`);
+        }
+
+        const stageEnumValue = this.mapPipelineStageToEnum(pipelineStage.name);
+
+        const [updatedDeal] = await tx
+          .update(deals)
+          .set({
+            stageId,
+            stage: stageEnumValue as any,
+            updatedAt: new Date(),
+            lastActivityAt: new Date()
+          })
+          .where(eq(deals.id, id))
+          .returning();
+
+        if (!updatedDeal) {
+          throw new Error(`Deal with ID ${id} not found`);
+        }
+
+        const stageName = pipelineStage.name;
+
+        await tx
+          .insert(dealActivities)
+          .values({
+            dealId: id,
+            userId: updatedDeal.assignedToUserId || 1,
+            type: 'stage_change',
+            content: `Deal moved to ${stageName} stage`,
+            metadata: {
+              previousStageId: previousStageId,
+              newStageId: stageId,
+              pipelineId: deal.pipelineId
+            },
+            createdAt: new Date()
+          });
+
+        return updatedDeal;
+      });
+    } catch (error) {
+      console.error(`Error updating stage for deal ${id}:`, error);
+      throw new Error(`Failed to update deal stage: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   private mapPipelineStageToEnum(stageName: string): string {
     const lowerStageName = stageName.toLowerCase();
@@ -8455,23 +8456,23 @@ async updateDealStageId(id: number, stageId: number): Promise<Deal> {
       });
     } catch (error) {
       console.error(`Error updating pipeline and stage for deal ${id}:`, error);
-      
 
-      const isUniqueConstraintError = 
+
+      const isUniqueConstraintError =
         (error as any)?.code === '23505' || // PostgreSQL unique violation error code
         (error instanceof Error && (
           error.message.includes('idx_unique_active_contact_deal_pipeline') ||
           error.message.includes('unique constraint') ||
           error.message.includes('duplicate key value')
         ));
-      
+
       if (isUniqueConstraintError) {
 
         const conflictError = new Error('DUPLICATE_DEAL_CONFLICT: Contact already has an active deal in this pipeline');
         (conflictError as any).isConflictError = true;
         throw conflictError;
       }
-      
+
       throw new Error(`Failed to update deal pipeline and stage: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -8521,64 +8522,64 @@ async updateDealStageId(id: number, stageId: number): Promise<Deal> {
     }
   }
 
-async createRolePermissions(rolePermission: InsertRolePermission): Promise<RolePermission> {
-  try {
-    const [newRolePermission] = await db
-      .insert(rolePermissions)
-      .values({
-        ...rolePermission,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
+  async createRolePermissions(rolePermission: InsertRolePermission): Promise<RolePermission> {
+    try {
+      const [newRolePermission] = await db
+        .insert(rolePermissions)
+        .values({
+          ...rolePermission,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
 
-    return {
-      ...newRolePermission,
-      permissions: newRolePermission.permissions as Record<string, boolean>
-    };
-  } catch (error) {
-    console.error("Error creating role permissions:", error);
-    throw error;
-  }
-}
-
-async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string, boolean>, companyId?: number): Promise<RolePermission> {
-  try {
-    if (!companyId) {
-      throw new Error('Company ID is required for updating role permissions');
-    }
-
-    const [updatedRolePermission] = await db
-      .update(rolePermissions)
-      .set({
-        permissions,
-        updatedAt: new Date()
-      })
-      .where(
-        and(
-          eq(rolePermissions.companyId, companyId),
-          eq(rolePermissions.role, role)
-        )
-      )
-      .returning();
-
-    if (updatedRolePermission) {
       return {
-        ...updatedRolePermission,
-        permissions: updatedRolePermission.permissions as Record<string, boolean>
+        ...newRolePermission,
+        permissions: newRolePermission.permissions as Record<string, boolean>
       };
+    } catch (error) {
+      console.error("Error creating role permissions:", error);
+      throw error;
     }
-
-    return await this.createRolePermissions({
-      companyId,
-      role,
-      permissions
-    });
-  } catch (error) {
-    console.error(`Error updating role permissions for company ${companyId} and role ${role}:`, error);
-    throw error;
   }
-}
+
+  async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string, boolean>, companyId?: number): Promise<RolePermission> {
+    try {
+      if (!companyId) {
+        throw new Error('Company ID is required for updating role permissions');
+      }
+
+      const [updatedRolePermission] = await db
+        .update(rolePermissions)
+        .set({
+          permissions,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(rolePermissions.companyId, companyId),
+            eq(rolePermissions.role, role)
+          )
+        )
+        .returning();
+
+      if (updatedRolePermission) {
+        return {
+          ...updatedRolePermission,
+          permissions: updatedRolePermission.permissions as Record<string, boolean>
+        };
+      }
+
+      return await this.createRolePermissions({
+        companyId,
+        role,
+        permissions
+      });
+    } catch (error) {
+      console.error(`Error updating role permissions for company ${companyId} and role ${role}:`, error);
+      throw error;
+    }
+  }
 
   async getActiveSubscriptionsCount(): Promise<number> {
     try {
@@ -9308,18 +9309,18 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
 
         }
       };
-      
+
 
       if (error.constraint === 'meta_whatsapp_phone_numbers_quality_rating_check') {
         errorData.suggestion = 'Quality rating value not allowed. Valid values: green, yellow, red, UNKNOWN, GREEN, YELLOW, RED, unknown';
       }
-      
+
 
       if (error.code === '23514') {
         errorData.errorType = 'CHECK constraint violation';
         errorData.constraintName = error.constraint;
       }
-      
+
       console.error("Error creating Meta WhatsApp phone number:", errorData);
       throw error;
     }
@@ -9842,7 +9843,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
         .where(eq(conversations.channelId, channelId))
         .orderBy(desc(conversations.lastMessageAt));
 
-      
+
 
       if (basicConversations.length === 0) {
 
@@ -9872,7 +9873,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
         contact: conv.contactId ? contactsMap.get(conv.contactId) || null : null
       }));
 
-      
+
       return conversationsWithContacts;
     } catch (error) {
       console.error('❌ Error querying conversations:', error);
@@ -10096,10 +10097,10 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
 
 
       const sortColumn = sortBy === 'name' ? affiliates.name :
-                        sortBy === 'email' ? affiliates.email :
-                        sortBy === 'status' ? affiliates.status :
-                        sortBy === 'totalEarnings' ? affiliates.totalEarnings :
-                        affiliates.createdAt;
+        sortBy === 'email' ? affiliates.email :
+          sortBy === 'status' ? affiliates.status :
+            sortBy === 'totalEarnings' ? affiliates.totalEarnings :
+              affiliates.createdAt;
 
       const orderBy = sortOrder === 'asc' ? sortColumn : desc(sortColumn);
 
@@ -10748,7 +10749,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
           if (affiliateId) {
             conditions.push(eq(affiliates.id, affiliateId));
           }
-          
+
           const results = await db
             .select()
             .from(affiliates)
@@ -10905,7 +10906,7 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
 
 
       const csvRows: string[] = [];
-      
+
 
       csvRows.push(headers.map(h => `"${h}"`).join(","));
 
@@ -12581,19 +12582,19 @@ async updateRolePermissions(role: 'admin' | 'agent', permissions: Record<string,
 
       if (options?.search) {
         const searchTerm = options.search.toLowerCase();
-        
+
 
         const allContacts = await db
           .select()
           .from(contacts)
           .where(eq(contacts.companyId, companyId));
-        
+
         const contactMap = new Map<number, Contact>(allContacts.map((contact: Contact) => [contact.id, contact]));
-        
+
         allTasks = allTasks.filter((task: ContactTask) => {
           const contact = contactMap.get(task.contactId);
           const contactName = contact?.name || '';
-          
+
           return task.title.toLowerCase().includes(searchTerm) ||
             (task.description && task.description.toLowerCase().includes(searchTerm)) ||
             (task.category && task.category.toLowerCase().includes(searchTerm)) ||
