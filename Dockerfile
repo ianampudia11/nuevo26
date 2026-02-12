@@ -48,7 +48,7 @@ ENV PGDATABASE=powerchat
 COPY package.json package-lock.json ./
 
 # Instalar solo dependencias de producción
-RUN npm ci --omit=dev --include=optional
+RUN npm install --production --no-optional
 
 # Copiar los artefactos construidos desde la etapa anterior
 COPY --from=builder /app/dist ./dist
